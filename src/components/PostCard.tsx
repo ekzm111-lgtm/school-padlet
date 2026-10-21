@@ -4,7 +4,6 @@ import { useState } from 'react';
 import {
   Heart,
   ThumbsUp,
-  Sparkles,
   Lightbulb,
   MessageCircle,
   ExternalLink,
@@ -12,6 +11,9 @@ import {
   Pin,
   Send,
   Pencil,
+  Download,
+  FileText,
+  Paperclip,
 } from 'lucide-react';
 import { Post, User } from '@/lib/types';
 import { getStoreData, saveStoreData, getMyPostIds } from '@/lib/store';
@@ -39,26 +41,26 @@ export default function PostCard({
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentPost, setCurrentPost] = useState(post);
   const [commentInput, setCommentInput] = useState('');
-  const [reactions, setReactions] = useState(post.reactions);
-  const [comments, setComments] = useState(post.comments || []);
+  const [reactions, setReactions] = useState(post?.reactions || { like: 0, clap: 0, heart: 0, insight: 0 });
+  const [comments, setComments] = useState(post?.comments || []);
   const [showImageModal, setShowImageModal] = useState(false);
+
+  if (!currentPost) return null;
 
   const handleReaction = (type: 'like' | 'clap' | 'heart' | 'insight') => {
     if (!allowReactions) return;
     const newReactions = {
       ...reactions,
-      [type]: reactions[type] + 1,
+      [type]: (reactions[type] || 0) + 1,
     };
     setReactions(newReactions);
 
-    // 스토어 업데이트
     const data = getStoreData();
     const updatedPosts = data.posts.map((p) =>
-      p.id === post.id ? { ...p, reactions: newReactions } : p
+      p.id === currentPost.id ? { ...p, reactions: newReactions } : p
     );
     saveStoreData.posts(updatedPosts);
 
-    // 하트나 박수 시 기분 좋은 파티클 효과
     try {
       confetti({
         particleCount: 20,
@@ -74,7 +76,7 @@ export default function PostCard({
 
     const newComment = {
       id: `c-${Date.now()}`,
-      postId: post.id,
+      postId: currentPost.id,
       authorName: currentUser?.name || '익명 참여자',
       content: commentInput.trim(),
       createdAt: '방금 전',
@@ -86,7 +88,7 @@ export default function PostCard({
 
     const data = getStoreData();
     const updatedPosts = data.posts.map((p) =>
-      p.id === post.id ? { ...p, comments: newComments } : p
+      p.id === currentPost.id ? { ...p, comments: newComments } : p
     );
     saveStoreData.posts(updatedPosts);
   };
@@ -111,7 +113,7 @@ export default function PostCard({
     green: 'card-color-green',
     purple: 'card-color-purple',
     white: 'card-color-white',
-  }[currentPost.color || 'yellow'];
+  }[currentPost.color || 'yellow'] || 'card-color-yellow';
 
   return (
     <>
@@ -145,9 +147,14 @@ export default function PostCard({
                 {currentPost.updatedAt || currentPost.createdAt}
               </span>
 
+              {/* 연필 수정 버튼 */}
               {canEdit && (
                 <button
-                  onClick={() => setShowEditModal(true)}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEditModal(true);
+                  }}
                   className="p-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white transition shadow-xs"
                   title="내용 수정하기"
                 >
@@ -155,9 +162,14 @@ export default function PostCard({
                 </button>
               )}
 
+              {/* 삭제 버튼 */}
               {canDelete && (
                 <button
-                  onClick={() => onDelete(currentPost.id)}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(currentPost.id);
+                  }}
                   className="p-1 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
                   title="삭제하기"
                 >
@@ -167,13 +179,46 @@ export default function PostCard({
             </div>
           </div>
 
-          {/* 제목 (있을 경우) */}
+          {/* 제목 */}
           {currentPost.title && (
             <h4 className="font-bold text-sm text-slate-900 mb-1.5 leading-snug">{currentPost.title}</h4>
           )}
 
           {/* 본문 */}
-          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{currentPost.content}</p>
+          {currentPost.content && (
+            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{currentPost.content}</p>
+          )}
+
+          {/* 🔥 첨부 파일 (다운로드 지원 - 한글, PDF, 워드, PPT 등) */}
+          {currentPost.fileAttachment && (
+            <div className="mt-3 p-2.5 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 transition flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 truncate">
+                <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                  <FileText className="w-3.5 h-3.5" />
+                </div>
+                <div className="truncate text-left">
+                  <div className="text-[11px] font-bold text-slate-800 truncate">
+                    {currentPost.fileAttachment.name}
+                  </div>
+                  <div className="text-[9px] text-slate-500 font-mono">
+                    {currentPost.fileAttachment.size}
+                  </div>
+                </div>
+              </div>
+
+              {/* 다운로드 버튼 */}
+              <a
+                href={currentPost.fileAttachment.dataUrl}
+                download={currentPost.fileAttachment.name}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition shadow-xs shrink-0"
+                title="파일 다운로드"
+              >
+                <Download className="w-3 h-3" />
+                <span>다운로드</span>
+              </a>
+            </div>
+          )}
 
           {/* 첨부 이미지 */}
           {currentPost.imageUrl && (
@@ -193,6 +238,7 @@ export default function PostCard({
               href={currentPost.linkUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/5 hover:bg-black/10 text-[11px] text-blue-700 font-medium truncate transition"
             >
               <ExternalLink className="w-3.5 h-3.5 shrink-0" />
@@ -204,41 +250,43 @@ export default function PostCard({
         {/* 하단 반응 및 댓글 바 */}
         <div className="mt-4 pt-3 border-t border-black/10">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            {/* 반응 이모지 4종 */}
             {allowReactions && (
               <div className="flex items-center gap-1">
                 <button
+                  type="button"
                   onClick={() => handleReaction('like')}
                   className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/5 hover:bg-white text-[11px] font-bold text-slate-700 transition"
                   title="좋아요"
                 >
                   <ThumbsUp className="w-3 h-3 text-blue-600" />
-                  <span>{reactions.like}</span>
+                  <span>{reactions.like || 0}</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => handleReaction('heart')}
                   className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/5 hover:bg-white text-[11px] font-bold text-slate-700 transition"
                   title="멋져요"
                 >
                   <Heart className="w-3 h-3 text-rose-500 fill-current" />
-                  <span>{reactions.heart}</span>
+                  <span>{reactions.heart || 0}</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => handleReaction('insight')}
                   className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/5 hover:bg-white text-[11px] font-bold text-slate-700 transition"
                   title="좋은 생각"
                 >
                   <Lightbulb className="w-3 h-3 text-amber-500" />
-                  <span>{reactions.insight}</span>
+                  <span>{reactions.insight || 0}</span>
                 </button>
               </div>
             )}
 
-            {/* 댓글 토글 버튼 */}
             {allowComments && (
               <button
+                type="button"
                 onClick={() => setShowComments(!showComments)}
                 className="flex items-center gap-1 text-[11px] font-bold text-slate-600 hover:text-slate-900 transition ml-auto"
               >
@@ -248,7 +296,7 @@ export default function PostCard({
             )}
           </div>
 
-          {/* 댓글 영역 */}
+          {/* 댓글 목록 */}
           {showComments && allowComments && (
             <div className="mt-3 pt-3 border-t border-black/5 space-y-2">
               {comments.map((c) => (
@@ -281,7 +329,7 @@ export default function PostCard({
         </div>
       </div>
 
-      {/* 이미지 크게 보기 모달 */}
+      {/* 이미지 확대 모달 */}
       {showImageModal && currentPost.imageUrl && (
         <div
           onClick={() => setShowImageModal(false)}
@@ -297,16 +345,18 @@ export default function PostCard({
         </div>
       )}
 
-      {/* 카드 수정 모달 */}
-      <EditPostModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        post={currentPost}
-        onUpdated={(updated) => {
-          setCurrentPost(updated);
-          if (onUpdated) onUpdated(updated);
-        }}
-      />
+      {/* 🔥 카드 수정 모달: 열려 있을 때만 마운트하여 이벤트 충돌 및 에러 완벽 차단! */}
+      {showEditModal && (
+        <EditPostModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          post={currentPost}
+          onUpdated={(updated) => {
+            setCurrentPost(updated);
+            if (onUpdated) onUpdated(updated);
+          }}
+        />
+      )}
     </>
   );
 }

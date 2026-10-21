@@ -33,11 +33,11 @@ export interface Board {
   allowComments: boolean;
   allowReactions: boolean;
   isLocked: boolean;
-  isPublic: boolean; // 학교 전체 공유 여부 (On: 누구나 조회/복제 가능, Off: 비공개)
+  isPublic: boolean;
   columns?: string[];
   customBgUrl?: string;
   category?: '수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트';
-  copiedFromTitle?: string; // 복제 출처
+  copiedFromTitle?: string;
   createdAt: string;
   postCount?: number;
 }
@@ -57,6 +57,13 @@ export interface PostComment {
   createdAt: string;
 }
 
+export interface FileAttachment {
+  name: string;
+  size: string;
+  type?: string;
+  dataUrl: string;
+}
+
 export interface Post {
   id: string;
   boardId: string;
@@ -65,6 +72,7 @@ export interface Post {
   color: 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'white';
   imageUrl?: string;
   linkUrl?: string;
+  fileAttachment?: FileAttachment; // 최대 10MB 파일 첨부 (HWP, PDF, PPT, Word 등)
   authorName: string;
   authorRole: UserRole;
   authorId: string;

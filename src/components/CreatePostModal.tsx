@@ -11,8 +11,11 @@ import {
   ClipboardCheck,
   Sparkles,
   Columns,
+  Paperclip,
+  FileText,
+  File,
 } from 'lucide-react';
-import { Post, User } from '@/lib/types';
+import { Post, User, FileAttachment } from '@/lib/types';
 import { getStoreData, saveStoreData, addMyPostId } from '@/lib/store';
 import confetti from 'canvas-confetti';
 
@@ -41,6 +44,7 @@ export default function CreatePostModal({
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [customAuthor, setCustomAuthor] = useState(currentUser?.name || '');
+  const [fileAttachment, setFileAttachment] = useState<FileAttachment | undefined>(undefined);
 
   // 모둠 선택 또는 새 모둠 직접 생성
   const [selectedColumn, setSelectedColumn] = useState(defaultColumn || columns[0] || '모둠 1');
@@ -50,7 +54,10 @@ export default function CreatePostModal({
   const [showImageTools, setShowImageTools] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [pasteNotice, setPasteNotice] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState('');
+
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (currentUser?.name) {
@@ -100,8 +107,8 @@ export default function CreatePostModal({
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, [isOpen]);
 
-  // 로컬 파일 업로드
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 로컬 이미지 업로드
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -115,13 +122,45 @@ export default function CreatePostModal({
     }
   };
 
+  // 🔥 10MB 제한 일반 파일 첨부 (HWP, Word, PDF, PPT, Excel, ZIP 등)
+  const handleDocFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 10MB 용량 제한 검사
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_SIZE) {
+      setFileError('⚠️ 파일 용량은 최대 10MB 이하만 첨부할 수 있습니다.');
+      return;
+    }
+
+    // 파일 크기 텍스트 포맷 (KB 또는 MB)
+    const formattedSize =
+      file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(file.size / 1024)} KB`;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFileAttachment({
+          name: file.name,
+          size: formattedSize,
+          type: file.type || file.name.split('.').pop() || '',
+          dataUrl: event.target.result as string,
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() && !title.trim() && !imageUrl) return;
+    if (!content.trim() && !title.trim() && !imageUrl && !fileAttachment) return;
 
-    // 새 모둠 이름 결정
     let finalColumn = selectedColumn;
     let createdColumnName: string | undefined = undefined;
 
@@ -138,6 +177,7 @@ export default function CreatePostModal({
       color,
       imageUrl: imageUrl.trim() || undefined,
       linkUrl: linkUrl.trim() || undefined,
+      fileAttachment,
       authorName: customAuthor.trim() || currentUser?.name || '익명 참여자',
       authorRole: currentUser?.role || 'student',
       authorId: currentUser?.id || `anon-${Date.now()}`,
@@ -177,9 +217,9 @@ export default function CreatePostModal({
       <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-slate-800">새 메모/과제 작성</h3>
+            <h3 className="text-base font-bold text-slate-800">새 메모/학습자료 작성</h3>
             <span className="text-[11px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-              Ctrl+V 캡처 붙여넣기 지원
+              Ctrl+V 캡처 & 10MB 파일 첨부
             </span>
           </div>
           <button
@@ -197,8 +237,14 @@ export default function CreatePostModal({
           </div>
         )}
 
+        {fileError && (
+          <div className="mt-2 p-2.5 bg-red-50 text-red-600 text-xs rounded-xl font-bold border border-red-100">
+            {fileError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          {/* 모둠 선택 또는 새 모둠 자동 생성 */}
+          {/* 모둠 선택 또는 새 모둠 직접 생성 */}
           <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
@@ -255,7 +301,7 @@ export default function CreatePostModal({
           <div>
             <input
               type="text"
-              placeholder="제목을 입력하세요"
+              placeholder="제목을 입력하세요 (예: 3단원 수업 요약 활동지)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
@@ -265,14 +311,42 @@ export default function CreatePostModal({
           {/* 본문 */}
           <div>
             <textarea
-              required={!imageUrl}
-              rows={4}
+              required={!imageUrl && !fileAttachment}
+              rows={3}
               placeholder="내용을 적어보세요... (화면 캡처 후 Ctrl+V 를 누르면 이미지가 바로 첨부됩니다)"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
             />
           </div>
+
+          {/* 🔥 첨부된 파일 미리보기 바 (한글, PDF, 워드, PPT 등) */}
+          {fileAttachment && (
+            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2.5 truncate">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="truncate text-left">
+                  <div className="text-xs font-bold text-indigo-950 truncate">
+                    {fileAttachment.name}
+                  </div>
+                  <div className="text-[10px] text-indigo-600 font-mono">
+                    {fileAttachment.size} · 첨부 완료
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFileAttachment(undefined)}
+                className="p-1.5 rounded-lg text-indigo-400 hover:text-red-600 hover:bg-white transition shrink-0"
+                title="파일 첨부 취소"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* 첨부된 이미지 미리보기 */}
           {imageUrl && (
@@ -289,6 +363,25 @@ export default function CreatePostModal({
             </div>
           )}
 
+          {/* 🔥 학습자료 파일 첨부 버튼 (10MB 제한) */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={docFileInputRef}
+              type="file"
+              accept=".hwp,.hwpx,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.txt,.png,.jpg,.jpeg"
+              onChange={handleDocFileUpload}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => docFileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition shadow-xs"
+            >
+              <Paperclip className="w-3.5 h-3.5" />
+              <span>📎 한글/워드/PDF/PPT 파일 첨부 (최대 10MB)</span>
+            </button>
+          </div>
+
           {/* 이미지 첨부 도구 */}
           <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
@@ -301,15 +394,15 @@ export default function CreatePostModal({
 
             <div className="flex gap-2">
               <input
-                ref={fileInputRef}
+                ref={imageFileInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleFileUpload}
+                onChange={handleImageUpload}
                 className="hidden"
               />
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => imageFileInputRef.current?.click()}
                 className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-blue-400 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 transition"
               >
                 <Upload className="w-3.5 h-3.5 text-blue-500" />
