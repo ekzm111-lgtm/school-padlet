@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
-import CreatePostModal from '@/components/CreatePostModal';
+import PostModal from '@/components/PostModal';
 import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
@@ -43,11 +43,14 @@ export default function BoardDetailPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [columns, setColumns] = useState<string[]>(DEFAULT_COLUMNS);
 
-  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedPostForEdit, setSelectedPostForEdit] = useState<Post | undefined>(undefined);
+
   const [showShareModal, setShowShareModal] = useState(false);
   const [showBgModal, setShowBgModal] = useState(false);
   const [activeColumn, setActiveColumn] = useState<string | undefined>(undefined);
-  const [currentLayout, setCurrentLayout] = useState<BoardLayout>('kanban'); // 기본 칸반 열
+  const [currentLayout, setCurrentLayout] = useState<BoardLayout>('kanban');
   const [copiedLink, setCopiedLink] = useState(false);
 
   // 모둠(열) 이름 수정 상태
@@ -74,7 +77,6 @@ export default function BoardDetailPage() {
       setBoard(foundBoard);
       const cols = foundBoard.columns && foundBoard.columns.length > 0 ? foundBoard.columns : DEFAULT_COLUMNS;
       setColumns(cols);
-      // 보드 개설 시 선택했던 배치 방식(레이아웃)을 기본으로 정확히 반영
       if (foundBoard.layout) {
         setCurrentLayout(foundBoard.layout);
       }
@@ -106,7 +108,7 @@ export default function BoardDetailPage() {
     currentUser?.role === 'teacher' ||
     (currentUser && currentUser.id === board.authorId);
 
-  // 레이아웃 변경 시 보드 설정에 즉시 저장하여 유지
+  // 레이아웃 변경 시 보드 설정에 즉시 저장
   const handleChangeLayout = (newLayout: BoardLayout) => {
     setCurrentLayout(newLayout);
     if (board) {
@@ -117,7 +119,7 @@ export default function BoardDetailPage() {
     }
   };
 
-  // 1) 학생 초대 전역 링크 복사
+  // 학생 초대 링크 복사
   const handleCopyInviteLink = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const inviteUrl = `${origin}/join/${board.code}`;
@@ -126,7 +128,7 @@ export default function BoardDetailPage() {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  // 2) 모둠(열) 추가
+  // 모둠(열) 추가
   const handleAddColumn = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newColName.trim()) return;
@@ -142,7 +144,7 @@ export default function BoardDetailPage() {
     setBoard(updatedBoard);
   };
 
-  // 3) 모둠(열) 이름 수정
+  // 모둠(열) 이름 수정
   const handleSaveColName = (idx: number) => {
     if (!editingColName.trim()) {
       setEditingColIdx(null);
@@ -166,7 +168,7 @@ export default function BoardDetailPage() {
     setBoard(updatedBoard);
   };
 
-  // 4) 모둠(열) 삭제
+  // 모둠(열) 삭제
   const handleDeleteColumn = (colName: string) => {
     if (confirm(`'${colName}' 열을 삭제하시겠습니까? (안에 있는 카드는 첫 번째 열로 이동됩니다)`)) {
       const updatedCols = columns.filter((c) => c !== colName);
@@ -184,7 +186,7 @@ export default function BoardDetailPage() {
     }
   };
 
-  // 5) 칸반 열 드래그 앤 드롭 이동
+  // 칸반 열 드래그 앤 드롭 이동
   const handleDragStartKanban = (e: React.DragEvent, postId: string) => {
     e.dataTransfer.setData('text/plain', postId);
   };
@@ -202,7 +204,7 @@ export default function BoardDetailPage() {
     saveStoreData.posts(updatedAll);
   };
 
-  // 6) 그리드 순서 변경
+  // 그리드 순서 변경
   const handleGridDragStart = (idx: number) => {
     dragItemIdx.current = idx;
   };
@@ -228,7 +230,7 @@ export default function BoardDetailPage() {
     );
   };
 
-  // 7) 자유 캔버스 마우스 드래그
+  // 자유 캔버스 마우스 드래그
   const handleMouseDownCanvasCard = (e: React.MouseEvent, post: Post) => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('input') || target.closest('textarea') || target.closest('a')) {
@@ -279,7 +281,7 @@ export default function BoardDetailPage() {
     setPosts(posts.filter((p) => p.id !== postId));
   };
 
-  // 카드 생성 콜백 (새 모둠이 함께 생성되었을 경우 columns 자동 갱신)
+  // 카드 생성 콜백
   const handlePostCreated = (newPost: Post, newColName?: string) => {
     setPosts([newPost, ...posts]);
     if (newColName && !columns.includes(newColName)) {
@@ -292,7 +294,11 @@ export default function BoardDetailPage() {
     }
   };
 
-  // 테마 및 커스텀 배경 스타일
+  // 카드 수정 콜백
+  const handlePostUpdated = (updated: Post) => {
+    setPosts(posts.map((p) => (p.id === updated.id ? updated : p)));
+  };
+
   const customBgStyle = board.customBgUrl
     ? {
         backgroundImage: `url(${board.customBgUrl})`,
@@ -368,7 +374,7 @@ export default function BoardDetailPage() {
               <span>{board.code}</span>
             </button>
 
-            {/* 🔥 이 보드 복제하기 버튼 */}
+            {/* 이 보드 복제하기 버튼 */}
             <button
               onClick={() => {
                 if (!currentUser) {
@@ -388,7 +394,7 @@ export default function BoardDetailPage() {
               <span>보드 복제</span>
             </button>
 
-            {/* 🔥 공개/비공개 공유 설정 토글 (내 보드인 경우) */}
+            {/* 공개/비공개 공유 설정 토글 (내 보드인 경우) */}
             {currentUser && board.authorId === currentUser.id && (
               <button
                 onClick={() => {
@@ -409,7 +415,7 @@ export default function BoardDetailPage() {
               </button>
             )}
 
-            {/* 🎨 배경 꾸미기 버튼 (요구사항) */}
+            {/* 배경 꾸미기 버튼 */}
             <button
               onClick={() => setShowBgModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition shadow-xs"
@@ -477,12 +483,14 @@ export default function BoardDetailPage() {
               </button>
             )}
 
-            {/* 새 카드 작성 */}
+            {/* 새 카드 작성 버튼 */}
             {(!board.isLocked || isTeacherOrAdmin) && (
               <button
                 onClick={() => {
+                  setModalMode('create');
+                  setSelectedPostForEdit(undefined);
                   setActiveColumn(columns[0]);
-                  setShowCreatePost(true);
+                  setShowPostModal(true);
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
               >
@@ -494,10 +502,10 @@ export default function BoardDetailPage() {
         </div>
       </div>
 
-      {/* 메인 콘텐츠 영역: 화면이 안 잘리도록 풀스크린 가로 스크롤 지원 (w-full overflow-x-auto) */}
-      <main className="flex-1 w-full px-4 sm:px-6 py-6 overflow-x-auto select-none">
+      {/* 메인 콘텐츠 영역 (상단 여백 넉넉하게 확보하여 상단 바와 첫 열 겹침 방지) */}
+      <main className="flex-1 w-full px-4 sm:px-6 pt-6 pb-12 overflow-x-auto select-none">
         {currentLayout === 'kanban' ? (
-          /* 🔥 1) 모둠 칸반 열 (상단 카드 추가 버튼 + 우측 무한 확장) */
+          /* 1) 모둠 칸반 열 (단정한 카드 추가 버튼 + 우측 무한 확장) */
           <div className="flex gap-5 items-start pb-12 w-max min-w-full">
             {columns.map((colName, idx) => {
               const colPosts = posts.filter(
@@ -511,7 +519,7 @@ export default function BoardDetailPage() {
                   onDrop={(e) => handleDropOnColumn(e, colName)}
                   className="w-80 shrink-0 bg-white/85 backdrop-blur-md rounded-3xl p-4 border border-slate-200/90 shadow-sm flex flex-col min-h-[620px] transition hover:border-blue-300"
                 >
-                  {/* 열 헤더 (이름 수정 및 삭제) */}
+                  {/* 열 헤더 */}
                   <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 group">
                     {editingColIdx === idx ? (
                       <div className="flex items-center gap-1 w-full">
@@ -568,21 +576,23 @@ export default function BoardDetailPage() {
                     )}
                   </div>
 
-                  {/* 🔥 [+ 이 열에 카드 추가] 버튼을 제일 위쪽에 배치 (요구사항) */}
+                  {/* 단정한 최상단 카드 추가 버튼 */}
                   {(!board.isLocked || isTeacherOrAdmin) && (
                     <button
                       onClick={() => {
+                        setModalMode('create');
+                        setSelectedPostForEdit(undefined);
                         setActiveColumn(colName);
-                        setShowCreatePost(true);
+                        setShowPostModal(true);
                       }}
                       className="mb-3 w-full py-2.5 rounded-xl bg-slate-100/90 hover:bg-blue-50 hover:text-blue-600 text-slate-600 text-xs font-bold transition flex items-center justify-center gap-1.5 border border-slate-200/60 shadow-xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ 이 열에 카드 추가</span>
+                      <span>이 열에 카드 추가</span>
                     </button>
                   )}
 
-                  {/* 카드 목록 (드래그 앤 드롭 이동) */}
+                  {/* 카드 목록 */}
                   <div className="space-y-4 flex-1">
                     {colPosts.map((post) => (
                       <div
@@ -594,10 +604,11 @@ export default function BoardDetailPage() {
                         <PostCard
                           post={post}
                           currentUser={currentUser}
+                          columns={columns}
                           allowComments={board.allowComments}
                           allowReactions={board.allowReactions}
                           onDelete={handleDeletePost}
-                          onUpdated={(up) => setPosts(posts.map((p) => (p.id === up.id ? up : p)))}
+                          onUpdated={handlePostUpdated}
                         />
                       </div>
                     ))}
@@ -606,7 +617,7 @@ export default function BoardDetailPage() {
               );
             })}
 
-            {/* 새 모둠(열) 계속 추가 카드 */}
+            {/* 새 모둠 추가 카드 */}
             {(!board.isLocked || isTeacherOrAdmin) && (
               <div className="w-72 shrink-0">
                 {showAddColInput ? (
@@ -645,14 +656,14 @@ export default function BoardDetailPage() {
                     className="w-full py-4 rounded-3xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white/70 hover:bg-white text-slate-600 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>+ 새 모둠(열) 계속 추가</span>
+                    <span>새 모둠(열) 추가</span>
                   </button>
                 )}
               </div>
             )}
           </div>
         ) : currentLayout === 'grid' ? (
-          /* 2) 그리드 모드 (드래그 순서 변경) */
+          /* 2) 그리드 모드 */
           <div>
             <div className="mb-3 text-xs font-bold text-slate-500 flex items-center gap-1.5">
               <Move className="w-3.5 h-3.5 text-blue-500" />
@@ -672,10 +683,11 @@ export default function BoardDetailPage() {
                   <PostCard
                     post={post}
                     currentUser={currentUser}
+                    columns={columns}
                     allowComments={board.allowComments}
                     allowReactions={board.allowReactions}
                     onDelete={handleDeletePost}
-                    onUpdated={(up) => setPosts(posts.map((p) => (p.id === up.id ? up : p)))}
+                    onUpdated={handlePostUpdated}
                   />
                 </div>
               ))}
@@ -717,10 +729,11 @@ export default function BoardDetailPage() {
                   <PostCard
                     post={post}
                     currentUser={currentUser}
+                    columns={columns}
                     allowComments={board.allowComments}
                     allowReactions={board.allowReactions}
                     onDelete={handleDeletePost}
-                    onUpdated={(up) => setPosts(posts.map((p) => (p.id === up.id ? up : p)))}
+                    onUpdated={handlePostUpdated}
                   />
                 </div>
               );
@@ -733,8 +746,10 @@ export default function BoardDetailPage() {
       {(!board.isLocked || isTeacherOrAdmin) && (
         <button
           onClick={() => {
+            setModalMode('create');
+            setSelectedPostForEdit(undefined);
             setActiveColumn(columns[0]);
-            setShowCreatePost(true);
+            setShowPostModal(true);
           }}
           className="no-print fixed bottom-8 right-8 z-40 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-blue-500/40"
           title="새 카드 작성"
@@ -743,16 +758,21 @@ export default function BoardDetailPage() {
         </button>
       )}
 
-      {/* 카드 작성 모달 (새 모둠 직접 추가 지원) */}
-      <CreatePostModal
-        isOpen={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        boardId={board.id}
-        currentUser={currentUser}
-        defaultColumn={activeColumn}
-        columns={columns}
-        onCreated={handlePostCreated}
-      />
+      {/* 🔥 생성 및 수정 통합 PostModal (시원한 2xl UI & 다중 파일 드래그앤드롭 완벽 지원) */}
+      {showPostModal && (
+        <PostModal
+          isOpen={showPostModal}
+          onClose={() => setShowPostModal(false)}
+          mode={modalMode}
+          boardId={board.id}
+          currentUser={currentUser}
+          post={selectedPostForEdit}
+          defaultColumn={activeColumn}
+          columns={columns}
+          onCreated={handlePostCreated}
+          onUpdated={handlePostUpdated}
+        />
+      )}
 
       {/* 공유 모달 */}
       <ShareModal

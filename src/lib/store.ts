@@ -66,6 +66,7 @@ const INITIAL_BOARDS: Board[] = [
     description: '각자 조사한 친환경 에너지 기술과 일상생활 적용 방안을 카드와 이미지로 공유해 봅시다.',
     layout: 'kanban',
     theme: 'blue',
+    customBgUrl: '/korean_classroom_banner.jpg',
     authorId: 'user-teacher-1',
     authorName: '이수학 선생님',
     authorRole: 'teacher',

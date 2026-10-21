@@ -72,7 +72,8 @@ export interface Post {
   color: 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'white';
   imageUrl?: string;
   linkUrl?: string;
-  fileAttachment?: FileAttachment; // 최대 10MB 파일 첨부 (HWP, PDF, PPT, Word 등)
+  fileAttachment?: FileAttachment; // 단일 호환
+  attachments?: FileAttachment[]; // 여러 파일 첨부 (HWP, PDF, PPT, Word 등)
   authorName: string;
   authorRole: UserRole;
   authorId: string;

@@ -15,14 +15,15 @@ import {
   FileText,
   Paperclip,
 } from 'lucide-react';
-import { Post, User } from '@/lib/types';
+import { Post, User, FileAttachment } from '@/lib/types';
 import { getStoreData, saveStoreData, getMyPostIds } from '@/lib/store';
-import EditPostModal from './EditPostModal';
+import PostModal from './PostModal';
 import confetti from 'canvas-confetti';
 
 interface PostCardProps {
   post: Post;
   currentUser: User | null;
+  columns?: string[];
   allowComments?: boolean;
   allowReactions?: boolean;
   onDelete: (postId: string) => void;
@@ -32,6 +33,7 @@ interface PostCardProps {
 export default function PostCard({
   post,
   currentUser,
+  columns = [],
   allowComments = true,
   allowReactions = true,
   onDelete,
@@ -115,6 +117,14 @@ export default function PostCard({
     white: 'card-color-white',
   }[currentPost.color || 'yellow'] || 'card-color-yellow';
 
+  // 첨부 파일 목록 취합 (다중 파일 + 단일 파일 호환)
+  const allAttachments: FileAttachment[] = [];
+  if (currentPost.attachments && currentPost.attachments.length > 0) {
+    allAttachments.push(...currentPost.attachments);
+  } else if (currentPost.fileAttachment) {
+    allAttachments.push(currentPost.fileAttachment);
+  }
+
   return (
     <>
       <div
@@ -189,34 +199,41 @@ export default function PostCard({
             <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{currentPost.content}</p>
           )}
 
-          {/* 🔥 첨부 파일 (다운로드 지원 - 한글, PDF, 워드, PPT 등) */}
-          {currentPost.fileAttachment && (
-            <div className="mt-3 p-2.5 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 transition flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 truncate">
-                <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                  <FileText className="w-3.5 h-3.5" />
-                </div>
-                <div className="truncate text-left">
-                  <div className="text-[11px] font-bold text-slate-800 truncate">
-                    {currentPost.fileAttachment.name}
+          {/* 🔥 다중 첨부 파일 다운로드 목록 (한글, PDF, 워드, PPT 등) */}
+          {allAttachments.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {allAttachments.map((file, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 transition flex items-center justify-between gap-2.5"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                      <FileText className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate text-left">
+                      <div className="text-[11px] font-bold text-slate-800 truncate">
+                        {file.name}
+                      </div>
+                      <div className="text-[9px] text-slate-500 font-mono">
+                        {file.size}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[9px] text-slate-500 font-mono">
-                    {currentPost.fileAttachment.size}
-                  </div>
-                </div>
-              </div>
 
-              {/* 다운로드 버튼 */}
-              <a
-                href={currentPost.fileAttachment.dataUrl}
-                download={currentPost.fileAttachment.name}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition shadow-xs shrink-0"
-                title="파일 다운로드"
-              >
-                <Download className="w-3 h-3" />
-                <span>다운로드</span>
-              </a>
+                  {/* 개별 파일 다운로드 버튼 */}
+                  <a
+                    href={file.dataUrl}
+                    download={file.name}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition shadow-xs shrink-0"
+                    title={`${file.name} 다운로드`}
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>다운로드</span>
+                  </a>
+                </div>
+              ))}
             </div>
           )}
 
@@ -345,12 +362,16 @@ export default function PostCard({
         </div>
       )}
 
-      {/* 🔥 카드 수정 모달: 열려 있을 때만 마운트하여 이벤트 충돌 및 에러 완벽 차단! */}
+      {/* 🔥 통합 PostModal (수정 모드 - 생성하기와 100% 동일한 넓고 쾌적한 UI!) */}
       {showEditModal && (
-        <EditPostModal
+        <PostModal
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
+          mode="edit"
+          boardId={currentPost.boardId}
+          currentUser={currentUser}
           post={currentPost}
+          columns={columns}
           onUpdated={(updated) => {
             setCurrentPost(updated);
             if (onUpdated) onUpdated(updated);

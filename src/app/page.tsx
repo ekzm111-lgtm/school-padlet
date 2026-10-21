@@ -143,11 +143,11 @@ export default function HomePage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 🔥 학교/교실 실사진 배경을 적용한 프리미엄 히어로 배너 */}
         <div className="relative overflow-hidden rounded-[2.5rem] text-white p-8 sm:p-12 shadow-2xl mb-10 border border-white/20 group">
-          {/* 실제 학교/교실 고화질 실사진 배경 */}
+          {/* 한국 선생님과 교복 입은 학생들 실사진 배경 */}
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
             style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1800&auto=format&fit=crop&q=80')`,
+              backgroundImage: `url('/korean_classroom_banner.jpg')`,
             }}
           />
 
@@ -429,6 +429,17 @@ export default function HomePage() {
                         )}
                       </button>
                     </div>
+
+                    {/* 첨부된 커버/배경 이미지 썸네일 */}
+                    {board.customBgUrl && (
+                      <div className="relative w-full h-36 rounded-2xl overflow-hidden mb-3.5 border border-black/5 shadow-xs bg-slate-100">
+                        <img
+                          src={board.customBgUrl}
+                          alt={board.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                    )}
 
                     <h3
                       className={`text-lg font-bold line-clamp-2 leading-snug group-hover:text-blue-600 transition ${
