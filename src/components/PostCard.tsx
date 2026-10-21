@@ -189,14 +189,18 @@ export default function PostCard({
             </div>
           </div>
 
-          {/* 제목 */}
+          {/* 제목 (긴 URL이나 단어도 박스를 넘어가지 않고 자동 줄바꿈) */}
           {currentPost.title && (
-            <h4 className="font-bold text-sm text-slate-900 mb-1.5 leading-snug">{currentPost.title}</h4>
+            <h4 className="font-bold text-sm text-slate-900 mb-1.5 leading-snug break-all [overflow-wrap:anywhere]">
+              {currentPost.title}
+            </h4>
           )}
 
           {/* 본문 */}
           {currentPost.content && (
-            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{currentPost.content}</p>
+            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-all [overflow-wrap:anywhere]">
+              {currentPost.content}
+            </p>
           )}
 
           {/* 🔥 다중 첨부 파일 다운로드 목록 (한글, PDF, 워드, PPT 등) */}

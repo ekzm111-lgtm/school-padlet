@@ -65,6 +65,10 @@ export default function BoardDetailPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // 칸반 열 내/간 드래그 앤 드롭 상태
+  const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+  const [dragOverPostId, setDragOverPostId] = useState<string | null>(null);
+
   // 그리드 드래그 앤 드롭 순서 변경
   const dragItemIdx = useRef<number | null>(null);
   const dragOverItemIdx = useRef<number | null>(null);
@@ -103,10 +107,14 @@ export default function BoardDetailPage() {
     );
   }
 
-  const isTeacherOrAdmin =
-    currentUser?.role === 'admin' ||
-    currentUser?.role === 'teacher' ||
-    (currentUser && currentUser.id === board.authorId);
+  // 본인이 직접 만든 보드이거나 복제해 온 내 보드인지 확인
+  const isBoardOwner = Boolean(
+    currentUser &&
+      (currentUser.id === board.authorId || currentUser.name === board.authorName)
+  );
+
+  // 최고 관리자이거나 해당 보드의 소유자(본인/복제자)만 보드 설정(잠금/배경/모둠수정 등) 가능
+  const isTeacherOrAdmin = currentUser?.role === 'admin' || isBoardOwner;
 
   // 레이아웃 변경 시 보드 설정에 즉시 저장
   const handleChangeLayout = (newLayout: BoardLayout) => {
@@ -186,22 +194,80 @@ export default function BoardDetailPage() {
     }
   };
 
-  // 칸반 열 드래그 앤 드롭 이동
+  // 칸반 열 내/간 드래그 앤 드롭 이동 및 순서 변경
   const handleDragStartKanban = (e: React.DragEvent, postId: string) => {
     e.dataTransfer.setData('text/plain', postId);
+    setDraggedPostId(postId);
   };
 
-  const handleDropOnColumn = (e: React.DragEvent, colName: string) => {
-    e.preventDefault();
-    const postId = e.dataTransfer.getData('text/plain');
-    if (!postId) return;
+  const handleDragEndKanban = () => {
+    setDraggedPostId(null);
+    setDragOverPostId(null);
+  };
 
-    const updated = posts.map((p) => (p.id === postId ? { ...p, column: colName } : p));
-    setPosts(updated);
+  // 같은 열 또는 다른 열의 특정 카드 위에 드롭했을 때 순서 변경
+  const handleDropOnCard = (e: React.DragEvent, targetPostId: string, colName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedPostId;
+    if (!sourceId || sourceId === targetPostId) {
+      setDraggedPostId(null);
+      setDragOverPostId(null);
+      return;
+    }
+
+    const currentPosts = [...posts];
+    const sourceIdx = currentPosts.findIndex((p) => p.id === sourceId);
+    const targetIdx = currentPosts.findIndex((p) => p.id === targetPostId);
+
+    if (sourceIdx === -1 || targetIdx === -1) {
+      setDraggedPostId(null);
+      setDragOverPostId(null);
+      return;
+    }
+
+    // 소스 카드 꺼내서 해당 모둠(열)으로 배정
+    const [draggedCard] = currentPosts.splice(sourceIdx, 1);
+    const updatedCard = { ...draggedCard, column: colName };
+
+    // 타겟 카드의 인덱스 앞쪽에 삽입하여 순서 변경
+    const newTargetIdx = currentPosts.findIndex((p) => p.id === targetPostId);
+    currentPosts.splice(newTargetIdx, 0, updatedCard);
+
+    setPosts(currentPosts);
+    setDraggedPostId(null);
+    setDragOverPostId(null);
 
     const data = getStoreData();
-    const updatedAll = data.posts.map((p) => (p.id === postId ? { ...p, column: colName } : p));
-    saveStoreData.posts(updatedAll);
+    const otherBoardPosts = data.posts.filter((p) => p.boardId !== boardId);
+    saveStoreData.posts([...otherBoardPosts, ...currentPosts]);
+  };
+
+  // 열 빈 공간에 드롭했을 때 맨 뒤로 이동
+  const handleDropOnColumn = (e: React.DragEvent, colName: string) => {
+    e.preventDefault();
+    const postId = e.dataTransfer.getData('text/plain') || draggedPostId;
+    if (!postId) return;
+
+    const currentPosts = [...posts];
+    const sourceIdx = currentPosts.findIndex((p) => p.id === postId);
+    if (sourceIdx === -1) {
+      setDraggedPostId(null);
+      setDragOverPostId(null);
+      return;
+    }
+
+    const [draggedCard] = currentPosts.splice(sourceIdx, 1);
+    const updatedCard = { ...draggedCard, column: colName };
+    currentPosts.push(updatedCard);
+
+    setPosts(currentPosts);
+    setDraggedPostId(null);
+    setDragOverPostId(null);
+
+    const data = getStoreData();
+    const otherBoardPosts = data.posts.filter((p) => p.boardId !== boardId);
+    saveStoreData.posts([...otherBoardPosts, ...currentPosts]);
   };
 
   // 그리드 순서 변경
@@ -415,15 +481,17 @@ export default function BoardDetailPage() {
               </button>
             )}
 
-            {/* 배경 꾸미기 버튼 */}
-            <button
-              onClick={() => setShowBgModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition shadow-xs"
-              title="배경화면 꾸미기 및 사진 업로드"
-            >
-              <Palette className="w-3.5 h-3.5 text-purple-600" />
-              <span>배경 꾸미기</span>
-            </button>
+            {/* 배경 꾸미기 버튼 (본인 보드 또는 관리자만 변경 가능) */}
+            {isTeacherOrAdmin && (
+              <button
+                onClick={() => setShowBgModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition shadow-xs"
+                title="배경화면 꾸미기 및 사진 업로드"
+              >
+                <Palette className="w-3.5 h-3.5 text-purple-600" />
+                <span>배경 꾸미기</span>
+              </button>
+            )}
 
             {/* 레이아웃 전환 */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl">
@@ -593,14 +661,33 @@ export default function BoardDetailPage() {
                     </button>
                   )}
 
-                  {/* 카드 목록 */}
-                  <div className="space-y-4 flex-1">
+                  {/* 카드 목록 (같은 모둠 내 드래그 앤 드롭 순서 변경 지원) */}
+                  <div className="space-y-4 flex-1 min-h-[80px]">
                     {colPosts.map((post) => (
                       <div
                         key={post.id}
                         draggable
                         onDragStart={(e) => handleDragStartKanban(e, post.id)}
-                        className="cursor-grab active:cursor-grabbing transition-transform active:scale-98"
+                        onDragEnd={handleDragEndKanban}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (draggedPostId && draggedPostId !== post.id) {
+                            setDragOverPostId(post.id);
+                          }
+                        }}
+                        onDrop={(e) => handleDropOnCard(e, post.id, colName)}
+                        className={`cursor-grab active:cursor-grabbing transition-all duration-150 ${
+                          draggedPostId === post.id ? 'opacity-40 scale-95' : 'opacity-100'
+                        } ${
+                          dragOverPostId === post.id
+                            ? 'ring-2 ring-blue-500 ring-offset-2 rounded-2xl scale-[1.02] shadow-lg'
+                            : ''
+                        }`}
                       >
                         <PostCard
                           post={post}

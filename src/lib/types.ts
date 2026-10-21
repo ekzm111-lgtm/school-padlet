@@ -35,7 +35,8 @@ export interface Board {
   isLocked: boolean;
   isPublic: boolean;
   columns?: string[];
-  customBgUrl?: string;
+  coverImageUrl?: string; // 메인 화면 카드 대표 썸네일 이미지
+  customBgUrl?: string;   // 보드 내부 전체 배경화면 이미지
   category?: '수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트';
   copiedFromTitle?: string;
   createdAt: string;

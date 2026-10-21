@@ -347,7 +347,12 @@ export default function HomePage() {
               };
 
               const isBlackboard = board.theme === 'blackboard';
-              const isMyBoard = currentUser && board.authorId === currentUser.id;
+              // 본인이 만든 보드이거나 복제해 온 내 보드 여부
+              const isMyBoard = Boolean(
+                currentUser && (board.authorId === currentUser.id || board.authorName === currentUser.name)
+              );
+              // 본인 소유 보드이거나 최고 관리자만 수정 가능 (다른 사람의 공개 보드는 임의 수정 불가)
+              const canEditBoard = Boolean(currentUser && (isMyBoard || currentUser.role === 'admin'));
 
               return (
                 <div
@@ -432,8 +437,8 @@ export default function HomePage() {
                         )}
                       </button>
 
-                      {/* 보드 정보 수정 버튼 (상단 빠른 편집) */}
-                      {(isMyBoard || isTeacherOrAdmin) && (
+                      {/* 보드 정보 수정 버튼 (본인이 만든 보드 / 복사한 보드만 가능) */}
+                      {canEditBoard && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -451,11 +456,11 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* 첨부된 커버/배경 이미지 썸네일 */}
-                    {board.customBgUrl && (
+                    {/* 메인 화면 보드 카드 대표 썸네일 이미지 */}
+                    {(board.coverImageUrl || board.customBgUrl) && (
                       <div className="relative w-full h-36 rounded-2xl overflow-hidden mb-3.5 border border-black/5 shadow-xs bg-slate-100">
                         <img
-                          src={board.customBgUrl}
+                          src={board.coverImageUrl || board.customBgUrl}
                           alt={board.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -490,8 +495,8 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      {/* 보드 정보 수정 버튼 */}
-                      {(isMyBoard || isTeacherOrAdmin) && (
+                      {/* 보드 정보 수정 버튼 (본인이 만든 보드 / 복사한 보드만 가능) */}
+                      {canEditBoard && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

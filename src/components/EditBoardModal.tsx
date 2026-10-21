@@ -64,7 +64,7 @@ export default function EditBoardModal({
   const [category, setCategory] = useState<'수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트'>(
     board.category || '수업자료'
   );
-  const [customBgUrl, setCustomBgUrl] = useState<string>(board.customBgUrl || '');
+  const [coverImageUrl, setCoverImageUrl] = useState<string>(board.coverImageUrl || board.customBgUrl || '');
   const [isPublic, setIsPublic] = useState<boolean>(board.isPublic !== false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,7 +79,7 @@ export default function EditBoardModal({
     setLayout(board.layout || 'kanban');
     setTheme(board.theme || 'blue');
     setCategory(board.category || '수업자료');
-    setCustomBgUrl(board.customBgUrl || '');
+    setCoverImageUrl(board.coverImageUrl || board.customBgUrl || '');
     setIsPublic(board.isPublic !== false);
     setAllowStudentPost(board.allowStudentPost ?? true);
     setAllowComments(board.allowComments ?? true);
@@ -101,7 +101,7 @@ export default function EditBoardModal({
     const reader = new FileReader();
     reader.onload = (e) => {
       if (typeof e.target?.result === 'string') {
-        setCustomBgUrl(e.target.result);
+        setCoverImageUrl(e.target.result);
       }
     };
     reader.readAsDataURL(file);
@@ -143,7 +143,9 @@ export default function EditBoardModal({
       description: description.trim(),
       layout,
       theme,
-      customBgUrl: customBgUrl.trim() || undefined,
+      coverImageUrl: coverImageUrl.trim() || undefined,
+      // 안쪽 배경은 기존 보드의 customBgUrl 유지 (보드 내부에서 별도로 관리)
+      customBgUrl: board.customBgUrl,
       category,
       isPublic,
       allowStudentPost,
@@ -236,17 +238,22 @@ export default function EditBoardModal({
             </div>
           </div>
 
-          {/* 🌟 보드 커버/배경 이미지 첨부 & 교체 */}
+          {/* 🌟 메인 화면 카드 대표 사진 변경 (메인 화면에서만 사용) */}
           <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-blue-600" />
-                <span>보드 커버 및 배경 사진 변경 (선택)</span>
-              </label>
-              {customBgUrl && (
+              <div>
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-blue-600" />
+                  <span>메인 카드 대표 사진 변경 (선택)</span>
+                </label>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  * 메인 화면 카드에만 표시되며, 보드 안쪽 배경은 입장 후 [배경 꾸미기]에서 자유롭게 변경 가능합니다.
+                </p>
+              </div>
+              {coverImageUrl && (
                 <button
                   type="button"
-                  onClick={() => setCustomBgUrl('')}
+                  onClick={() => setCoverImageUrl('')}
                   className="text-[11px] font-bold text-rose-500 hover:text-rose-600 flex items-center gap-1 hover:underline"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -256,10 +263,10 @@ export default function EditBoardModal({
             </div>
 
             {/* 현재 적용된 사진 미리보기 */}
-            {customBgUrl ? (
+            {coverImageUrl ? (
               <div className="relative rounded-2xl overflow-hidden border-2 border-blue-500/30 h-36 w-full shadow-inner group">
                 <img
-                  src={customBgUrl}
+                  src={coverImageUrl}
                   alt="Board cover"
                   className="w-full h-full object-cover"
                 />
@@ -273,7 +280,7 @@ export default function EditBoardModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCustomBgUrl('')}
+                    onClick={() => setCoverImageUrl('')}
                     className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow"
                   >
                     삭제
@@ -301,7 +308,7 @@ export default function EditBoardModal({
                     새 사진을 여기로 드래그하거나 <span className="text-blue-600 underline">클릭하여 첨부</span>하세요
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    JPG, PNG, GIF, WebP (최대 10MB) • 보드 썸네일 및 배경으로 지정됩니다.
+                    JPG, PNG, GIF, WebP (최대 10MB) • 메인 화면 카드 썸네일로 사용됩니다.
                   </p>
                 </div>
               </div>
@@ -323,9 +330,9 @@ export default function EditBoardModal({
                   <button
                     key={preset.name}
                     type="button"
-                    onClick={() => setCustomBgUrl(preset.url)}
+                    onClick={() => setCoverImageUrl(preset.url)}
                     className={`relative rounded-xl overflow-hidden aspect-video border-2 transition group ${
-                      customBgUrl === preset.url
+                      coverImageUrl === preset.url
                         ? 'border-blue-600 ring-2 ring-blue-500/50 scale-105'
                         : 'border-slate-200 hover:border-slate-400'
                     }`}
@@ -340,7 +347,7 @@ export default function EditBoardModal({
                         {preset.name}
                       </span>
                     </div>
-                    {customBgUrl === preset.url && (
+                    {coverImageUrl === preset.url && (
                       <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center">
                         <Check className="w-2.5 h-2.5" />
                       </div>
@@ -354,7 +361,7 @@ export default function EditBoardModal({
           {/* 테마 배경 색상 */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">
-              배경 색상 테마 {customBgUrl && <span className="text-slate-400 font-normal">(사진 첨부 시 사진 우선)</span>}
+              배경 색상 테마 {coverImageUrl && <span className="text-slate-400 font-normal">(사진 미등록 시 메인 카드 색상)</span>}
             </label>
             <div className="grid grid-cols-5 gap-2">
               {[
