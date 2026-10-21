@@ -73,6 +73,10 @@ export default function BoardDetailPage() {
       setBoard(foundBoard);
       const cols = foundBoard.columns && foundBoard.columns.length > 0 ? foundBoard.columns : DEFAULT_COLUMNS;
       setColumns(cols);
+      // 보드 개설 시 선택했던 배치 방식(레이아웃)을 기본으로 정확히 반영
+      if (foundBoard.layout) {
+        setCurrentLayout(foundBoard.layout);
+      }
     }
     const boardPosts = data.posts.filter((p) => p.boardId === boardId);
     setPosts(boardPosts);
@@ -100,6 +104,17 @@ export default function BoardDetailPage() {
     currentUser?.role === 'admin' ||
     currentUser?.role === 'teacher' ||
     (currentUser && currentUser.id === board.authorId);
+
+  // 레이아웃 변경 시 보드 설정에 즉시 저장하여 유지
+  const handleChangeLayout = (newLayout: BoardLayout) => {
+    setCurrentLayout(newLayout);
+    if (board) {
+      const updatedBoard = { ...board, layout: newLayout };
+      setBoard(updatedBoard);
+      const data = getStoreData();
+      saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+    }
+  };
 
   // 1) 학생 초대 전역 링크 복사
   const handleCopyInviteLink = () => {
@@ -365,7 +380,7 @@ export default function BoardDetailPage() {
             {/* 레이아웃 전환 */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl">
               <button
-                onClick={() => setCurrentLayout('kanban')}
+                onClick={() => handleChangeLayout('kanban')}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
                   currentLayout === 'kanban' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500'
                 }`}
@@ -375,7 +390,7 @@ export default function BoardDetailPage() {
                 <span>칸반 열</span>
               </button>
               <button
-                onClick={() => setCurrentLayout('grid')}
+                onClick={() => handleChangeLayout('grid')}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
                   currentLayout === 'grid' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500'
                 }`}
@@ -385,7 +400,7 @@ export default function BoardDetailPage() {
                 <span>그리드</span>
               </button>
               <button
-                onClick={() => setCurrentLayout('canvas')}
+                onClick={() => handleChangeLayout('canvas')}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
                   currentLayout === 'canvas' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500'
                 }`}
