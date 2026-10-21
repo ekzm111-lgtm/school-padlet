@@ -21,9 +21,11 @@ import {
   FolderOpen,
   TrendingUp,
   Share2,
+  Pencil,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import CreateBoardModal from '@/components/CreateBoardModal';
+import EditBoardModal from '@/components/EditBoardModal';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
 import { Board, User } from '@/lib/types';
 import confetti from 'canvas-confetti';
@@ -34,6 +36,7 @@ export default function HomePage() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingBoard, setEditingBoard] = useState<Board | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
@@ -428,6 +431,24 @@ export default function HomePage() {
                           <Copy className="w-3 h-3 opacity-60" />
                         )}
                       </button>
+
+                      {/* 보드 정보 수정 버튼 (상단 빠른 편집) */}
+                      {(isMyBoard || isTeacherOrAdmin) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingBoard(board);
+                          }}
+                          className={`p-1.5 rounded-full transition shadow-2xs ${
+                            isBlackboard
+                              ? 'bg-emerald-800 hover:bg-emerald-700 text-emerald-100'
+                              : 'bg-white hover:bg-amber-50 text-slate-500 hover:text-amber-600 border border-slate-200'
+                          }`}
+                          title="보드 제목, 커버 사진 및 설정 수정"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
 
                     {/* 첨부된 커버/배경 이미지 썸네일 */}
@@ -469,6 +490,25 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      {/* 보드 정보 수정 버튼 */}
+                      {(isMyBoard || isTeacherOrAdmin) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingBoard(board);
+                          }}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition shadow-xs ${
+                            isBlackboard
+                              ? 'bg-emerald-800 hover:bg-emerald-700 text-emerald-100'
+                              : 'bg-white hover:bg-amber-50 text-amber-700 border border-slate-200 hover:border-amber-300'
+                          }`}
+                          title="보드 제목, 커버 사진, 설정 수정"
+                        >
+                          <Pencil className="w-3 h-3 text-amber-600" />
+                          <span>수정</span>
+                        </button>
+                      )}
+
                       {/* 🔥 보드 복제(Copy/Remix) 버튼 */}
                       <button
                         onClick={(e) => handleDuplicateBoard(e, board)}
@@ -518,6 +558,23 @@ export default function HomePage() {
           onCreated={(newBoard) => {
             loadData();
             router.push(`/board/${newBoard.id}`);
+          }}
+        />
+      )}
+
+      {/* 🌟 메인 화면 보드 정보 및 사진 수정 모달 */}
+      {editingBoard && (
+        <EditBoardModal
+          board={editingBoard}
+          isOpen={!!editingBoard}
+          onClose={() => setEditingBoard(null)}
+          onUpdated={(updated) => {
+            loadData();
+            setEditingBoard(null);
+          }}
+          onDeleted={() => {
+            loadData();
+            setEditingBoard(null);
           }}
         />
       )}

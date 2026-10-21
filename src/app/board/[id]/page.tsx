@@ -313,15 +313,15 @@ export default function BoardDetailPage() {
   return (
     <div
       style={customBgStyle}
-      className={`min-h-screen flex flex-col transition-all duration-300 ${themeClass}`}
+      className={`h-screen flex flex-col overflow-hidden transition-all duration-300 ${themeClass}`}
     >
-      <div className="no-print">
+      {/* 상단 완벽 고정 영역 (전체 헤더 + 보드 서브 컨트롤 바) */}
+      <div className="shrink-0 z-30 no-print shadow-xs">
         <Header />
-      </div>
 
-      {/* 상단 컨트롤 바 */}
-      <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 sm:px-6 py-2.5 no-print shadow-xs">
-        <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {/* 보드 서브 컨트롤 바 */}
+        <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 sm:px-6 py-2.5">
+          <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* 보드 타이틀 */}
           <div className="flex items-center gap-3">
             <Link
@@ -501,9 +501,10 @@ export default function BoardDetailPage() {
           </div>
         </div>
       </div>
+    </div>
 
-      {/* 메인 콘텐츠 영역 (상단 여백 넉넉하게 확보하여 상단 바와 첫 열 겹침 방지) */}
-      <main className="flex-1 w-full px-4 sm:px-6 pt-6 pb-12 overflow-x-auto select-none">
+      {/* 메인 콘텐츠 영역 (가로/세로 독립 스크롤이 매끄럽게 발생) */}
+      <main className="flex-1 w-full px-4 sm:px-6 pt-5 pb-16 overflow-x-auto overflow-y-auto select-none">
         {currentLayout === 'kanban' ? (
           /* 1) 모둠 칸반 열 (단정한 카드 추가 버튼 + 우측 무한 확장) */
           <div className="flex gap-5 items-start pb-12 w-max min-w-full">
