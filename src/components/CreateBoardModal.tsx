@@ -44,10 +44,14 @@ export default function CreateBoardModal({
       theme,
       authorId: currentUser.id,
       authorName: currentUser.name,
+      authorRole: currentUser.role,
       allowStudentPost,
       allowComments,
       allowReactions,
       isLocked: false,
+      isPublic: true, // 기본 공개 공유
+      columns: ['모둠 1', '모둠 2', '모둠 3'],
+      category: '수업자료',
       createdAt: new Date().toISOString().split('T')[0],
       postCount: 0,
     };

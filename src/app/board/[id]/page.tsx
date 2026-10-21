@@ -21,13 +21,14 @@ import {
   Trash2,
   X,
   Palette,
+  Globe,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
 import CreatePostModal from '@/components/CreatePostModal';
 import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
-import { getStoreData, saveStoreData } from '@/lib/store';
+import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 
 const DEFAULT_COLUMNS = ['모둠 1 (조사 및 계획)', '모둠 2 (의견 토론)', '모둠 3 (결과 정리)'];
@@ -366,6 +367,47 @@ export default function BoardDetailPage() {
               <Hash className="w-3.5 h-3.5" />
               <span>{board.code}</span>
             </button>
+
+            {/* 🔥 이 보드 복제하기 버튼 */}
+            <button
+              onClick={() => {
+                if (!currentUser) {
+                  alert('보드를 복제하려면 먼저 로그인해 주세요.');
+                  return;
+                }
+                const copied = duplicateBoard(board.id, currentUser);
+                if (copied) {
+                  alert(`🎉 [${board.title}] 보드가 내 보드로 복제되었습니다!`);
+                  router.push(`/board/${copied.id}`);
+                }
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold transition shadow-xs"
+              title="이 보드를 내 보드로 복제해오기"
+            >
+              <Copy className="w-3.5 h-3.5 text-blue-500" />
+              <span>보드 복제</span>
+            </button>
+
+            {/* 🔥 공개/비공개 공유 설정 토글 (내 보드인 경우) */}
+            {currentUser && board.authorId === currentUser.id && (
+              <button
+                onClick={() => {
+                  const updated = { ...board, isPublic: !board.isPublic };
+                  setBoard(updated);
+                  const data = getStoreData();
+                  saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updated : b)));
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition ${
+                  board.isPublic !== false
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-300'
+                }`}
+                title="학교 전체 공개/비공개 전환"
+              >
+                {board.isPublic !== false ? <Globe className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                <span>{board.isPublic !== false ? '공개 공유중' : '나만보기(비공개)'}</span>
+              </button>
+            )}
 
             {/* 🎨 배경 꾸미기 버튼 (요구사항) */}
             <button

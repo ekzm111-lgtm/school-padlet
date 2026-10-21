@@ -28,12 +28,16 @@ export interface Board {
   theme: BoardTheme;
   authorId: string;
   authorName: string;
+  authorRole?: UserRole;
   allowStudentPost: boolean;
   allowComments: boolean;
   allowReactions: boolean;
   isLocked: boolean;
+  isPublic: boolean; // 학교 전체 공유 여부 (On: 누구나 조회/복제 가능, Off: 비공개)
   columns?: string[];
-  customBgUrl?: string; // 사용자가 직접 올린 배경화면 URL
+  customBgUrl?: string;
+  category?: '수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트';
+  copiedFromTitle?: string; // 복제 출처
   createdAt: string;
   postCount?: number;
 }
