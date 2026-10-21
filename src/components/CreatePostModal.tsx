@@ -50,29 +50,38 @@ export default function CreatePostModal({
     }
   }, [currentUser]);
 
-  // 클립보드 붙여넣기(Ctrl+V) 이미지 감지
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
+  // 모달이 열려 있을 때 전역 어디서든 Ctrl+V 캡처 이미지 감지
+  useEffect(() => {
+    if (!isOpen) return;
 
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (event.target?.result) {
-              setImageUrl(event.target.result as string);
-              setShowImageTools(true);
-              setPasteNotice(true);
-              setTimeout(() => setPasteNotice(false), 3000);
-            }
-          };
-          reader.readAsDataURL(file);
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              if (event.target?.result) {
+                setImageUrl(event.target.result as string);
+                setShowImageTools(true);
+                setPasteNotice(true);
+                setTimeout(() => setPasteNotice(false), 3000);
+              }
+            };
+            reader.readAsDataURL(file);
+            break;
+          }
         }
       }
-    }
-  };
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [isOpen]);
 
   // 로컬 파일 업로드
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,7 +150,6 @@ export default function CreatePostModal({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div
-        onPaste={handlePaste}
         className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in duration-200"
       >
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
