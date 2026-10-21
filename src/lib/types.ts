@@ -16,12 +16,12 @@ export interface User {
   createdAt: string;
 }
 
-export type BoardLayout = 'canvas' | 'grid' | 'kanban' | 'stream';
+export type BoardLayout = 'kanban' | 'canvas' | 'grid' | 'stream';
 export type BoardTheme = 'blue' | 'cork' | 'blackboard' | 'gradient' | 'warm';
 
 export interface Board {
   id: string;
-  code: string; // 6자리 학생 참여 핀코드
+  code: string;
   title: string;
   description: string;
   layout: BoardLayout;
@@ -32,6 +32,7 @@ export interface Board {
   allowComments: boolean;
   allowReactions: boolean;
   isLocked: boolean;
+  columns?: string[]; // 모둠/섹션 열 목록 (동적 추가/수정 가능)
   createdAt: string;
   postCount?: number;
 }
@@ -66,8 +67,9 @@ export interface Post {
   comments: PostComment[];
   pinned?: boolean;
   column?: string;
-  x?: number; // 자유 캔버스 드래그 X 좌표
-  y?: number; // 자유 캔버스 드래그 Y 좌표
+  order?: number; // 정렬 순서
+  x?: number;
+  y?: number;
   createdAt: string;
   updatedAt?: string;
 }

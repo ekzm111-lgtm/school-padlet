@@ -140,27 +140,26 @@ export default function PostCard({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-500 font-medium">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-slate-500 font-medium mr-1">
                 {currentPost.updatedAt || currentPost.createdAt}
               </span>
 
               {canEdit && (
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-xs transition"
-                  title="내가 쓴 글 수정하기"
+                  className="p-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white transition shadow-xs"
+                  title="내용 수정하기"
                 >
-                  <Pencil className="w-3 h-3" />
-                  <span>수정</span>
+                  <Pencil className="w-3.5 h-3.5" />
                 </button>
               )}
 
               {canDelete && (
                 <button
                   onClick={() => onDelete(currentPost.id)}
-                  className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-black/5 transition"
-                  title="삭제"
+                  className="p-1 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
+                  title="삭제하기"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
