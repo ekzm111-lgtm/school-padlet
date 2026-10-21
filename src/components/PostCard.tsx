@@ -237,22 +237,52 @@ export default function PostCard({
             </div>
           )}
 
-          {/* 첨부 이미지 */}
+          {/* 첨부 이미지 (클릭 시 링크가 있으면 링크 새 탭 오픈, 없으면 원본 확대) */}
           {currentPost.imageUrl && (
-            <div className="mt-3 overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group">
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (currentPost.linkUrl) {
+                  let url = currentPost.linkUrl.trim();
+                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    url = 'https://' + url;
+                  }
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                } else {
+                  setShowImageModal(true);
+                }
+              }}
+              className="mt-3 relative overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group"
+              title={
+                currentPost.linkUrl
+                  ? `클릭하여 새 탭에서 링크 열기: ${currentPost.linkUrl}`
+                  : '클릭하여 이미지 크게 보기'
+              }
+            >
               <img
                 src={currentPost.imageUrl}
                 alt="첨부 이미지"
-                onClick={() => setShowImageModal(true)}
-                className="w-full max-h-56 object-cover group-hover:scale-105 transition duration-200"
+                className="w-full max-h-56 object-cover group-hover:scale-105 transition duration-300"
               />
+
+              {/* 링크가 연결되어 있는 경우 새 탭 이동 힌트 오버레이 */}
+              {currentPost.linkUrl && (
+                <div className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1 shadow-md transition group-hover:scale-105">
+                  <ExternalLink className="w-3 h-3 text-sky-300" />
+                  <span>새 창 열기</span>
+                </div>
+              )}
             </div>
           )}
 
           {/* 첨부 링크 */}
           {currentPost.linkUrl && (
             <a
-              href={currentPost.linkUrl}
+              href={
+                currentPost.linkUrl.startsWith('http://') || currentPost.linkUrl.startsWith('https://')
+                  ? currentPost.linkUrl
+                  : `https://${currentPost.linkUrl}`
+              }
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
