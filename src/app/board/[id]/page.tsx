@@ -347,9 +347,12 @@ export default function BoardDetailPage() {
     setPosts(posts.filter((p) => p.id !== postId));
   };
 
-  // 카드 생성 콜백
+  // 카드 생성 콜백 (중복 생성 방어)
   const handlePostCreated = (newPost: Post, newColName?: string) => {
-    setPosts([newPost, ...posts]);
+    setPosts((prev) => {
+      if (prev.some((p) => p.id === newPost.id)) return prev;
+      return [newPost, ...prev];
+    });
     if (newColName && !columns.includes(newColName)) {
       const updatedCols = [...columns, newColName];
       setColumns(updatedCols);

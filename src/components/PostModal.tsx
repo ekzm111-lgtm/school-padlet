@@ -65,6 +65,7 @@ export default function PostModal({
   const [pasteNotice, setPasteNotice] = useState(false);
   const [fileError, setFileError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const docFileInputRef = useRef<HTMLInputElement>(null);
@@ -142,7 +143,7 @@ export default function PostModal({
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, [isOpen]);
 
-  // 🔥 다중 파일 처리 공통 함수 (드래그 드롭 & 파일 선택 모두 지원)
+  // 🔥 다중 파일 처리 공통 함수 (드래그 드롭 & 파일 선택 모두 지원, 중복 방지)
   const processFiles = (fileList: FileList | File[]) => {
     setFileError('');
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -159,7 +160,6 @@ export default function PostModal({
           ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
           : `${Math.round(file.size / 1024)} KB`;
 
-      // 첨부 파일은 순수하게 첨부 파일 목록(attachments)으로만 관리 (이미지와 중복 방지)
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -169,7 +169,13 @@ export default function PostModal({
             type: file.type || file.name.split('.').pop() || '',
             dataUrl: event.target.result as string,
           };
-          setAttachments((prev) => [...prev, newAtt]);
+          // 파일 목록에 중복 방지 (같은 이름과 같은 크기면 1개만 유지)
+          setAttachments((prev) => {
+            if (prev.some((a) => a.name === newAtt.name && a.size === newAtt.size)) {
+              return prev;
+            }
+            return [...prev, newAtt];
+          });
         }
       };
       reader.readAsDataURL(file);
@@ -179,6 +185,7 @@ export default function PostModal({
   // 탐색기 파일 드롭(Drop) 핸들러
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       processFiles(e.dataTransfer.files);
@@ -186,6 +193,7 @@ export default function PostModal({
   };
 
   const handleDocFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
     if (e.target.files && e.target.files.length > 0) {
       processFiles(e.target.files);
       e.target.value = ''; // 재선택 가능하도록 초기화
@@ -198,7 +206,10 @@ export default function PostModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return; // 중복 제출 원천 방지
     if (!content.trim() && !title.trim() && !imageUrl && attachments.length === 0) return;
+
+    setIsSubmitting(true);
 
     let finalColumn = selectedColumn;
     let createdColumnName: string | undefined = undefined;
@@ -227,11 +238,12 @@ export default function PostModal({
       const data = getStoreData();
       saveStoreData.posts(data.posts.map((p) => (p.id === post.id ? updated : p)));
       if (onUpdated) onUpdated(updated);
+      setIsSubmitting(false);
       onClose();
     } else {
-      // 생성 모드 저장
+      // 생성 모드 저장 (유니크 타임스탬프 + 랜덤 ID)
       const newPost: Post = {
-        id: `post-${Date.now()}`,
+        id: `post-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         boardId,
         title: title.trim(),
         content: content.trim(),
@@ -260,6 +272,7 @@ export default function PostModal({
         confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
       } catch (err) {}
 
+      setIsSubmitting(false);
       onClose();
     }
   };
