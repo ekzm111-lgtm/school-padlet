@@ -3,6 +3,8 @@ export type UserStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: string;
+  username?: string; // 예: admin
+  password?: string; // 기본: admin
   name: string;
   email: string;
   role: UserRole;
@@ -19,7 +21,7 @@ export type BoardTheme = 'blue' | 'cork' | 'blackboard' | 'gradient' | 'warm';
 
 export interface Board {
   id: string;
-  code: string; // 6자리 학생 참여 핀코드 (예: 482910)
+  code: string; // 6자리 학생 참여 핀코드
   title: string;
   description: string;
   layout: BoardLayout;
@@ -29,7 +31,7 @@ export interface Board {
   allowStudentPost: boolean;
   allowComments: boolean;
   allowReactions: boolean;
-  isLocked: boolean; // 수업 종료 후 읽기 전용
+  isLocked: boolean;
   createdAt: string;
   postCount?: number;
 }
@@ -68,13 +70,14 @@ export interface Post {
   reactions: PostReaction;
   comments: PostComment[];
   pinned?: boolean;
-  column?: string; // 칸반 레이아웃용 (예: '할 일', '진행 중', '완료')
+  column?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface SystemSettings {
-  autoApproveUsers: boolean; // 기본값 true: 자동 가입
+  autoApproveUsers: boolean;
   allowGoogleLogin: boolean;
-  allowGuestStudentCode: boolean; // 비로그인 PIN코드 참여 허용 여부
+  allowGuestStudentCode: boolean;
   schoolName: string;
 }

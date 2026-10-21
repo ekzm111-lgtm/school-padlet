@@ -44,6 +44,14 @@ export default function HomePage() {
     return () => window.removeEventListener('store_updated', handleUpdate);
   }, []);
 
+  // 로그인되지 않은 경우 로그인 페이지로 자동 안내
+  useEffect(() => {
+    const data = getStoreData();
+    if (!data.currentUser) {
+      router.push('/login');
+    }
+  }, [router]);
+
   const handleCopyCode = (e: React.MouseEvent, code: string) => {
     e.stopPropagation();
     navigator.clipboard.writeText(code);

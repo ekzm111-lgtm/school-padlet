@@ -11,10 +11,11 @@ import {
   Trash2,
   Pin,
   Send,
-  MoreVertical,
+  Pencil,
 } from 'lucide-react';
 import { Post, User } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
+import EditPostModal from './EditPostModal';
 import confetti from 'canvas-confetti';
 
 interface PostCardProps {
@@ -23,6 +24,7 @@ interface PostCardProps {
   allowComments?: boolean;
   allowReactions?: boolean;
   onDelete: (postId: string) => void;
+  onUpdated?: (updated: Post) => void;
 }
 
 export default function PostCard({
@@ -31,8 +33,11 @@ export default function PostCard({
   allowComments = true,
   allowReactions = true,
   onDelete,
+  onUpdated,
 }: PostCardProps) {
   const [showComments, setShowComments] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [currentPost, setCurrentPost] = useState(post);
   const [commentInput, setCommentInput] = useState('');
   const [reactions, setReactions] = useState(post.reactions);
   const [comments, setComments] = useState(post.comments || []);
@@ -86,10 +91,15 @@ export default function PostCard({
     saveStoreData.posts(updatedPosts);
   };
 
+  const canEdit =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'teacher' ||
+    (currentUser && currentUser.id === currentPost.authorId);
+
   const canDelete =
     currentUser?.role === 'admin' ||
     currentUser?.role === 'teacher' ||
-    (currentUser && currentUser.id === post.authorId);
+    (currentUser && currentUser.id === currentPost.authorId);
 
   const cardColorClass = {
     yellow: 'card-color-yellow',
@@ -98,41 +108,54 @@ export default function PostCard({
     green: 'card-color-green',
     purple: 'card-color-purple',
     white: 'card-color-white',
-  }[post.color || 'yellow'];
+  }[currentPost.color || 'yellow'];
 
   return (
     <>
       <div
         className={`relative rounded-2xl p-5 border shadow-sm transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
       >
-        {/* 상단 핀 & 작성자 & 삭제 버튼 */}
+        {/* 상단 핀 & 작성자 & 수정/삭제 버튼 */}
         <div>
           <div className="flex items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-1.5 flex-wrap">
-              {post.pinned && (
+              {currentPost.pinned && (
                 <span className="flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-600">
                   <Pin className="w-3 h-3 fill-current rotate-45" />
                   <span>공지</span>
                 </span>
               )}
-              <span className="font-bold text-xs text-slate-800">{post.authorName}</span>
+              <span className="font-bold text-xs text-slate-800">{currentPost.authorName}</span>
               <span
                 className={`text-[9px] px-1.5 py-0.2 rounded-full font-semibold ${
-                  post.authorRole === 'teacher'
+                  currentPost.authorRole === 'teacher'
                     ? 'bg-blue-600 text-white'
                     : 'bg-black/10 text-slate-700'
                 }`}
               >
-                {post.authorRole === 'teacher' ? '선생님' : '학생'}
+                {currentPost.authorRole === 'teacher' ? '선생님' : '학생'}
               </span>
             </div>
 
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-slate-500 font-medium">{post.createdAt}</span>
+              <span className="text-[10px] text-slate-500 font-medium">
+                {currentPost.updatedAt || currentPost.createdAt}
+              </span>
+
+              {canEdit && (
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="p-1 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-black/5 transition"
+                  title="카드 내용 수정"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+
               {canDelete && (
                 <button
-                  onClick={() => onDelete(post.id)}
-                  className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition"
+                  onClick={() => onDelete(currentPost.id)}
+                  className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-black/5 transition"
                   title="삭제"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -142,18 +165,18 @@ export default function PostCard({
           </div>
 
           {/* 제목 (있을 경우) */}
-          {post.title && (
-            <h4 className="font-bold text-sm text-slate-900 mb-1.5 leading-snug">{post.title}</h4>
+          {currentPost.title && (
+            <h4 className="font-bold text-sm text-slate-900 mb-1.5 leading-snug">{currentPost.title}</h4>
           )}
 
           {/* 본문 */}
-          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{post.content}</p>
+          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{currentPost.content}</p>
 
           {/* 첨부 이미지 */}
-          {post.imageUrl && (
+          {currentPost.imageUrl && (
             <div className="mt-3 overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group">
               <img
-                src={post.imageUrl}
+                src={currentPost.imageUrl}
                 alt="첨부 이미지"
                 onClick={() => setShowImageModal(true)}
                 className="w-full max-h-56 object-cover group-hover:scale-105 transition duration-200"
@@ -162,15 +185,15 @@ export default function PostCard({
           )}
 
           {/* 첨부 링크 */}
-          {post.linkUrl && (
+          {currentPost.linkUrl && (
             <a
-              href={post.linkUrl}
+              href={currentPost.linkUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/5 hover:bg-black/10 text-[11px] text-blue-700 font-medium truncate transition"
             >
               <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{post.linkUrl}</span>
+              <span className="truncate">{currentPost.linkUrl}</span>
             </a>
           )}
         </div>
@@ -256,20 +279,31 @@ export default function PostCard({
       </div>
 
       {/* 이미지 크게 보기 모달 */}
-      {showImageModal && post.imageUrl && (
+      {showImageModal && currentPost.imageUrl && (
         <div
           onClick={() => setShowImageModal(false)}
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
         >
           <div className="max-w-3xl max-h-[90vh] p-2">
             <img
-              src={post.imageUrl}
+              src={currentPost.imageUrl}
               alt="확대 이미지"
               className="max-h-[85vh] w-auto rounded-2xl shadow-2xl mx-auto object-contain"
             />
           </div>
         </div>
       )}
+
+      {/* 카드 수정 모달 */}
+      <EditPostModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        post={currentPost}
+        onUpdated={(updated) => {
+          setCurrentPost(updated);
+          if (onUpdated) onUpdated(updated);
+        }}
+      />
     </>
   );
 }

@@ -10,6 +10,8 @@ const INITIAL_SETTINGS: SystemSettings = {
 const INITIAL_USERS: User[] = [
   {
     id: 'user-admin',
+    username: 'admin',
+    password: 'admin', // 기본 관리자 비번
     name: '김관리 (정보부장)',
     email: 'admin@school.ac.kr',
     role: 'admin',
@@ -19,6 +21,8 @@ const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-teacher-1',
+    username: 'teacher',
+    password: '1234',
     name: '이수학 선생님',
     email: 'math.lee@school.ac.kr',
     role: 'teacher',
@@ -28,6 +32,8 @@ const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-student-1',
+    username: 'student',
+    password: '1234',
     name: '박민우 (학생)',
     email: 'minwoo2026@gmail.com',
     role: 'student',
@@ -39,6 +45,8 @@ const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-student-pending',
+    username: 'jiwoo',
+    password: '1234',
     name: '최지우 (신규가입 학생)',
     email: 'jiwoo.student@gmail.com',
     role: 'student',
@@ -190,7 +198,7 @@ export const getStoreData = (): StoreData => {
       users: INITIAL_USERS,
       boards: INITIAL_BOARDS,
       posts: INITIAL_POSTS,
-      currentUser: INITIAL_USERS[0], // 기본 김관리(어드민)
+      currentUser: null, // 첫 접속 시 미로그인 상태 (로그인 페이지 유도)
     };
   }
 
@@ -205,7 +213,7 @@ export const getStoreData = (): StoreData => {
     users: storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS,
     boards: storedBoards ? JSON.parse(storedBoards) : INITIAL_BOARDS,
     posts: storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS,
-    currentUser: storedCurrentUser ? JSON.parse(storedCurrentUser) : INITIAL_USERS[0],
+    currentUser: storedCurrentUser ? JSON.parse(storedCurrentUser) : null,
   };
 };
 

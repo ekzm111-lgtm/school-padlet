@@ -1,7 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Image as ImageIcon, Link as LinkIcon, Palette, Send, Paperclip } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Palette,
+  Send,
+  Upload,
+  ClipboardCheck,
+  Sparkles,
+  Check,
+} from 'lucide-react';
 import { Post, User } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import confetti from 'canvas-confetti';
@@ -29,14 +39,61 @@ export default function CreatePostModal({
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [customAuthor, setCustomAuthor] = useState(currentUser?.name || '');
-  const [showImageInput, setShowImageInput] = useState(false);
+  const [showImageTools, setShowImageTools] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
+  const [pasteNotice, setPasteNotice] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (currentUser?.name) {
+      setCustomAuthor(currentUser.name);
+    }
+  }, [currentUser]);
+
+  // 클립보드 붙여넣기(Ctrl+V) 이미지 감지
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target?.result) {
+              setImageUrl(event.target.result as string);
+              setShowImageTools(true);
+              setPasteNotice(true);
+              setTimeout(() => setPasteNotice(false), 3000);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    }
+  };
+
+  // 로컬 파일 업로드
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setImageUrl(event.target.result as string);
+          setShowImageTools(true);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() && !title.trim()) return;
+    if (!content.trim() && !title.trim() && !imageUrl) return;
 
     const newPost: Post = {
       id: `post-${Date.now()}`,
@@ -46,7 +103,7 @@ export default function CreatePostModal({
       color,
       imageUrl: imageUrl.trim() || undefined,
       linkUrl: linkUrl.trim() || undefined,
-      authorName: customAuthor.trim() || currentUser?.name || '익명 학생',
+      authorName: customAuthor.trim() || currentUser?.name || '익명 참여자',
       authorRole: currentUser?.role || 'student',
       authorId: currentUser?.id || `anon-${Date.now()}`,
       reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
@@ -59,30 +116,38 @@ export default function CreatePostModal({
     saveStoreData.posts([newPost, ...data.posts]);
     onCreated(newPost);
 
-    // 가벼운 축하 효과
     try {
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.8 },
-      });
+      confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
     } catch (e) {}
 
     onClose();
   };
 
-  const sampleImages = [
-    { label: '실험/과학', url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=60' },
-    { label: '독서/책', url: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=60' },
-    { label: '자연/환경', url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&auto=format&fit=crop&q=60' },
-    { label: '미술/예술', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=60' },
+  // 학교 맞춤 테마별 추천 고화질 일러스트/사진
+  const themePresets = [
+    { label: '🧪 과학 실험', url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=60' },
+    { label: '📚 도서관/독서', url: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=60' },
+    { label: '🎨 미술/예술', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=60' },
+    { label: '🌱 자연과 환경', url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&auto=format&fit=crop&q=60' },
+    { label: '🚀 우주와 천문', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=60' },
+    { label: '💻 코딩과 로봇', url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=60' },
+    { label: '⚽ 체육/활동', url: 'https://images.unsplash.com/photo-1526232761682-d26e03ac148e?w=800&auto=format&fit=crop&q=60' },
+    { label: '📜 역사와 문화', url: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&auto=format&fit=crop&q=60' },
   ];
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-800">새 메모/과제 작성</h3>
+      <div
+        onPaste={handlePaste}
+        className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in duration-200"
+      >
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold text-slate-800">새 메모/과제 작성</h3>
+            <span className="text-[11px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
+              Ctrl+V 캡처 붙여넣기 지원
+            </span>
+          </div>
           <button
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
@@ -91,7 +156,14 @@ export default function CreatePostModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        {pasteNotice && (
+          <div className="mt-2 p-2 bg-emerald-50 text-emerald-700 text-xs rounded-xl flex items-center gap-1.5 font-bold animate-in fade-in">
+            <ClipboardCheck className="w-4 h-4" />
+            <span>캡처한 이미지가 바로 첨부되었습니다!</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {/* 작성자 이름 */}
           <div>
             <label className="block text-[11px] font-bold text-slate-600 mb-1">작성자 (이름 / 모둠명)</label>
@@ -108,71 +180,90 @@ export default function CreatePostModal({
           <div>
             <input
               type="text"
-              placeholder="제목을 입력하세요 (선택)"
+              placeholder="제목을 입력하세요"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none placeholder:font-normal"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
 
-          {/* 본문 */}
+          {/* 본문 (Ctrl+V 이미지 붙여넣기 가능) */}
           <div>
             <textarea
-              required
+              required={!imageUrl}
               rows={4}
-              placeholder="나누고 싶은 생각이나 조사한 내용을 자유롭게 적어보세요..."
+              placeholder="내용을 적어보세요... (화면 캡처 후 Ctrl+V 를 누르면 이미지가 바로 첨부됩니다)"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
             />
           </div>
 
-          {/* 이미지 첨부 토글/입력 */}
-          {showImageInput ? (
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>이미지 웹 주소(URL)</span>
-                <button
-                  type="button"
-                  onClick={() => setShowImageInput(false)}
-                  className="text-slate-400 hover:text-slate-600 text-[10px]"
-                >
-                  닫기
-                </button>
-              </div>
+          {/* 첨부된 이미지 미리보기 */}
+          {imageUrl && (
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200 group max-h-56 bg-slate-100">
+              <img src={imageUrl} alt="첨부 미리보기" className="w-full h-48 object-cover" />
+              <button
+                type="button"
+                onClick={() => setImageUrl('')}
+                className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full transition"
+                title="이미지 삭제"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* 이미지 첨부 도구 (캡처/업로드/테마 이미지) */}
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-blue-600" />
+                <span>사진/이미지 추가</span>
+              </span>
+              <span className="text-[10px] text-slate-400">화면 캡처 후 Ctrl+V 가능</span>
+            </div>
+
+            <div className="flex gap-2">
               <input
-                type="url"
-                placeholder="https://... 이미지 링크 주소"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none bg-white"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
               />
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                <span className="text-[10px] text-slate-400">추천 샘플:</span>
-                {sampleImages.map((s) => (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-blue-400 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 transition"
+              >
+                <Upload className="w-3.5 h-3.5 text-blue-500" />
+                <span>내 컴퓨터 사진 올리기</span>
+              </button>
+            </div>
+
+            {/* 테마 프리셋 갤러리 */}
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 mb-1.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>학교 수업 테마 이미지 선택 (원클릭)</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {themePresets.map((t) => (
                   <button
-                    key={s.label}
+                    key={t.label}
                     type="button"
-                    onClick={() => setImageUrl(s.url)}
-                    className="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 hover:border-blue-400 text-slate-600"
+                    onClick={() => setImageUrl(t.url)}
+                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-[10px] font-medium text-slate-700 text-center truncate transition"
                   >
-                    {s.label}
+                    {t.label}
                   </button>
                 ))}
               </div>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowImageInput(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-blue-600 font-medium"
-            >
-              <ImageIcon className="w-4 h-4 text-blue-500" />
-              <span>+ 사진/이미지 추가</span>
-            </button>
-          )}
+          </div>
 
-          {/* 링크 첨부 토글/입력 */}
+          {/* 링크 추가 */}
           {showLinkInput ? (
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
               <div className="flex items-center justify-between text-xs font-bold text-slate-700">
@@ -197,14 +288,14 @@ export default function CreatePostModal({
             <button
               type="button"
               onClick={() => setShowLinkInput(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-blue-600 font-medium ml-3"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-blue-600 font-medium"
             >
               <LinkIcon className="w-4 h-4 text-emerald-500" />
-              <span>+ 참고 링크 추가</span>
+              <span>+ 참고 링크(URL) 추가</span>
             </button>
           )}
 
-          {/* 포스트잇 색상 선택 */}
+          {/* 색상 선택 */}
           <div>
             <label className="block text-[11px] font-bold text-slate-600 mb-1.5">포스트잇 색상</label>
             <div className="flex items-center gap-2">
