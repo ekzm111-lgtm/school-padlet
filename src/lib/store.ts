@@ -1,4 +1,5 @@
 import { Board, Post, User, SystemSettings } from './types';
+import { fileStorage } from './fileStorage';
 
 const INITIAL_SETTINGS: SystemSettings = {
   autoApproveUsers: true,
@@ -191,6 +192,23 @@ export interface StoreData {
   currentUser: User | null;
 }
 
+// 대용량 파일(10MB) 첨부 시 localStorage 5MB 한계 극복을 위한 메모리 캐시 및 IndexedDB 연동
+let memoryPostsCache: Post[] | null = null;
+
+if (typeof window !== 'undefined') {
+  fileStorage.get('school_padlet_posts_full').then((fullJson) => {
+    if (fullJson) {
+      try {
+        const parsed = JSON.parse(fullJson);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryPostsCache = parsed;
+          window.dispatchEvent(new Event('store_updated'));
+        }
+      } catch (e) {}
+    }
+  });
+}
+
 export const getStoreData = (): StoreData => {
   if (typeof window === 'undefined') {
     return {
@@ -212,7 +230,7 @@ export const getStoreData = (): StoreData => {
     settings: storedSettings ? JSON.parse(storedSettings) : INITIAL_SETTINGS,
     users: storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS,
     boards: storedBoards ? JSON.parse(storedBoards) : INITIAL_BOARDS,
-    posts: storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS,
+    posts: memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS),
     currentUser: storedCurrentUser ? JSON.parse(storedCurrentUser) : null,
   };
 };
@@ -238,7 +256,26 @@ export const saveStoreData = {
   },
   posts: (data: Post[]) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(data));
+      // 1. 메모리 캐시 즉시 갱신
+      memoryPostsCache = data;
+
+      // 2. 대용량 파일(10MB) 저장을 위해 브라우저 내장 IndexedDB에 영구 저장 (용량 한도 수백 MB)
+      fileStorage.set('school_padlet_posts_full', JSON.stringify(data));
+
+      // 3. localStorage에도 저장 시도 (5MB 초과 시 메타데이터 백업)
+      try {
+        localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(data));
+      } catch (quotaErr) {
+        console.warn('LocalStorage quota reached (5MB limit). Using IndexedDB storage instead.');
+        try {
+          const lightweight = data.map((p) => ({
+            ...p,
+            attachments: p.attachments?.map((a) => ({ ...a, dataUrl: '' })),
+          }));
+          localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(lightweight));
+        } catch (e2) {}
+      }
+
       window.dispatchEvent(new Event('store_updated'));
     }
   },

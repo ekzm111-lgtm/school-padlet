@@ -159,18 +159,7 @@ export default function PostModal({
           ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
           : `${Math.round(file.size / 1024)} KB`;
 
-      // 만약 이미지 파일이고 아직 이미지가 지정되지 않았으면 이미지로도 첨부
-      if (file.type.startsWith('image/') && !imageUrl) {
-        const imgReader = new FileReader();
-        imgReader.onload = (ev) => {
-          if (ev.target?.result) {
-            setImageUrl(ev.target.result as string);
-            setShowImageTools(true);
-          }
-        };
-        imgReader.readAsDataURL(file);
-      }
-
+      // 첨부 파일은 순수하게 첨부 파일 목록(attachments)으로만 관리 (이미지와 중복 방지)
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
