@@ -20,11 +20,13 @@ import {
   Pencil,
   Trash2,
   X,
+  Palette,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
 import CreatePostModal from '@/components/CreatePostModal';
 import ShareModal from '@/components/ShareModal';
+import BackgroundModal from '@/components/BackgroundModal';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 
@@ -42,8 +44,9 @@ export default function BoardDetailPage() {
 
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showBgModal, setShowBgModal] = useState(false);
   const [activeColumn, setActiveColumn] = useState<string | undefined>(undefined);
-  const [currentLayout, setCurrentLayout] = useState<BoardLayout>('kanban'); // 기본: 칸반 열 형태
+  const [currentLayout, setCurrentLayout] = useState<BoardLayout>('kanban'); // 기본 칸반 열
   const [copiedLink, setCopiedLink] = useState(false);
 
   // 모둠(열) 이름 수정 상태
@@ -117,14 +120,13 @@ export default function BoardDetailPage() {
     setNewColName('');
     setShowAddColInput(false);
 
-    // 보드 객체에 저장
     const data = getStoreData();
     const updatedBoard = { ...board, columns: updatedCols };
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
     setBoard(updatedBoard);
   };
 
-  // 3) 모둠(열) 이름 수정 완료
+  // 3) 모둠(열) 이름 수정
   const handleSaveColName = (idx: number) => {
     if (!editingColName.trim()) {
       setEditingColIdx(null);
@@ -138,7 +140,6 @@ export default function BoardDetailPage() {
     setColumns(updatedCols);
     setEditingColIdx(null);
 
-    // 기존 카드의 column 필드도 새 이름으로 업데이트
     const updatedPosts = posts.map((p) => (p.column === oldName ? { ...p, column: newName } : p));
     setPosts(updatedPosts);
 
@@ -185,15 +186,13 @@ export default function BoardDetailPage() {
     saveStoreData.posts(updatedAll);
   };
 
-  // 6) 그리드 모드 드래그 앤 드롭 순서 변경 (Reorder)
+  // 6) 그리드 순서 변경
   const handleGridDragStart = (idx: number) => {
     dragItemIdx.current = idx;
   };
-
   const handleGridDragEnter = (idx: number) => {
     dragOverItemIdx.current = idx;
   };
-
   const handleGridDrop = () => {
     if (dragItemIdx.current === null || dragOverItemIdx.current === null) return;
     const reordered = [...posts];
@@ -264,17 +263,43 @@ export default function BoardDetailPage() {
     setPosts(posts.filter((p) => p.id !== postId));
   };
 
-  const themeClass = `theme-${board.theme || 'blue'}`;
+  // 카드 생성 콜백 (새 모둠이 함께 생성되었을 경우 columns 자동 갱신)
+  const handlePostCreated = (newPost: Post, newColName?: string) => {
+    setPosts([newPost, ...posts]);
+    if (newColName && !columns.includes(newColName)) {
+      const updatedCols = [...columns, newColName];
+      setColumns(updatedCols);
+      const data = getStoreData();
+      const updatedBoard = { ...board, columns: updatedCols };
+      saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+      setBoard(updatedBoard);
+    }
+  };
+
+  // 테마 및 커스텀 배경 스타일
+  const customBgStyle = board.customBgUrl
+    ? {
+        backgroundImage: `url(${board.customBgUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }
+    : undefined;
+
+  const themeClass = board.customBgUrl ? '' : `theme-${board.theme || 'blue'}`;
 
   return (
-    <div className={`min-h-screen flex flex-col ${themeClass}`}>
+    <div
+      style={customBgStyle}
+      className={`min-h-screen flex flex-col transition-all duration-300 ${themeClass}`}
+    >
       <div className="no-print">
         <Header />
       </div>
 
       {/* 상단 컨트롤 바 */}
-      <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-2.5 no-print shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 sm:px-6 py-2.5 no-print shadow-xs">
+        <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* 보드 타이틀 */}
           <div className="flex items-center gap-3">
             <Link
@@ -327,14 +352,24 @@ export default function BoardDetailPage() {
               <span>{board.code}</span>
             </button>
 
-            {/* 패들렛 레이아웃 전환 */}
+            {/* 🎨 배경 꾸미기 버튼 (요구사항) */}
+            <button
+              onClick={() => setShowBgModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition shadow-xs"
+              title="배경화면 꾸미기 및 사진 업로드"
+            >
+              <Palette className="w-3.5 h-3.5 text-purple-600" />
+              <span>배경 꾸미기</span>
+            </button>
+
+            {/* 레이아웃 전환 */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl">
               <button
                 onClick={() => setCurrentLayout('kanban')}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
                   currentLayout === 'kanban' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500'
                 }`}
-                title="모둠별 칸반 열 (드래그 앤 드롭 이동)"
+                title="모둠별 칸반 열"
               >
                 <Columns className="w-3.5 h-3.5" />
                 <span>칸반 열</span>
@@ -344,7 +379,7 @@ export default function BoardDetailPage() {
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
                   currentLayout === 'grid' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500'
                 }`}
-                title="그리드 바둑판 (드래그 순서 변경)"
+                title="그리드 바둑판 (순서 드래그)"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>그리드</span>
@@ -354,7 +389,7 @@ export default function BoardDetailPage() {
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
                   currentLayout === 'canvas' ? 'bg-white shadow-xs text-blue-600' : 'text-slate-500'
                 }`}
-                title="자유 캔버스 (마우스 자유 드래그)"
+                title="자유 캔버스 (자유 드래그)"
               >
                 <Move className="w-3.5 h-3.5" />
                 <span>자유 드래그</span>
@@ -402,11 +437,11 @@ export default function BoardDetailPage() {
         </div>
       </div>
 
-      {/* 메인 콘텐츠 영역 */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 overflow-x-auto">
+      {/* 메인 콘텐츠 영역: 화면이 안 잘리도록 풀스크린 가로 스크롤 지원 (w-full overflow-x-auto) */}
+      <main className="flex-1 w-full px-4 sm:px-6 py-6 overflow-x-auto select-none">
         {currentLayout === 'kanban' ? (
-          /* 🔥 1) 기본 모드: 모둠별 칸반 열 (열 무한 추가 & 이름 수정 & 드래그 앤 드롭) */
-          <div className="flex gap-5 items-start pb-8 min-w-full">
+          /* 🔥 1) 모둠 칸반 열 (상단 카드 추가 버튼 + 우측 무한 확장) */
+          <div className="flex gap-5 items-start pb-12 w-max min-w-full">
             {columns.map((colName, idx) => {
               const colPosts = posts.filter(
                 (p) => p.column === colName || (!p.column && idx === 0)
@@ -420,7 +455,7 @@ export default function BoardDetailPage() {
                   className="w-80 shrink-0 bg-white/85 backdrop-blur-md rounded-3xl p-4 border border-slate-200/90 shadow-sm flex flex-col min-h-[620px] transition hover:border-blue-300"
                 >
                   {/* 열 헤더 (이름 수정 및 삭제) */}
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 group">
+                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 group">
                     {editingColIdx === idx ? (
                       <div className="flex items-center gap-1 w-full">
                         <input
@@ -476,6 +511,20 @@ export default function BoardDetailPage() {
                     )}
                   </div>
 
+                  {/* 🔥 [+ 이 열에 카드 추가] 버튼을 제일 위쪽에 배치 (요구사항) */}
+                  {(!board.isLocked || isTeacherOrAdmin) && (
+                    <button
+                      onClick={() => {
+                        setActiveColumn(colName);
+                        setShowCreatePost(true);
+                      }}
+                      className="mb-3 w-full py-2.5 rounded-xl bg-slate-100/90 hover:bg-blue-50 hover:text-blue-600 text-slate-600 text-xs font-bold transition flex items-center justify-center gap-1.5 border border-slate-200/60 shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ 이 열에 카드 추가</span>
+                    </button>
+                  )}
+
                   {/* 카드 목록 (드래그 앤 드롭 이동) */}
                   <div className="space-y-4 flex-1">
                     {colPosts.map((post) => (
@@ -496,31 +545,17 @@ export default function BoardDetailPage() {
                       </div>
                     ))}
                   </div>
-
-                  {/* 이 열에 카드 추가 버튼 */}
-                  {(!board.isLocked || isTeacherOrAdmin) && (
-                    <button
-                      onClick={() => {
-                        setActiveColumn(colName);
-                        setShowCreatePost(true);
-                      }}
-                      className="mt-3 w-full py-2 rounded-xl bg-slate-100/90 hover:bg-blue-50 hover:text-blue-600 text-slate-600 text-xs font-bold transition flex items-center justify-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>이 열에 카드 추가</span>
-                    </button>
-                  )}
                 </div>
               );
             })}
 
-            {/* 🔥 새 모둠/섹션 열 추가 카드 */}
+            {/* 새 모둠(열) 계속 추가 카드 */}
             {(!board.isLocked || isTeacherOrAdmin) && (
               <div className="w-72 shrink-0">
                 {showAddColInput ? (
                   <form
                     onSubmit={handleAddColumn}
-                    className="p-4 bg-white/90 backdrop-blur-md rounded-3xl border border-blue-300 shadow-sm space-y-3"
+                    className="p-4 bg-white/95 backdrop-blur-md rounded-3xl border border-blue-300 shadow-md space-y-3"
                   >
                     <div className="text-xs font-bold text-slate-700">새 모둠(열) 추가</div>
                     <input
@@ -550,7 +585,7 @@ export default function BoardDetailPage() {
                 ) : (
                   <button
                     onClick={() => setShowAddColInput(true)}
-                    className="w-full py-3.5 rounded-3xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white/60 hover:bg-white text-slate-600 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
+                    className="w-full py-4 rounded-3xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white/70 hover:bg-white text-slate-600 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
                   >
                     <Plus className="w-4 h-4" />
                     <span>+ 새 모둠(열) 계속 추가</span>
@@ -560,9 +595,9 @@ export default function BoardDetailPage() {
             )}
           </div>
         ) : currentLayout === 'grid' ? (
-          /* 🔥 2) 그리드 모드: 마우스 드래그 앤 드롭으로 카드 순서 변경 (Reorder) */
+          /* 2) 그리드 모드 (드래그 순서 변경) */
           <div>
-            <div className="mb-3 text-xs font-bold text-slate-400 flex items-center gap-1.5">
+            <div className="mb-3 text-xs font-bold text-slate-500 flex items-center gap-1.5">
               <Move className="w-3.5 h-3.5 text-blue-500" />
               <span>카드를 마우스로 끌어서 다른 카드 위치로 놓으면 순서가 바로 바뀝니다.</span>
             </div>
@@ -590,14 +625,14 @@ export default function BoardDetailPage() {
             </div>
           </div>
         ) : (
-          /* 🔥 3) 자유 캔버스 모드 (마우스 자유 좌표 드래그) */
+          /* 3) 자유 캔버스 모드 */
           <div
             onMouseMove={handleMouseMoveCanvas}
             onMouseUp={handleMouseUpCanvas}
             onMouseLeave={handleMouseUpCanvas}
             className="relative min-h-[800px] w-full rounded-3xl border-2 border-dashed border-slate-300/60 p-4 transition overflow-hidden"
           >
-            <div className="absolute top-3 left-4 text-xs font-bold text-slate-400/80 pointer-events-none flex items-center gap-1.5">
+            <div className="absolute top-3 left-4 text-xs font-bold text-slate-500/80 pointer-events-none flex items-center gap-1.5">
               <MousePointer2 className="w-3.5 h-3.5" />
               <span>카드를 마우스로 잡고 원하는 위치로 자유롭게 드래그해 옮겨보세요!</span>
             </div>
@@ -651,14 +686,15 @@ export default function BoardDetailPage() {
         </button>
       )}
 
-      {/* 카드 작성 모달 */}
+      {/* 카드 작성 모달 (새 모둠 직접 추가 지원) */}
       <CreatePostModal
         isOpen={showCreatePost}
         onClose={() => setShowCreatePost(false)}
         boardId={board.id}
         currentUser={currentUser}
         defaultColumn={activeColumn}
-        onCreated={(newPost) => setPosts([newPost, ...posts])}
+        columns={columns}
+        onCreated={handlePostCreated}
       />
 
       {/* 공유 모달 */}
@@ -666,6 +702,14 @@ export default function BoardDetailPage() {
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         board={board}
+      />
+
+      {/* 배경화면 꾸미기 모달 */}
+      <BackgroundModal
+        isOpen={showBgModal}
+        onClose={() => setShowBgModal(false)}
+        board={board}
+        onUpdated={(up) => setBoard(up)}
       />
     </div>
   );

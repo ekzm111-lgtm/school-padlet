@@ -32,7 +32,8 @@ export interface Board {
   allowComments: boolean;
   allowReactions: boolean;
   isLocked: boolean;
-  columns?: string[]; // 모둠/섹션 열 목록 (동적 추가/수정 가능)
+  columns?: string[];
+  customBgUrl?: string; // 사용자가 직접 올린 배경화면 URL
   createdAt: string;
   postCount?: number;
 }
@@ -67,7 +68,7 @@ export interface Post {
   comments: PostComment[];
   pinned?: boolean;
   column?: string;
-  order?: number; // 정렬 순서
+  order?: number;
   x?: number;
   y?: number;
   createdAt: string;
