@@ -3,8 +3,8 @@ export type UserStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: string;
-  username?: string; // 예: admin
-  password?: string; // 기본: admin
+  username?: string;
+  password?: string;
   name: string;
   email: string;
   role: UserRole;
@@ -16,7 +16,7 @@ export interface User {
   createdAt: string;
 }
 
-export type BoardLayout = 'grid' | 'wall' | 'stream' | 'kanban';
+export type BoardLayout = 'canvas' | 'grid' | 'kanban' | 'stream';
 export type BoardTheme = 'blue' | 'cork' | 'blackboard' | 'gradient' | 'warm';
 
 export interface Board {
@@ -59,11 +59,6 @@ export interface Post {
   color: 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'white';
   imageUrl?: string;
   linkUrl?: string;
-  fileAttachment?: {
-    name: string;
-    url: string;
-    size?: string;
-  };
   authorName: string;
   authorRole: UserRole;
   authorId: string;
@@ -71,6 +66,8 @@ export interface Post {
   comments: PostComment[];
   pinned?: boolean;
   column?: string;
+  x?: number; // 자유 캔버스 드래그 X 좌표
+  y?: number; // 자유 캔버스 드래그 Y 좌표
   createdAt: string;
   updatedAt?: string;
 }

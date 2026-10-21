@@ -107,17 +107,17 @@ export default function CreateBoardModal({
             <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
-                onClick={() => setLayout('grid')}
+                onClick={() => setLayout('canvas')}
                 className={`p-3.5 rounded-2xl border-2 text-left transition flex flex-col justify-between ${
-                  layout === 'grid'
+                  layout === 'canvas'
                     ? 'border-blue-600 bg-blue-50/50 text-blue-900'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
                 <LayoutGrid className="w-5 h-5 mb-2 text-blue-600" />
                 <div>
-                  <div className="font-bold text-xs">그리드 (격자)</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">정갈한 카드 바둑판 배치</div>
+                  <div className="font-bold text-xs">자유 캔버스</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">마우스로 자유롭게 드래그</div>
                 </div>
               </button>
 
@@ -139,17 +139,17 @@ export default function CreateBoardModal({
 
               <button
                 type="button"
-                onClick={() => setLayout('stream')}
+                onClick={() => setLayout('grid')}
                 className={`p-3.5 rounded-2xl border-2 text-left transition flex flex-col justify-between ${
-                  layout === 'stream'
+                  layout === 'grid'
                     ? 'border-blue-600 bg-blue-50/50 text-blue-900'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
                 <Rows className="w-5 h-5 mb-2 text-teal-600" />
                 <div>
-                  <div className="font-bold text-xs">타임라인 (피드)</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">위에서 아래로 흐르는 글</div>
+                  <div className="font-bold text-xs">격자 그리드</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">정갈한 바둑판 배치</div>
                 </div>
               </button>
             </div>

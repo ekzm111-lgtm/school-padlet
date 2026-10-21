@@ -13,7 +13,7 @@ import {
   Check,
 } from 'lucide-react';
 import { Post, User } from '@/lib/types';
-import { getStoreData, saveStoreData } from '@/lib/store';
+import { getStoreData, saveStoreData, addMyPostId } from '@/lib/store';
 import confetti from 'canvas-confetti';
 
 interface CreatePostModalProps {
@@ -109,11 +109,14 @@ export default function CreatePostModal({
       reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
       comments: [],
       column: defaultColumn || undefined,
+      x: 30 + (Math.random() * 200),
+      y: 80 + (Math.random() * 200),
       createdAt: '방금 전',
     };
 
     const data = getStoreData();
     saveStoreData.posts([newPost, ...data.posts]);
+    addMyPostId(newPost.id);
     onCreated(newPost);
 
     try {

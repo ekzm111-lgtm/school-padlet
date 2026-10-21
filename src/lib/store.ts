@@ -181,6 +181,21 @@ const STORAGE_KEYS = {
   BOARDS: 'school_padlet_boards',
   POSTS: 'school_padlet_posts',
   CURRENT_USER: 'school_padlet_current_user',
+  MY_POST_IDS: 'school_padlet_my_post_ids',
+};
+
+export const getMyPostIds = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(STORAGE_KEYS.MY_POST_IDS);
+  return stored ? JSON.parse(stored) : [];
+};
+
+export const addMyPostId = (postId: string) => {
+  if (typeof window === 'undefined') return;
+  const list = getMyPostIds();
+  if (!list.includes(postId)) {
+    localStorage.setItem(STORAGE_KEYS.MY_POST_IDS, JSON.stringify([...list, postId]));
+  }
 };
 
 export interface StoreData {

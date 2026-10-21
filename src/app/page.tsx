@@ -179,7 +179,8 @@ export default function HomePage() {
                 warm: 'from-orange-50 to-amber-50 border-orange-200',
               };
 
-              const layoutNames = {
+              const layoutNames: Record<string, string> = {
+                canvas: '자유 드래그',
                 grid: '그리드',
                 kanban: '칸반(열)',
                 stream: '타임라인',

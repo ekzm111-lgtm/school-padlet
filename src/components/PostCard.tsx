@@ -14,7 +14,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { Post, User } from '@/lib/types';
-import { getStoreData, saveStoreData } from '@/lib/store';
+import { getStoreData, saveStoreData, getMyPostIds } from '@/lib/store';
 import EditPostModal from './EditPostModal';
 import confetti from 'canvas-confetti';
 
@@ -91,15 +91,18 @@ export default function PostCard({
     saveStoreData.posts(updatedPosts);
   };
 
+  const myPostIds = getMyPostIds();
+  const isAuthor =
+    (currentUser && currentUser.id === currentPost.authorId) ||
+    (currentUser && currentUser.name === currentPost.authorName) ||
+    myPostIds.includes(currentPost.id);
+
   const canEdit =
     currentUser?.role === 'admin' ||
     currentUser?.role === 'teacher' ||
-    (currentUser && currentUser.id === currentPost.authorId);
+    isAuthor;
 
-  const canDelete =
-    currentUser?.role === 'admin' ||
-    currentUser?.role === 'teacher' ||
-    (currentUser && currentUser.id === currentPost.authorId);
+  const canDelete = canEdit;
 
   const cardColorClass = {
     yellow: 'card-color-yellow',
@@ -137,7 +140,7 @@ export default function PostCard({
               </span>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-slate-500 font-medium">
                 {currentPost.updatedAt || currentPost.createdAt}
               </span>
@@ -145,10 +148,11 @@ export default function PostCard({
               {canEdit && (
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="p-1 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-black/5 transition"
-                  title="카드 내용 수정"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-xs transition"
+                  title="내가 쓴 글 수정하기"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Pencil className="w-3 h-3" />
+                  <span>수정</span>
                 </button>
               )}
 
