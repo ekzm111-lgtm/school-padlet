@@ -141,11 +141,21 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 🔥 최고급 다이나믹 히어로 배너 */}
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-indigo-900 via-blue-700 to-sky-500 text-white p-8 sm:p-12 shadow-2xl mb-10 border border-white/10">
-          {/* 배경 발광 블러 효과 */}
-          <div className="absolute -right-12 -top-12 w-96 h-96 bg-sky-400/25 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -left-12 -bottom-12 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+        {/* 🔥 학교/교실 실사진 배경을 적용한 프리미엄 히어로 배너 */}
+        <div className="relative overflow-hidden rounded-[2.5rem] text-white p-8 sm:p-12 shadow-2xl mb-10 border border-white/20 group">
+          {/* 실제 학교/교실 고화질 실사진 배경 */}
+          <div
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+            style={{
+              backgroundImage: `url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1800&auto=format&fit=crop&q=80')`,
+            }}
+          />
+
+          {/* 선명한 텍스트 가독성을 위한 고급 그라데이션 오버레이 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-blue-950/85 to-indigo-950/75 backdrop-blur-[1px]" />
+
+          {/* 은은한 빛 효과 */}
+          <div className="absolute -right-12 -top-12 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             <div className="max-w-2xl">
@@ -170,7 +180,7 @@ export default function HomePage() {
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-blue-800 hover:bg-blue-50 font-black text-sm shadow-xl shadow-black/15 transition-all hover:scale-105 active:scale-95"
+                  className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-blue-800 hover:bg-blue-50 font-black text-sm shadow-xl shadow-black/20 transition-all hover:scale-105 active:scale-95"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
                   <span>새 협업 보드 만들기</span>
@@ -178,7 +188,7 @@ export default function HomePage() {
 
                 <button
                   onClick={() => setActiveTab('template')}
-                  className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 backdrop-blur-md text-white font-bold text-sm transition"
+                  className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white/20 hover:bg-white/30 border border-white/25 backdrop-blur-md text-white font-bold text-sm transition"
                 >
                   <Layers className="w-4 h-4 text-amber-300" />
                   <span>추천 템플릿 복제하기</span>
@@ -188,7 +198,7 @@ export default function HomePage() {
 
             {/* 우측 다이나믹 통계 위젯 카드 */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full lg:w-80 shrink-0">
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 flex flex-col justify-between">
+              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 flex flex-col justify-between shadow-lg">
                 <div className="text-[11px] font-bold text-blue-200 flex items-center gap-1.5">
                   <Globe className="w-3.5 h-3.5 text-sky-300" />
                   <span>공유된 보드</span>
@@ -199,7 +209,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 flex flex-col justify-between">
+              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 flex flex-col justify-between shadow-lg">
                 <div className="text-[11px] font-bold text-blue-200 flex items-center gap-1.5">
                   <FileCheck className="w-3.5 h-3.5 text-emerald-300" />
                   <span>나눈 메모/카드</span>
@@ -210,17 +220,17 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="col-span-2 bg-gradient-to-r from-amber-500/20 to-purple-500/20 backdrop-blur-md rounded-2xl p-4 border border-white/15">
+              <div className="col-span-2 bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-lg">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-amber-200 flex items-center gap-1">
                     <TrendingUp className="w-3.5 h-3.5 text-amber-300" />
                     <span>실시간 협업 상태</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/80 text-white font-bold animate-pulse">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-bold animate-pulse shadow-xs">
                     LIVE 연결됨
                   </span>
                 </div>
-                <div className="text-[11px] text-white/80 mt-1.5">
+                <div className="text-[11px] text-white/85 mt-1.5">
                   수업 중 학생들의 카드와 모둠 활동이 실시간 동기화 중입니다.
                 </div>
               </div>
