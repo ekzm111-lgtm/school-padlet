@@ -143,42 +143,67 @@ export default function PostModal({
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, [isOpen]);
 
-  // 🔥 다중 파일 처리 공통 함수 (드래그 드롭 & 파일 선택 모두 지원, 중복 방지)
-  const processFiles = (fileList: FileList | File[]) => {
+  // 🔥 다중 파일 처리 공통 함수 (Promise.all 및 Set 기반 중복 완전 박멸)
+  const processFiles = async (fileList: FileList | File[]) => {
     setFileError('');
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
     const filesArray = Array.from(fileList);
 
-    filesArray.forEach((file) => {
-      if (file.size > MAX_SIZE) {
-        setFileError(`⚠️ '${file.name}' 파일이 10MB를 초과하여 제외되었습니다.`);
-        return;
+    // 1차: 입력 단계에서 동일 파일 중복 필터링
+    const uniqueFiles: File[] = [];
+    const seen = new Set<string>();
+    for (const f of filesArray) {
+      const key = `${f.name}_${f.size}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueFiles.push(f);
       }
+    }
 
-      const formattedSize =
-        file.size > 1024 * 1024
-          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-          : `${Math.round(file.size / 1024)} KB`;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const newAtt: FileAttachment = {
-            name: file.name,
-            size: formattedSize,
-            type: file.type || file.name.split('.').pop() || '',
-            dataUrl: event.target.result as string,
-          };
-          // 파일 목록에 중복 방지 (같은 이름과 같은 크기면 1개만 유지)
-          setAttachments((prev) => {
-            if (prev.some((a) => a.name === newAtt.name && a.size === newAtt.size)) {
-              return prev;
-            }
-            return [...prev, newAtt];
-          });
+    // 2차: 비동기 파일 읽기를 Promise.all로 병렬 수행
+    const readFilePromise = (file: File): Promise<FileAttachment | null> => {
+      return new Promise((resolve) => {
+        if (file.size > MAX_SIZE) {
+          setFileError(`⚠️ '${file.name}' 파일이 10MB를 초과하여 제외되었습니다.`);
+          resolve(null);
+          return;
         }
-      };
-      reader.readAsDataURL(file);
+
+        const formattedSize =
+          file.size > 1024 * 1024
+            ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+            : `${Math.round(file.size / 1024)} KB`;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            resolve({
+              name: file.name,
+              size: formattedSize,
+              type: file.type || file.name.split('.').pop() || '',
+              dataUrl: event.target.result as string,
+            });
+          } else {
+            resolve(null);
+          }
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const results = await Promise.all(uniqueFiles.map(readFilePromise));
+    const validNewAttachments = results.filter((r): r is FileAttachment => r !== null);
+
+    // 3차: 단 한 번의 원자적(Atomic) 상태 업데이트로 React Race Condition 완벽 차단
+    setAttachments((prev) => {
+      const combined = [...prev];
+      for (const newAtt of validNewAttachments) {
+        if (!combined.some((item) => item.name === newAtt.name && item.size === newAtt.size)) {
+          combined.push(newAtt);
+        }
+      }
+      return combined;
     });
   };
 

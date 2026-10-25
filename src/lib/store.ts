@@ -61,6 +61,32 @@ const INITIAL_USERS: User[] = [
 
 const INITIAL_BOARDS: Board[] = [
   {
+    id: 'board-digital-tutor-2025',
+    code: '202501',
+    title: '2025. 디지털튜터 강의의 복제물',
+    description: '디지털튜터 양성 및 역량 강화 실습 강의를 위한 수업 협업 및 실습 보드입니다.',
+    layout: 'kanban',
+    theme: 'blue',
+    coverImageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+    authorId: 'user-admin',
+    authorName: 'minwan kim (디지털튜터 강사)',
+    authorRole: 'teacher',
+    allowStudentPost: true,
+    allowComments: true,
+    allowReactions: true,
+    isLocked: false,
+    isPublic: true,
+    category: '수업자료',
+    columns: [
+      '[1강] 디지털 기초 & 기기 활용',
+      '[2강] 에듀테크 도구 탐구',
+      '[3강] 수업 실습 & 교안 제작',
+      '[4강] 디지털튜터 코칭 사례',
+      '자료 나눔 & Q&A',
+    ],
+    createdAt: '2025-11-08',
+  },
+  {
     id: 'board-1',
     code: '782914',
     title: '🌿 2학년 3반 과학 탐구: 신재생 에너지 아이디어 보드',
@@ -120,6 +146,81 @@ const INITIAL_BOARDS: Board[] = [
 ];
 
 const INITIAL_POSTS: Post[] = [
+  {
+    id: 'dt-post-1',
+    boardId: 'board-digital-tutor-2025',
+    title: '📱 [1강] 태블릿 기기 기본 설정 & 미러링 가이드',
+    content: '수업 시작 5분 전 교실 와이파이 연결 상태 및 미러링(무선 화면 전송) 점검 체크리스트입니다.',
+    color: 'blue',
+    imageUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
+    linkUrl: 'https://padlet.com/ekzm111/2025-4bqdzenxzjr0mjty',
+    authorName: 'minwan kim (강사)',
+    authorRole: 'teacher',
+    authorId: 'user-admin',
+    column: '[1강] 디지털 기초 & 기기 활용',
+    reactions: { like: 8, clap: 5, heart: 6, insight: 4 },
+    comments: [],
+    createdAt: '2025-11-08 09:30',
+  },
+  {
+    id: 'dt-post-2',
+    boardId: 'board-digital-tutor-2025',
+    title: '🎨 [2강] 패들릿 & 캔바 협업 템플릿 실습',
+    content: '학생들이 직접 아이디어를 카드에 적고, 실시간으로 생각을 공유하는 상호작용 수업 설계 기법을 배웁니다.',
+    color: 'yellow',
+    imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80',
+    linkUrl: 'https://padlet.com',
+    authorName: 'minwan kim (강사)',
+    authorRole: 'teacher',
+    authorId: 'user-admin',
+    column: '[2강] 에듀테크 도구 탐구',
+    reactions: { like: 12, clap: 9, heart: 7, insight: 5 },
+    comments: [],
+    createdAt: '2025-11-08 11:15',
+  },
+  {
+    id: 'dt-post-3',
+    boardId: 'board-digital-tutor-2025',
+    title: '📄 [3강] 모둠별 협업 수업계획서 서식 (HWP/PDF)',
+    content: '실습용 협업 수업계획서 양식 파일입니다. 다운로드받아 모둠별로 작성 후 이 열에 업로드해 주세요.',
+    color: 'purple',
+    authorName: 'minwan kim (강사)',
+    authorRole: 'teacher',
+    authorId: 'user-admin',
+    column: '[3강] 수업 실습 & 교안 제작',
+    reactions: { like: 6, clap: 4, heart: 5, insight: 3 },
+    comments: [],
+    createdAt: '2025-11-08 14:00',
+  },
+  {
+    id: 'dt-post-4',
+    boardId: 'board-digital-tutor-2025',
+    title: '🌟 [4강] 디지털 기기 장애 대처 & 1:1 맞춤 코칭 팁',
+    content: '소리가 안 나거나 앱이 튕길 때 3초 해결법, 기기 조작이 서툰 학생을 격려하며 이끄는 튜터링 노하우입니다.',
+    color: 'green',
+    imageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
+    authorName: 'minwan kim (강사)',
+    authorRole: 'teacher',
+    authorId: 'user-admin',
+    column: '[4강] 디지털튜터 코칭 사례',
+    reactions: { like: 15, clap: 8, heart: 11, insight: 9 },
+    comments: [],
+    createdAt: '2025-11-08 15:45',
+  },
+  {
+    id: 'dt-post-5',
+    boardId: 'board-digital-tutor-2025',
+    title: '💬 강의 참여 소감 및 질문 나눔방',
+    content: '오늘 강의에서 가장 인상 깊었던 내용이나 현장 적용 시 궁금한 점을 자유롭게 적어주세요!',
+    color: 'pink',
+    authorName: 'minwan kim (강사)',
+    authorRole: 'teacher',
+    authorId: 'user-admin',
+    column: '자료 나눔 & Q&A',
+    reactions: { like: 9, clap: 12, heart: 8, insight: 6 },
+    comments: [],
+    createdAt: '2025-11-08 17:00',
+  },
   {
     id: 'post-1',
     boardId: 'board-1',
@@ -226,11 +327,28 @@ export const getStoreData = (): StoreData => {
   const storedPosts = localStorage.getItem(STORAGE_KEYS.POSTS);
   const storedCurrentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
 
+  let boardsList: Board[] = storedBoards ? JSON.parse(storedBoards) : INITIAL_BOARDS;
+  // '2025. 디지털튜터 강의의 복제물' 보드 자동 동기화
+  const hasDigitalTutorBoard = boardsList.some((b) => b.id === 'board-digital-tutor-2025');
+  if (!hasDigitalTutorBoard) {
+    boardsList = [INITIAL_BOARDS[0], ...boardsList];
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
+    } catch (e) {}
+  }
+
+  let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
+  const hasDtPost = postsList.some((p) => p.boardId === 'board-digital-tutor-2025');
+  if (!hasDtPost) {
+    const dtPosts = INITIAL_POSTS.filter((p) => p.boardId === 'board-digital-tutor-2025');
+    postsList = [...dtPosts, ...postsList];
+  }
+
   return {
     settings: storedSettings ? JSON.parse(storedSettings) : INITIAL_SETTINGS,
     users: storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS,
-    boards: storedBoards ? JSON.parse(storedBoards) : INITIAL_BOARDS,
-    posts: memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS),
+    boards: boardsList,
+    posts: postsList,
     currentUser: storedCurrentUser ? JSON.parse(storedCurrentUser) : null,
   };
 };
