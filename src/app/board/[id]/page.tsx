@@ -30,6 +30,7 @@ import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
+import { createShortUrl } from '@/lib/shortUrl';
 
 const DEFAULT_COLUMNS = ['모둠 1 (조사 및 계획)', '모둠 2 (의견 토론)', '모둠 3 (결과 정리)'];
 
@@ -127,12 +128,23 @@ export default function BoardDetailPage() {
     }
   };
 
-  // 학생 초대 링크 복사
-  const handleCopyInviteLink = () => {
+  // 학생 초대 단축 링크 복사
+  const handleCopyInviteLink = async () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const inviteUrl = `${origin}/join/${board.code}`;
-    navigator.clipboard.writeText(inviteUrl);
+    const shortPath = `${origin}/j/${board.code}`;
+    
+    // 우선 즉시 빠른 단축 경로 복사
+    navigator.clipboard.writeText(shortPath);
     setCopiedLink(true);
+
+    // 글로벌 초단축 링크(is.gd / tinyurl) 비동기 생성 시도하여 클립보드 교체
+    try {
+      const shortUrl = await createShortUrl(shortPath);
+      if (shortUrl && shortUrl !== shortPath) {
+        navigator.clipboard.writeText(shortUrl);
+      }
+    } catch (e) {}
+
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
