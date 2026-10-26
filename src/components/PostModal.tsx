@@ -62,7 +62,6 @@ export default function PostModal({
   const [newColumnInput, setNewColumnInput] = useState('');
 
   const [showImageTools, setShowImageTools] = useState(false);
-  const [showLinkInput, setShowLinkInput] = useState(false);
   const [pasteNotice, setPasteNotice] = useState(false);
   const [fileError, setFileError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -97,7 +96,6 @@ export default function PostModal({
       }
       setAttachments(existingFiles);
       if (post.imageUrl) setShowImageTools(true);
-      if (post.linkUrl) setShowLinkInput(true);
     } else {
       // 생성 모드
       setTitle('');
@@ -109,7 +107,6 @@ export default function PostModal({
       setSelectedColumn(defaultColumn || columns[0] || '모둠 1');
       setAttachments([]);
       setShowImageTools(false);
-      setShowLinkInput(false);
     }
     setFileError('');
     setIsCreatingNewColumn(false);
@@ -527,76 +524,108 @@ export default function PostModal({
             </div>
           )}
 
-          {/* 첨부된 대표 이미지 미리보기 */}
-          {imageUrl && (
-            <div className="relative rounded-2xl overflow-hidden border border-slate-200 group max-h-56 bg-slate-100">
-              <img src={imageUrl} alt="첨부 미리보기" className="w-full h-48 object-cover" />
-              <button
-                type="button"
-                onClick={() => setImageUrl('')}
-                className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full transition"
-                title="이미지 삭제"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {/* 이미지 도구 (프리셋 갤러리) */}
-          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          {/* 대표 이미지 (웹 이미지 링크 주소 입력 + 수업 테마 선택) */}
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <ImageIcon className="w-4 h-4 text-blue-600" />
-                <span>학교 수업 테마 이미지 선택</span>
+                <span>대표 이미지 (이미지 링크 주소 넣기 또는 테마)</span>
               </span>
               <span className="text-[10px] text-slate-400">화면 캡처 후 Ctrl+V 가능</span>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 pt-1">
-              {themePresets.map((t) => (
+            {/* 이미지 링크 주소 직접 입력 */}
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                placeholder="이미지 링크(URL) 주소 직접 입력 (예: https://.../image.png)"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-xs outline-none bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+              />
+              {imageUrl && (
                 <button
-                  key={t.label}
                   type="button"
-                  onClick={() => setImageUrl(t.url)}
-                  className="p-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-500 text-[10px] font-medium text-slate-700 text-center truncate transition"
+                  onClick={() => setImageUrl('')}
+                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shrink-0"
                 >
-                  {t.label}
+                  지우기
                 </button>
-              ))}
+              )}
+            </div>
+
+            {/* 첨부된 대표 이미지 미리보기 */}
+            {imageUrl && (
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 group max-h-56 bg-slate-100">
+                <img
+                  src={imageUrl}
+                  alt="대표 이미지 미리보기"
+                  className="w-full h-44 object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.opacity = '0.5';
+                  }}
+                />
+                <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-white text-[10px] rounded-md font-bold">
+                  이미지 미리보기
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl('')}
+                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full transition shadow-md"
+                  title="이미지 삭제"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* 학교 수업 테마 이미지 선택 (원클릭) */}
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 mb-1.5">학교 수업 테마 이미지 선택:</div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {themePresets.map((t) => (
+                  <button
+                    key={t.label}
+                    type="button"
+                    onClick={() => setImageUrl(t.url)}
+                    className={`p-1.5 rounded-lg border text-[10px] font-medium text-center truncate transition ${
+                      imageUrl === t.url
+                        ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold ring-1 ring-blue-500'
+                        : 'bg-white border-slate-200 hover:border-blue-400 text-slate-700'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* 링크 추가 */}
-          {showLinkInput ? (
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+          {/* 참고 링크(URL) - 항상 오픈 형식 */}
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <LinkIcon className="w-4 h-4 text-emerald-600" />
                 <span>참고 링크(URL)</span>
+              </label>
+              {linkUrl && (
                 <button
                   type="button"
-                  onClick={() => setShowLinkInput(false)}
-                  className="text-slate-400 hover:text-slate-600 text-[10px]"
+                  onClick={() => setLinkUrl('')}
+                  className="text-[10px] text-slate-400 hover:text-red-500 font-normal transition"
                 >
-                  닫기
+                  지우기
                 </button>
-              </div>
-              <input
-                type="url"
-                placeholder="https://..."
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none bg-white"
-              />
+              )}
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowLinkInput(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-blue-600 font-medium"
-            >
-              <LinkIcon className="w-4 h-4 text-emerald-500" />
-              <span>+ 참고 링크(URL) 추가</span>
-            </button>
-          )}
+            <input
+              type="url"
+              placeholder="https://... (클릭 시 새 창으로 연결될 웹사이트/유튜브/자료 주소를 입력하세요)"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs outline-none bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+            />
+          </div>
 
           {/* 색상 선택 */}
           <div>
