@@ -1,5 +1,14 @@
 import { Board, Post, User, SystemSettings } from './types';
 import { fileStorage } from './fileStorage';
+import { isSupabaseConfigured, supabase } from './supabase';
+import {
+  fetchRemoteBoards,
+  fetchRemotePosts,
+  saveRemoteBoard,
+  saveRemotePost,
+  deleteRemoteBoard,
+  deleteRemotePost,
+} from './supabaseStore';
 
 const INITIAL_SETTINGS: SystemSettings = {
   autoApproveUsers: true,
@@ -374,6 +383,47 @@ if (typeof window !== 'undefined') {
       } catch (e) {}
     }
   });
+
+  // Supabase 클라우드 실시간 자동 동기화
+  if (isSupabaseConfigured && supabase) {
+    fetchRemoteBoards().then((remoteBoards) => {
+      if (remoteBoards && remoteBoards.length > 0) {
+        localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(remoteBoards));
+        window.dispatchEvent(new Event('store_updated'));
+      }
+    });
+
+    fetchRemotePosts().then((remotePosts) => {
+      if (remotePosts && remotePosts.length > 0) {
+        memoryPostsCache = remotePosts;
+        localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(remotePosts));
+        window.dispatchEvent(new Event('store_updated'));
+      }
+    });
+
+    try {
+      supabase
+        .channel('schoolpad_live_channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+          fetchRemotePosts().then((posts) => {
+            if (posts) {
+              memoryPostsCache = posts;
+              localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(posts));
+              window.dispatchEvent(new Event('store_updated'));
+            }
+          });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, () => {
+          fetchRemoteBoards().then((boards) => {
+            if (boards) {
+              localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boards));
+              window.dispatchEvent(new Event('store_updated'));
+            }
+          });
+        })
+        .subscribe();
+    } catch (e) {}
+  }
 }
 
 export const getStoreData = (): StoreData => {
@@ -452,6 +502,9 @@ export const saveStoreData = {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(data));
       window.dispatchEvent(new Event('store_updated'));
     }
+    if (isSupabaseConfigured) {
+      data.forEach((b) => saveRemoteBoard(b));
+    }
   },
   posts: (data: Post[]) => {
     if (typeof window !== 'undefined') {
@@ -476,6 +529,9 @@ export const saveStoreData = {
       }
 
       window.dispatchEvent(new Event('store_updated'));
+    }
+    if (isSupabaseConfigured) {
+      data.forEach((p) => saveRemotePost(p));
     }
   },
   currentUser: (data: User | null) => {

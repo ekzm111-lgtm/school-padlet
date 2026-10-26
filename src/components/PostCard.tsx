@@ -129,7 +129,7 @@ export default function PostCard({
   return (
     <>
       <div
-        className={`relative rounded-2xl p-5 border shadow-sm transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
+        className={`relative rounded-2xl p-3.5 sm:p-5 border shadow-sm transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
       >
         {/* 상단 핀 & 작성자 & 수정/삭제 버튼 */}
         <div>
