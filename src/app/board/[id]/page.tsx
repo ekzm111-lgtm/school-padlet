@@ -136,16 +136,34 @@ export default function BoardDetailPage() {
   // 학생 초대 단축 링크 복사
   const handleCopyInviteLink = async () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const minimalBoard = {
+      id: board.id,
+      code: board.code,
+      title: board.title,
+      description: board.description || '',
+      layout: board.layout || 'kanban',
+      theme: board.theme || 'blue',
+      coverImageUrl: board.coverImageUrl || '',
+      customBgUrl: board.customBgUrl || '',
+      authorId: board.authorId,
+      authorName: board.authorName,
+      columns: board.columns || [],
+      allowComments: board.allowComments !== false,
+      allowReactions: board.allowReactions !== false,
+      isLocked: Boolean(board.isLocked),
+    };
+    const bPayload = encodeURIComponent(JSON.stringify(minimalBoard));
+    const targetWithPayload = `${origin}/join/${board.code}?b=${bPayload}`;
     const shortPath = `${origin}/j/${board.code}`;
     
     // 우선 즉시 빠른 단축 경로 복사
     navigator.clipboard.writeText(shortPath);
     setCopiedLink(true);
 
-    // 글로벌 초단축 링크(is.gd / tinyurl) 비동기 생성 시도하여 클립보드 교체
+    // 글로벌 초단축 링크(is.gd / tinyurl) 비동기 생성 시도 (보드 데이터 페이로드 포함하여 타 기기 자동 복원)
     try {
-      const shortUrl = await createShortUrl(shortPath);
-      if (shortUrl && shortUrl !== shortPath) {
+      const shortUrl = await createShortUrl(targetWithPayload);
+      if (shortUrl && shortUrl !== targetWithPayload) {
         navigator.clipboard.writeText(shortUrl);
       }
     } catch (e) {}

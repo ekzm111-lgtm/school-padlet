@@ -20,6 +20,24 @@ export default function ShareModal({ isOpen, onClose, board }: ShareModalProps) 
   const [isLoadingShort, setIsLoadingShort] = useState(false);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const minimalBoard = {
+    id: board.id,
+    code: board.code,
+    title: board.title,
+    description: board.description || '',
+    layout: board.layout || 'kanban',
+    theme: board.theme || 'blue',
+    coverImageUrl: board.coverImageUrl || '',
+    customBgUrl: board.customBgUrl || '',
+    authorId: board.authorId,
+    authorName: board.authorName,
+    columns: board.columns || [],
+    allowComments: board.allowComments !== false,
+    allowReactions: board.allowReactions !== false,
+    isLocked: Boolean(board.isLocked),
+  };
+  const bPayload = encodeURIComponent(JSON.stringify(minimalBoard));
+  const targetWithPayload = `${origin}/join/${board.code}?b=${bPayload}`;
   const standardJoinUrl = `${origin}/j/${board.code}`;
 
   useEffect(() => {
@@ -28,8 +46,8 @@ export default function ShareModal({ isOpen, onClose, board }: ShareModalProps) 
     let isMounted = true;
     setIsLoadingShort(true);
 
-    // 글로벌 초단축 링크 자동 생성
-    createShortUrl(standardJoinUrl).then((resUrl) => {
+    // 글로벌 초단축 링크 자동 생성 (타 기기에서도 열리도록 보드 데이터 페이로드 포함)
+    createShortUrl(targetWithPayload).then((resUrl) => {
       if (isMounted) {
         setShortUrl(resUrl);
         setIsLoadingShort(false);
@@ -39,7 +57,7 @@ export default function ShareModal({ isOpen, onClose, board }: ShareModalProps) 
     return () => {
       isMounted = false;
     };
-  }, [isOpen, standardJoinUrl]);
+  }, [isOpen, targetWithPayload]);
 
   if (!isOpen) return null;
 

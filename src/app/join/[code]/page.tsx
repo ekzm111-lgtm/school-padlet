@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   GraduationCap,
@@ -15,10 +15,12 @@ import {
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { Board, User } from '@/lib/types';
 
-export default function GlobalJoinPage() {
+function JoinPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const code = params.code as string;
+  const bData = searchParams?.get('b');
 
   const [board, setBoard] = useState<Board | null>(null);
   const [studentName, setStudentName] = useState('');
@@ -26,13 +28,30 @@ export default function GlobalJoinPage() {
 
   useEffect(() => {
     const data = getStoreData();
-    const found = data.boards.find((b) => b.code === code);
+    let found = data.boards.find((b) => b.code === code);
+
+    // 타 기기나 시크릿 창이라 로컬스토리지에 없는 경우, URL에 전달된 압축 보드 데이터(b)로 자동 복원
+    if (!found && bData) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(bData));
+        if (decoded && decoded.code === code) {
+          found = decoded;
+          // 이 기기의 로컬 저장소에도 보드 등록
+          const updatedBoards = [decoded, ...data.boards];
+          saveStoreData.boards(updatedBoards);
+        }
+      } catch (e) {
+        console.error('Failed to parse board payload', e);
+      }
+    }
+
     if (found) {
       setBoard(found);
+      setErrorMsg('');
     } else {
       setErrorMsg(`참여코드 [${code}]에 해당하는 수업 보드를 찾을 수 없습니다.`);
     }
-  }, [code]);
+  }, [code, bData]);
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,5 +139,13 @@ export default function GlobalJoinPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+export default function GlobalJoinPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-xs text-slate-500 font-bold">로딩 중...</div>}>
+      <JoinPageContent />
+    </Suspense>
   );
 }

@@ -486,15 +486,20 @@ export default function HomePage() {
 
                   {/* 하단 공유 & 복제 액션 버튼들 */}
                   <div
-                    className={`mt-6 pt-4 border-t flex items-center justify-between text-xs ${
+                    className={`mt-6 pt-4 border-t flex items-center justify-between text-xs gap-2 ${
                       isBlackboard ? 'border-emerald-800/60 text-emerald-300/80' : 'border-slate-200/70 text-slate-500'
                     }`}
                   >
-                    <div className="flex items-center gap-1 font-medium text-[11px]">
-                      <span>{board.authorName}</span>
+                    {/* 작성자 이름 (길어져도 버튼을 침범하지 않고 말줄임 처리) */}
+                    <div
+                      className="flex items-center gap-1 font-medium text-[11px] min-w-0 flex-1"
+                      title={board.authorName}
+                    >
+                      <span className="truncate">{board.authorName}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    {/* 액션 버튼 그룹 (절대 줄바꿈되거나 찌그러지지 않도록 고정) */}
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {/* 보드 정보 수정 버튼 (본인이 만든 보드 / 복사한 보드만 가능) */}
                       {canEditBoard && (
                         <button
@@ -502,7 +507,7 @@ export default function HomePage() {
                             e.stopPropagation();
                             setEditingBoard(board);
                           }}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition shadow-xs ${
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition shadow-xs whitespace-nowrap shrink-0 ${
                             isBlackboard
                               ? 'bg-emerald-800 hover:bg-emerald-700 text-emerald-100'
                               : 'bg-white hover:bg-amber-50 text-amber-700 border border-slate-200 hover:border-amber-300'
@@ -517,7 +522,7 @@ export default function HomePage() {
                       {/* 🔥 보드 복제(Copy/Remix) 버튼 */}
                       <button
                         onClick={(e) => handleDuplicateBoard(e, board)}
-                        className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition shadow-xs ${
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition shadow-xs whitespace-nowrap shrink-0 ${
                           isBlackboard
                             ? 'bg-emerald-800 hover:bg-emerald-700 text-white'
                             : 'bg-white hover:bg-blue-50 text-blue-700 border border-slate-200'
@@ -525,13 +530,13 @@ export default function HomePage() {
                         title="이 보드를 내 보드로 통째로 복사해오기"
                       >
                         <Copy className="w-3 h-3 text-blue-500" />
-                        <span>복제하기</span>
+                        <span>복제</span>
                       </button>
 
                       {/* 링크 복사 버튼 */}
                       <button
                         onClick={(e) => handleCopyLink(e, board.code)}
-                        className="p-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition"
+                        className="p-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition shrink-0"
                         title="학생 참여 링크 복사"
                       >
                         {copiedLink === board.code ? (
@@ -541,7 +546,7 @@ export default function HomePage() {
                         )}
                       </button>
 
-                      <div className="flex items-center gap-1 font-bold group-hover:translate-x-1 transition text-blue-600 ml-1">
+                      <div className="flex items-center gap-1 font-bold group-hover:translate-x-1 transition text-blue-600 ml-1 shrink-0 whitespace-nowrap">
                         <span>입장</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </div>
