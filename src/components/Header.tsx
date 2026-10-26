@@ -194,23 +194,6 @@ export default function Header() {
                   </div>
                 </div>
 
-                {/* 빠른 계정 전환 (체험/테스트 용이성) */}
-                <select
-                  value={currentUser.id}
-                  onChange={(e) => {
-                    const selected = users.find((u) => u.id === e.target.value);
-                    if (selected) saveStoreData.currentUser(selected);
-                  }}
-                  className="text-xs bg-slate-100 hover:bg-slate-200 border-none rounded-lg py-1.5 px-2 text-slate-700 font-medium cursor-pointer focus:ring-2 focus:ring-blue-500"
-                  title="테스트용 계정 전환"
-                >
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      [{u.role === 'admin' ? '관리자' : u.role === 'teacher' ? '교사' : '학생'}] {u.name}
-                    </option>
-                  ))}
-                </select>
-
                 <button
                   onClick={() => {
                     saveStoreData.currentUser(null);
