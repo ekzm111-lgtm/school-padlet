@@ -82,19 +82,31 @@ export default function PostModal({
 
     if (mode === 'edit' && post) {
       setTitle(post.title || '');
-      setContent(post.content || '');
-      setColor(post.color || 'yellow');
-      setImageUrl(post.imageUrl || '');
-      setLinkUrl(post.linkUrl || '');
-      setCustomAuthor(post.authorName || '');
-      setSelectedColumn(post.column || defaultColumn || columns[0] || '모둠 1');
-      // 기존 단일 파일과 복수 파일 통합
+      let cleanContent = post.content || '';
       const existingFiles: FileAttachment[] = [];
       if (post.attachments && post.attachments.length > 0) {
         existingFiles.push(...post.attachments);
       } else if (post.fileAttachment) {
         existingFiles.push(post.fileAttachment);
       }
+      if (cleanContent.includes('<!--SCHOOLPAD_META:')) {
+        const metaMatch = cleanContent.match(/<!--SCHOOLPAD_META:([\s\S]*?)-->/);
+        if (metaMatch && metaMatch[1]) {
+          try {
+            const parsed = JSON.parse(metaMatch[1]);
+            if (Array.isArray(parsed.attachments) && existingFiles.length === 0) {
+              existingFiles.push(...parsed.attachments);
+            }
+          } catch (e) {}
+        }
+        cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
+      }
+      setContent(cleanContent);
+      setColor(post.color || 'yellow');
+      setImageUrl(post.imageUrl || '');
+      setLinkUrl(post.linkUrl || '');
+      setCustomAuthor(post.authorName || '');
+      setSelectedColumn(post.column || defaultColumn || columns[0] || '모둠 1');
       setAttachments(existingFiles);
       if (post.imageUrl) setShowImageTools(true);
     } else {

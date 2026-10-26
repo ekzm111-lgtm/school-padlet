@@ -81,29 +81,52 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
     }
     const { data, error } = await query;
     if (error || !data) return null;
-    return data.map((p) => ({
-      id: p.id,
-      boardId: p.board_id,
-      title: p.title,
-      content: p.content || '',
-      color: p.color || 'yellow',
-      imageUrl: p.image_url || '',
-      linkUrl: p.link_url || '',
-      authorId: p.author_id || 'user-student',
-      authorName: p.author_name || '학생',
-      authorRole: 'student',
-      column: p.column_id || '모둠 1',
-      reactions: {
-        like: Array.isArray(p.likes) ? p.likes.length : 0,
-        clap: 0,
-        heart: 0,
-        insight: 0,
-      },
-      comments: [],
-      attachments: [],
-      pinned: false,
-      createdAt: p.created_at ? new Date(p.created_at).toLocaleString() : '',
-    }));
+    return data.map((p) => {
+      let rawContent = p.content || '';
+      let attachments: FileAttachment[] = [];
+      let comments: any[] = [];
+
+      // content 내에 인코딩된 첨부파일 및 댓글 메타데이터 복원
+      if (rawContent.includes('<!--SCHOOLPAD_META:')) {
+        const metaMatch = rawContent.match(/<!--SCHOOLPAD_META:([\s\S]*?)-->/);
+        if (metaMatch && metaMatch[1]) {
+          try {
+            const parsed = JSON.parse(metaMatch[1]);
+            if (Array.isArray(parsed.attachments)) {
+              attachments = parsed.attachments;
+            }
+            if (Array.isArray(parsed.comments)) {
+              comments = parsed.comments;
+            }
+          } catch (e) {}
+        }
+        rawContent = rawContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
+      }
+
+      return {
+        id: p.id,
+        boardId: p.board_id,
+        title: p.title,
+        content: rawContent,
+        color: p.color || 'yellow',
+        imageUrl: p.image_url || '',
+        linkUrl: p.link_url || '',
+        authorId: p.author_id || 'user-student',
+        authorName: p.author_name || '학생',
+        authorRole: 'student',
+        column: p.column_id || '모둠 1',
+        reactions: {
+          like: Array.isArray(p.likes) ? p.likes.length : 0,
+          clap: 0,
+          heart: 0,
+          insight: 0,
+        },
+        comments: comments,
+        attachments: attachments,
+        pinned: false,
+        createdAt: p.created_at ? new Date(p.created_at).toLocaleString() : '',
+      };
+    });
   } catch (e) {
     console.error('fetchRemotePosts error', e);
     return null;
@@ -113,12 +136,35 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
 export async function saveRemotePost(post: Post): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
+    let cleanContent = post.content || '';
+    cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
+
+    // 첨부파일과 댓글을 메타데이터로 함께 인코딩하여 저장
+    const meta: { attachments?: FileAttachment[]; comments?: any[] } = {};
+    const atts: FileAttachment[] = [];
+    if (post.attachments && post.attachments.length > 0) {
+      atts.push(...post.attachments);
+    } else if (post.fileAttachment) {
+      atts.push(post.fileAttachment);
+    }
+    if (atts.length > 0) {
+      meta.attachments = atts;
+    }
+    if (post.comments && post.comments.length > 0) {
+      meta.comments = post.comments;
+    }
+
+    let finalContent = cleanContent;
+    if (Object.keys(meta).length > 0) {
+      finalContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
+    }
+
     const { error } = await supabase.from('posts').upsert({
       id: post.id,
       board_id: post.boardId,
       column_id: post.column || '모둠 1',
       title: post.title,
-      content: post.content || '',
+      content: finalContent,
       color: post.color || 'yellow',
       image_url: post.imageUrl || null,
       link_url: post.linkUrl || null,

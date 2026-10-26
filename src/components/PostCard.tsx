@@ -118,12 +118,26 @@ export default function PostCard({
     white: 'card-color-white',
   }[currentPost.color || 'yellow'] || 'card-color-yellow';
 
-  // 첨부 파일 목록 취합 (다중 파일 + 단일 파일 호환)
+  // 첨부 파일 목록 취합 (다중 파일 + 단일 파일 호환 + 클라우드 메타데이터 복원)
+  let displayContent = currentPost.content || '';
   const allAttachments: FileAttachment[] = [];
   if (currentPost.attachments && currentPost.attachments.length > 0) {
     allAttachments.push(...currentPost.attachments);
   } else if (currentPost.fileAttachment) {
     allAttachments.push(currentPost.fileAttachment);
+  }
+
+  if (displayContent.includes('<!--SCHOOLPAD_META:')) {
+    const metaMatch = displayContent.match(/<!--SCHOOLPAD_META:([\s\S]*?)-->/);
+    if (metaMatch && metaMatch[1]) {
+      try {
+        const parsed = JSON.parse(metaMatch[1]);
+        if (Array.isArray(parsed.attachments) && allAttachments.length === 0) {
+          allAttachments.push(...parsed.attachments);
+        }
+      } catch (e) {}
+    }
+    displayContent = displayContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
   }
 
   return (
@@ -198,9 +212,9 @@ export default function PostCard({
           )}
 
           {/* 본문 */}
-          {currentPost.content && (
+          {displayContent && (
             <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-all [overflow-wrap:anywhere]">
-              {currentPost.content}
+              {displayContent}
             </p>
           )}
 
