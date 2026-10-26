@@ -502,9 +502,6 @@ export const saveStoreData = {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(data));
       window.dispatchEvent(new Event('store_updated'));
     }
-    if (isSupabaseConfigured) {
-      data.forEach((b) => saveRemoteBoard(b));
-    }
   },
   posts: (data: Post[]) => {
     if (typeof window !== 'undefined') {
@@ -529,9 +526,6 @@ export const saveStoreData = {
       }
 
       window.dispatchEvent(new Event('store_updated'));
-    }
-    if (isSupabaseConfigured) {
-      data.forEach((p) => saveRemotePost(p));
     }
   },
   currentUser: (data: User | null) => {

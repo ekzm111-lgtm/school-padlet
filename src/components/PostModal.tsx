@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { Post, User, FileAttachment } from '@/lib/types';
 import { getStoreData, saveStoreData, addMyPostId } from '@/lib/store';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { saveRemotePost } from '@/lib/supabaseStore';
 import confetti from 'canvas-confetti';
 
 interface PostModalProps {
@@ -326,6 +328,9 @@ export default function PostModal({
 
       const data = getStoreData();
       saveStoreData.posts(data.posts.map((p) => (p.id === post.id ? updated : p)));
+      if (isSupabaseConfigured) {
+        saveRemotePost(updated);
+      }
       if (onUpdated) onUpdated(updated);
       setIsSubmitting(false);
       onClose();
@@ -354,6 +359,9 @@ export default function PostModal({
 
       const data = getStoreData();
       saveStoreData.posts([newPost, ...data.posts]);
+      if (isSupabaseConfigured) {
+        saveRemotePost(newPost);
+      }
       addMyPostId(newPost.id);
       if (onCreated) onCreated(newPost, createdColumnName);
 
@@ -463,7 +471,7 @@ export default function PostModal({
                 onChange={(e) => setSelectedColumn(e.target.value)}
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold outline-none bg-white focus:ring-2 focus:ring-blue-500"
               >
-                {columns.map((col) => (
+                {Array.from(new Set([...columns, selectedColumn].filter(Boolean))).map((col) => (
                   <option key={col} value={col}>
                     {col}
                   </option>

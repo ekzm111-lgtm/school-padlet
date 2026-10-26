@@ -34,7 +34,7 @@ import BackgroundModal from '@/components/BackgroundModal';
 import QrModal from '@/components/QrModal';
 import { getStoreData, saveStoreData, duplicateBoard, deletePost } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchRemotePosts } from '@/lib/supabaseStore';
+import { fetchRemotePosts, saveRemoteBoard, saveRemotePost } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
 
@@ -171,50 +171,48 @@ export default function BoardDetailPage() {
     return () => window.removeEventListener('store_updated', handleUpdate);
   }, [boardId]);
 
-  // 🔥 실시간 동기화 (Supabase Realtime 채널 + 3초 주기 자동 폴링 백업)
-  // 학생과 교사가 서로 다른 기기에서 작업할 때 1~3초 내에 자동 화면 반영!
+  // 🔥 실시간 동기화 (Supabase Realtime 채널 + 2초 주기 자동 폴링 백업)
+  // 학생과 교사가 서로 다른 기기에서 작업할 때 1~2초 내에 자동 화면 반영 (게시글 + 모둠 열)!
   useEffect(() => {
     if (!boardId) return;
+
+    const syncRemoteData = async () => {
+      if (!isSupabaseConfigured || !supabase) return;
+      try {
+        // 1. 최신 게시글 동기화
+        const remote = await fetchRemotePosts(boardId);
+        if (remote) {
+          setPosts(remote);
+        }
+
+        // 2. 최신 모둠(열) 실시간 동기화 (학생이 123 만들면 선생님 화면에도 123 컬럼 즉시 생성!)
+        const { data: dbBoard } = await supabase
+          .from('boards')
+          .select('columns')
+          .or(`id.eq.${boardId},code.eq.${boardId}`)
+          .maybeSingle();
+
+        if (dbBoard && Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
+          setColumns(dbBoard.columns);
+          setBoard((prev) => (prev ? { ...prev, columns: dbBoard.columns } : prev));
+        }
+      } catch (e) {
+        console.error('syncRemoteData error', e);
+      }
+    };
 
     let channel: any = null;
     if (isSupabaseConfigured && supabase) {
       try {
         channel = supabase
           .channel(`board_live_sub_${boardId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'posts',
-            },
-            async () => {
-              const remote = await fetchRemotePosts(boardId);
-              if (remote) {
-                setPosts(remote);
-                const data = getStoreData();
-                const other = data.posts.filter((p) => p.boardId !== boardId);
-                saveStoreData.posts([...remote, ...other]);
-              }
-            }
-          )
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, syncRemoteData)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, syncRemoteData)
           .subscribe();
       } catch (e) {}
     }
 
-    const pollTimer = setInterval(async () => {
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const remote = await fetchRemotePosts(boardId);
-          if (remote) {
-            setPosts(remote);
-            const data = getStoreData();
-            const other = data.posts.filter((p) => p.boardId !== boardId);
-            saveStoreData.posts([...remote, ...other]);
-          }
-        } catch (e) {}
-      }
-    }, 3000);
+    const pollTimer = setInterval(syncRemoteData, 2000);
 
     return () => {
       if (channel && supabase) {
@@ -317,6 +315,9 @@ export default function BoardDetailPage() {
     const updatedBoard = { ...board, columns: updatedCols };
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
     setBoard(updatedBoard);
+    if (isSupabaseConfigured) {
+      saveRemoteBoard(updatedBoard);
+    }
   };
 
   // 모둠(열) 이름 수정
@@ -341,6 +342,10 @@ export default function BoardDetailPage() {
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
     saveStoreData.posts(data.posts.map((p) => (p.column === oldName ? { ...p, column: newName } : p)));
     setBoard(updatedBoard);
+    if (isSupabaseConfigured) {
+      saveRemoteBoard(updatedBoard);
+      updatedPosts.filter((p) => p.column === newName).forEach((p) => saveRemotePost(p));
+    }
   };
 
   // 모둠(열) 삭제
@@ -358,6 +363,10 @@ export default function BoardDetailPage() {
       saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
       saveStoreData.posts(data.posts.map((p) => (p.column === colName ? { ...p, column: targetCol } : p)));
       setBoard(updatedBoard);
+      if (isSupabaseConfigured) {
+        saveRemoteBoard(updatedBoard);
+        updatedPosts.filter((p) => p.column === targetCol).forEach((p) => saveRemotePost(p));
+      }
     }
   };
 
@@ -403,6 +412,9 @@ export default function BoardDetailPage() {
     const updatedBoard = { ...board, columns: updatedCols };
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
     setBoard(updatedBoard);
+    if (isSupabaseConfigured) {
+      saveRemoteBoard(updatedBoard);
+    }
   };
 
   // 같은 열 또는 다른 열의 특정 카드 위에 드롭했을 때 순서 변경
@@ -449,6 +461,9 @@ export default function BoardDetailPage() {
     const data = getStoreData();
     const otherBoardPosts = data.posts.filter((p) => p.boardId !== boardId);
     saveStoreData.posts([...otherBoardPosts, ...currentPosts]);
+    if (isSupabaseConfigured) {
+      saveRemotePost(updatedCard);
+    }
   };
 
   // 열 빈 공간에 드롭했을 때 맨 뒤로 이동
@@ -484,6 +499,9 @@ export default function BoardDetailPage() {
     const data = getStoreData();
     const otherBoardPosts = data.posts.filter((p) => p.boardId !== boardId);
     saveStoreData.posts([...otherBoardPosts, ...currentPosts]);
+    if (isSupabaseConfigured) {
+      saveRemotePost(updatedCard);
+    }
   };
 
   // 그리드 순서 변경
@@ -576,12 +594,18 @@ export default function BoardDetailPage() {
       const updatedBoard = { ...board, columns: updatedCols };
       saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
       setBoard(updatedBoard);
+      if (isSupabaseConfigured) {
+        saveRemoteBoard(updatedBoard);
+      }
     }
   };
 
   // 카드 수정 콜백
   const handlePostUpdated = (updated: Post) => {
     setPosts(posts.map((p) => (p.id === updated.id ? updated : p)));
+    if (isSupabaseConfigured) {
+      saveRemotePost(updated);
+    }
   };
 
   const customBgStyle = board.customBgUrl
