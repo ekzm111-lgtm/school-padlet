@@ -61,6 +61,26 @@ const INITIAL_USERS: User[] = [
 
 const INITIAL_BOARDS: Board[] = [
   {
+    id: 'board-vibecoding',
+    code: '999190',
+    title: '바이브코딩 교육자료',
+    description: '바이브코딩 실습 및 교육 자료 공유를 위한 수업 보드입니다.',
+    layout: 'kanban',
+    theme: 'blue',
+    coverImageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+    authorId: 'user-vibecoding',
+    authorName: '바이브코딩',
+    authorRole: 'teacher',
+    allowStudentPost: true,
+    allowComments: true,
+    allowReactions: true,
+    isLocked: false,
+    isPublic: true,
+    category: '수업자료',
+    columns: ['모둠 1', '모둠 2', '모둠 3'],
+    createdAt: '2026-10-25',
+  },
+  {
     id: 'board-digital-tutor-2025',
     code: '202501',
     title: '2025. 디지털튜터 강의의 복제물',
@@ -146,6 +166,52 @@ const INITIAL_BOARDS: Board[] = [
 ];
 
 const INITIAL_POSTS: Post[] = [
+  {
+    id: 'post-vibe-1',
+    boardId: 'board-vibecoding',
+    title: 'QR 동의서 샘플',
+    content: '구글 앱스스크립트를 활용한 학생/학부모 QR 모바일 동의서 실습 양식입니다.',
+    color: 'yellow',
+    imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=60',
+    linkUrl: 'https://script.google.com/macros/s/AKfycbz_sample',
+    authorId: 'user-vibecoding',
+    authorName: '바이브',
+    authorRole: 'teacher',
+    column: '모둠 1',
+    reactions: { like: 5, clap: 3, heart: 2, insight: 1 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-vibe-2',
+    boardId: 'board-vibecoding',
+    title: '엑셀시트 데이터',
+    content: '실시간 응답 데이터를 취합하고 분석하는 스프레드시트 예시 자료입니다.',
+    color: 'blue',
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=60',
+    linkUrl: 'https://docs.google.com/spreadsheets/d/sample',
+    authorId: 'user-vibecoding',
+    authorName: '바이브',
+    authorRole: 'teacher',
+    column: '모둠 1',
+    reactions: { like: 4, clap: 2, heart: 1, insight: 0 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-vibe-3',
+    boardId: 'board-vibecoding',
+    title: '교육자료 유인물',
+    content: '수업에 필요한 필수 활동지 및 참고 유인물 모음입니다.',
+    color: 'white',
+    authorId: 'user-vibecoding',
+    authorName: '바이브',
+    authorRole: 'teacher',
+    column: '모둠 2',
+    reactions: { like: 3, clap: 1, heart: 0, insight: 0 },
+    comments: [],
+    createdAt: '방금 전',
+  },
   {
     id: 'dt-post-1',
     boardId: 'board-digital-tutor-2025',
@@ -328,16 +394,31 @@ export const getStoreData = (): StoreData => {
   const storedCurrentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
 
   let boardsList: Board[] = storedBoards ? JSON.parse(storedBoards) : INITIAL_BOARDS;
-  // '2025. 디지털튜터 강의의 복제물' 보드 자동 동기화
-  const hasDigitalTutorBoard = boardsList.some((b) => b.id === 'board-digital-tutor-2025');
-  if (!hasDigitalTutorBoard) {
-    boardsList = [INITIAL_BOARDS[0], ...boardsList];
+  // '바이브코딩 교육자료' (999190) 및 '2025. 디지털튜터' 보드 자동 동기화
+  const vibeBoard = INITIAL_BOARDS.find((b) => b.code === '999190');
+  const dtBoard = INITIAL_BOARDS.find((b) => b.code === '202501');
+
+  if (vibeBoard && !boardsList.some((b) => b.code === '999190')) {
+    boardsList = [vibeBoard, ...boardsList];
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
+    } catch (e) {}
+  }
+
+  if (dtBoard && !boardsList.some((b) => b.code === '202501')) {
+    boardsList = [dtBoard, ...boardsList];
     try {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
     } catch (e) {}
   }
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
+  const hasVibePost = postsList.some((p) => p.boardId === 'board-vibecoding');
+  if (!hasVibePost) {
+    const vibePosts = INITIAL_POSTS.filter((p) => p.boardId === 'board-vibecoding');
+    postsList = [...vibePosts, ...postsList];
+  }
+
   const hasDtPost = postsList.some((p) => p.boardId === 'board-digital-tutor-2025');
   if (!hasDtPost) {
     const dtPosts = INITIAL_POSTS.filter((p) => p.boardId === 'board-digital-tutor-2025');

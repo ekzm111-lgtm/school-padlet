@@ -22,10 +22,12 @@ import {
   TrendingUp,
   Share2,
   Pencil,
+  QrCode,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import CreateBoardModal from '@/components/CreateBoardModal';
 import EditBoardModal from '@/components/EditBoardModal';
+import QrModal from '@/components/QrModal';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
 import { Board, User } from '@/lib/types';
 import confetti from 'canvas-confetti';
@@ -37,6 +39,7 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingBoard, setEditingBoard] = useState<Board | null>(null);
+  const [qrBoard, setQrBoard] = useState<Board | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
@@ -546,6 +549,18 @@ export default function HomePage() {
                         )}
                       </button>
 
+                      {/* 🔥 QR 코드 초대 버튼 */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQrBoard(board);
+                        }}
+                        className="p-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition shrink-0"
+                        title="스마트폰/태블릿 카메라 스캔용 대형 QR코드 초대"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                      </button>
+
                       <div className="flex items-center gap-1 font-bold group-hover:translate-x-1 transition text-blue-600 ml-1 shrink-0 whitespace-nowrap">
                         <span>입장</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -586,6 +601,15 @@ export default function HomePage() {
             loadData();
             setEditingBoard(null);
           }}
+        />
+      )}
+
+      {/* 🔥 대형 QR코드 초대 모달 (다운로드 & 빔프로젝터 모드 지원) */}
+      {qrBoard && (
+        <QrModal
+          isOpen={Boolean(qrBoard)}
+          onClose={() => setQrBoard(null)}
+          board={qrBoard}
         />
       )}
     </div>

@@ -23,12 +23,14 @@ import {
   Palette,
   Globe,
   GripVertical,
+  QrCode,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
 import PostModal from '@/components/PostModal';
 import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
+import QrModal from '@/components/QrModal';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
@@ -50,6 +52,7 @@ export default function BoardDetailPage() {
   const [selectedPostForEdit, setSelectedPostForEdit] = useState<Post | undefined>(undefined);
 
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [showBgModal, setShowBgModal] = useState(false);
   const [activeColumn, setActiveColumn] = useState<string | undefined>(undefined);
   const [currentLayout, setCurrentLayout] = useState<BoardLayout>('kanban');
@@ -517,11 +520,21 @@ export default function BoardDetailPage() {
               <span>{copiedLink ? '링크 복사됨!' : '🔗 학생 참여링크 복사'}</span>
             </button>
 
+            {/* 🔥 학생 참여 QR코드 초대 버튼 */}
+            <button
+              onClick={() => setShowQrModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold transition shadow-sm active:scale-95"
+              title="스마트폰/태블릿 교실 카메라 스캔용 대형 QR코드 초대창 열기"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>QR 초대</span>
+            </button>
+
             {/* 6자리 참여 핀코드 뱃지 */}
             <button
-              onClick={() => setShowShareModal(true)}
+              onClick={() => setShowQrModal(true)}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-mono font-bold hover:bg-blue-100 transition"
-              title="QR코드 확인"
+              title="QR코드 및 참여정보 확인"
             >
               <Hash className="w-3.5 h-3.5" />
               <span>{board.code}</span>
@@ -985,6 +998,13 @@ export default function BoardDetailPage() {
       <ShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
+        board={board}
+      />
+
+      {/* QR코드 전용 초대 모달 (대형 빔프로젝터 모드 및 이미지 저장 지원) */}
+      <QrModal
+        isOpen={showQrModal}
+        onClose={() => setShowQrModal(false)}
         board={board}
       />
 
