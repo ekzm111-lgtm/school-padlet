@@ -6,27 +6,32 @@ import { Board, Post, User, FileAttachment } from './types';
 export async function fetchRemoteBoards(): Promise<Board[] | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const { data, error } = await supabase.from('boards').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('boards')
+      .select('*')
+      .order('created_at', { ascending: false });
     if (error || !data) return null;
     return data.map((b) => ({
       id: b.id,
       code: b.code,
       title: b.title,
       description: b.description || '',
-      layout: b.layout || 'kanban',
+      layout: 'kanban',
       theme: b.theme || 'blue',
-      coverImageUrl: b.cover_image_url || '',
-      customBgUrl: b.custom_bg_url || '',
-      authorId: b.author_id,
-      authorName: b.author_name,
-      authorRole: b.author_role,
-      columns: b.columns || ['모둠 1', '모둠 2', '모둠 3'],
-      allowStudentPost: b.allow_student_post !== false,
-      allowComments: b.allow_comments !== false,
-      allowReactions: b.allow_reactions !== false,
-      isLocked: Boolean(b.is_locked),
-      isPublic: b.is_public !== false,
-      category: b.category || '수업자료',
+      coverImageUrl:
+        b.cover_image_url ||
+        'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+      customBgUrl: '',
+      authorId: b.author_id || 'user-admin',
+      authorName: b.author_name || '관리자',
+      authorRole: 'teacher',
+      columns: Array.isArray(b.columns) ? b.columns : ['모둠 1', '모둠 2', '모둠 3'],
+      allowStudentPost: true,
+      allowComments: true,
+      allowReactions: true,
+      isLocked: false,
+      isPublic: true,
+      category: '수업자료',
       createdAt: b.created_at ? new Date(b.created_at).toISOString().split('T')[0] : '',
     }));
   } catch (e) {
@@ -42,23 +47,15 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       id: board.id,
       code: board.code,
       title: board.title,
-      description: board.description,
-      layout: board.layout || 'kanban',
+      description: board.description || '',
       theme: board.theme || 'blue',
-      cover_image_url: board.coverImageUrl || '',
-      custom_bg_url: board.customBgUrl || '',
-      author_id: board.authorId,
-      author_name: board.authorName,
-      author_role: board.authorRole,
-      columns: board.columns,
-      allow_student_post: board.allowStudentPost,
-      allow_comments: board.allowComments,
-      allow_reactions: board.allowReactions,
-      is_locked: board.isLocked,
-      is_public: board.isPublic,
-      category: board.category,
+      columns: board.columns || ['모둠 1', '모둠 2', '모둠 3'],
     });
-    return !error;
+    if (error) {
+      console.error('saveRemoteBoard error', error);
+      return false;
+    }
+    return true;
   } catch (e) {
     console.error('saveRemoteBoard error', e);
     return false;
@@ -92,16 +89,19 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
       color: p.color || 'yellow',
       imageUrl: p.image_url || '',
       linkUrl: p.link_url || '',
-      authorId: p.author_id,
-      authorName: p.author_name,
-      authorRole: p.author_role,
-      column: p.column_name,
-      reactions: p.reactions || { like: 0, clap: 0, heart: 0, insight: 0 },
-      comments: p.comments || [],
-      attachments: p.attachments || [],
-      pinned: Boolean(p.pinned),
-      x: p.x,
-      y: p.y,
+      authorId: p.author_id || 'user-student',
+      authorName: p.author_name || '학생',
+      authorRole: 'student',
+      column: p.column_id || '모둠 1',
+      reactions: {
+        like: Array.isArray(p.likes) ? p.likes.length : 0,
+        clap: 0,
+        heart: 0,
+        insight: 0,
+      },
+      comments: [],
+      attachments: [],
+      pinned: false,
       createdAt: p.created_at ? new Date(p.created_at).toLocaleString() : '',
     }));
   } catch (e) {
@@ -116,23 +116,21 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     const { error } = await supabase.from('posts').upsert({
       id: post.id,
       board_id: post.boardId,
+      column_id: post.column || '모둠 1',
       title: post.title,
-      content: post.content,
-      color: post.color,
-      image_url: post.imageUrl || '',
-      link_url: post.linkUrl || '',
-      author_id: post.authorId,
-      author_name: post.authorName,
-      author_role: post.authorRole,
-      column_name: post.column,
-      reactions: post.reactions,
-      comments: post.comments,
-      attachments: post.attachments || [],
-      pinned: post.pinned,
-      x: post.x,
-      y: post.y,
+      content: post.content || '',
+      color: post.color || 'yellow',
+      image_url: post.imageUrl || null,
+      link_url: post.linkUrl || null,
+      author_id: post.authorId || 'student',
+      author_name: post.authorName || '학생',
+      order_index: post.order || 0,
     });
-    return !error;
+    if (error) {
+      console.error('saveRemotePost error', error);
+      return false;
+    }
+    return true;
   } catch (e) {
     console.error('saveRemotePost error', e);
     return false;

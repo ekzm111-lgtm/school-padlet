@@ -280,23 +280,45 @@ export default function PostCard({
             </div>
           )}
 
-          {/* 첨부 링크 */}
-          {currentPost.linkUrl && (
-            <a
-              href={
-                currentPost.linkUrl.startsWith('http://') || currentPost.linkUrl.startsWith('https://')
-                  ? currentPost.linkUrl
-                  : `https://${currentPost.linkUrl}`
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/5 hover:bg-black/10 text-[11px] text-blue-700 font-medium truncate transition"
-            >
-              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{currentPost.linkUrl}</span>
-            </a>
-          )}
+          {/* 첨부 링크 (구글 드라이브 특별 디자인 적용) */}
+          {currentPost.linkUrl && (() => {
+            const isGoogleDrive =
+              currentPost.linkUrl.includes('drive.google.com') ||
+              currentPost.linkUrl.includes('docs.google.com');
+            return (
+              <a
+                href={
+                  currentPost.linkUrl.startsWith('http://') || currentPost.linkUrl.startsWith('https://')
+                    ? currentPost.linkUrl
+                    : `https://${currentPost.linkUrl}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition shadow-xs ${
+                  isGoogleDrive
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
+                    : 'bg-black/5 hover:bg-black/10 text-blue-700'
+                }`}
+                title={currentPost.linkUrl}
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  {isGoogleDrive ? (
+                    <>
+                      <span className="text-sm">📁</span>
+                      <span className="truncate">구글 드라이브 자료 열기</span>
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{currentPost.linkUrl}</span>
+                    </>
+                  )}
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-80" />
+              </a>
+            );
+          })()}
         </div>
 
         {/* 하단 반응 및 댓글 바 */}
