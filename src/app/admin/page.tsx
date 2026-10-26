@@ -21,6 +21,7 @@ import {
   KeyRound,
   ShieldCheck,
   Lock,
+  Pencil,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import { getStoreData, saveStoreData } from '@/lib/store';
@@ -43,6 +44,10 @@ export default function AdminPage() {
   // 특정 유저 비밀번호 재설정 모달 상태
   const [targetUserForPw, setTargetUserForPw] = useState<User | null>(null);
   const [resetPwInput, setResetPwInput] = useState('');
+
+  // 🌟 관리자 회원 이름 수정 상태
+  const [editingUserForName, setEditingUserForName] = useState<User | null>(null);
+  const [newNameInput, setNewNameInput] = useState('');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -109,6 +114,43 @@ export default function AdminPage() {
     showToast(`${targetUserForPw.name}님의 비밀번호가 변경되었습니다.`);
     setTargetUserForPw(null);
     setResetPwInput('');
+  };
+
+  // 🌟 관리자 회원 이름 수정 처리
+  const handleSaveUserName = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUserForName || !newNameInput.trim()) return;
+
+    const trimmedName = newNameInput.trim();
+    const oldName = editingUserForName.name;
+
+    const updated = users.map((u) =>
+      u.id === editingUserForName.id ? { ...u, name: trimmedName } : u
+    );
+    saveStoreData.users(updated);
+    setUsers(updated);
+
+    // 본인 계정이면 currentUser도 즉시 동기화
+    if (currentUser?.id === editingUserForName.id) {
+      saveStoreData.currentUser({ ...currentUser, name: trimmedName });
+    }
+
+    // 해당 사용자가 작성한 보드 및 포스트의 작성자명도 일괄 동기화
+    const data = getStoreData();
+    const updatedBoards = data.boards.map((b) =>
+      b.authorId === editingUserForName.id ? { ...b, authorName: trimmedName } : b
+    );
+    saveStoreData.boards(updatedBoards);
+    setBoards(updatedBoards);
+
+    const updatedPosts = data.posts.map((p) =>
+      p.authorId === editingUserForName.id ? { ...p, authorName: trimmedName } : p
+    );
+    saveStoreData.posts(updatedPosts);
+
+    showToast(`'${oldName}'님의 이름이 '${trimmedName}'(으)로 변경되었습니다.`);
+    setEditingUserForName(null);
+    setNewNameInput('');
   };
 
   // 관리자 본인 비밀번호 변경 처리
@@ -418,7 +460,18 @@ export default function AdminPage() {
                     <tr key={user.id} className="hover:bg-slate-50 transition">
                       <td className="py-3 px-3 font-bold text-slate-800">
                         <div className="flex items-center gap-1.5">
-                          <span>{user.name}</span>
+                          <span className="hover:text-blue-600 transition">{user.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUserForName(user);
+                              setNewNameInput(user.name);
+                            }}
+                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition"
+                            title="이름 수정하기"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
                           {user.grade && (
                             <span className="text-[10px] text-slate-400 font-normal">
                               ({user.grade}-{user.classNum})
@@ -581,6 +634,51 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+
+      {/* 🌟 관리자: 회원 이름 수정 모달 */}
+      {editingUserForName && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-base font-bold text-slate-800">
+              회원 이름 수정
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              [{editingUserForName.username || editingUserForName.email}] 사용자의 표시 이름을 변경합니다.
+            </p>
+
+            <form onSubmit={handleSaveUserName} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">새 이름</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: 홍길동 (교사) 또는 김철수"
+                  value={newNameInput}
+                  onChange={(e) => setNewNameInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUserForName(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm"
+                >
+                  변경 저장
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 특정 사용자 비밀번호 재설정 모달 */}
       {targetUserForPw && (

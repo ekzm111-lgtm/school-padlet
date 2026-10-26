@@ -13,6 +13,8 @@ import {
   Sparkles,
   School,
   CheckCircle2,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User } from '@/lib/types';
@@ -25,6 +27,41 @@ export default function Header() {
   const [pinInput, setPinInput] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinError, setPinError] = useState('');
+
+  // 🌟 본인 이름 직접 수정 상태
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [myNewName, setMyNewName] = useState('');
+
+  const handleUpdateMyName = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !myNewName.trim()) return;
+
+    const trimmed = myNewName.trim();
+    const oldName = currentUser.name;
+
+    const updatedUser: User = { ...currentUser, name: trimmed };
+    const data = getStoreData();
+
+    // 1. users 목록 갱신
+    const updatedUsers = data.users.map((u) => (u.id === currentUser.id ? updatedUser : u));
+    saveStoreData.users(updatedUsers);
+
+    // 2. 현재 로그인 세션 갱신
+    saveStoreData.currentUser(updatedUser);
+
+    // 3. 내가 작성한 보드 및 포스트의 작성자명 동기화
+    const updatedBoards = data.boards.map((b) =>
+      b.authorId === currentUser.id ? { ...b, authorName: trimmed } : b
+    );
+    saveStoreData.boards(updatedBoards);
+
+    const updatedPosts = data.posts.map((p) =>
+      p.authorId === currentUser.id ? { ...p, authorName: trimmed } : p
+    );
+    saveStoreData.posts(updatedPosts);
+
+    setShowNameModal(false);
+  };
 
   const loadData = () => {
     const data = getStoreData();
@@ -130,7 +167,18 @@ export default function Header() {
               <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
                 <div className="text-right hidden sm:block">
                   <div className="text-xs font-bold text-slate-800 flex items-center justify-end gap-1">
-                    {currentUser.name}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMyNewName(currentUser.name);
+                        setShowNameModal(true);
+                      }}
+                      className="hover:text-blue-600 flex items-center gap-1 group transition"
+                      title="클릭하여 내 이름 변경"
+                    >
+                      <span>{currentUser.name}</span>
+                      <Pencil className="w-3 h-3 text-slate-400 group-hover:text-blue-600 opacity-60 group-hover:opacity-100" />
+                    </button>
                     {currentUser.role === 'admin' && (
                       <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.2 rounded font-medium">관리자</span>
                     )}
@@ -229,6 +277,63 @@ export default function Header() {
                   className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold transition shadow-md shadow-blue-500/20"
                 >
                   입장하기
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 본인 이름 직접 수정 모달 */}
+      {showNameModal && currentUser && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-slate-800">내 이름(닉네임) 변경</h3>
+              </div>
+              <button
+                onClick={() => setShowNameModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              수업 보드 및 카드 작성자명으로 표시될 내 이름을 변경합니다.
+            </p>
+
+            <form onSubmit={handleUpdateMyName} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">변경할 새 이름</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: 홍길동 (교사) 또는 김철수"
+                  value={myNewName}
+                  onChange={(e) => setMyNewName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNameModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm"
+                >
+                  이름 저장
                 </button>
               </div>
             </form>

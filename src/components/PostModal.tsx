@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Image as ImageIcon,
@@ -66,6 +67,11 @@ export default function PostModal({
   const [fileError, setFileError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const docFileInputRef = useRef<HTMLInputElement>(null);
@@ -311,13 +317,13 @@ export default function PostModal({
     { label: '💻 코딩과 로봇', url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=60' },
   ];
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 cursor-default text-slate-800"
+      className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 cursor-default text-slate-800"
     >
       <div
         onDragOver={(e) => {
@@ -331,13 +337,13 @@ export default function PostModal({
         }`}
       >
         {/* 모달 상단 헤더 */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0 shadow-xs">
               {mode === 'edit' ? <Save className="w-5 h-5" /> : <Send className="w-5 h-5" />}
             </div>
-            <div>
-              <h3 className="text-lg font-black text-slate-800 tracking-tight">
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight truncate sm:whitespace-normal">
                 {mode === 'edit' ? '카드 내용 및 학습자료 수정' : '새 메모 / 학습자료 작성'}
               </h3>
               <p className="text-[11px] text-slate-400">
@@ -347,7 +353,7 @@ export default function PostModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+            className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -636,6 +642,7 @@ export default function PostModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

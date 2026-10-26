@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Heart,
   ThumbsUp,
@@ -381,10 +382,10 @@ export default function PostCard({
       </div>
 
       {/* 이미지 확대 모달 */}
-      {showImageModal && currentPost.imageUrl && (
+      {showImageModal && currentPost.imageUrl && typeof document !== 'undefined' && createPortal(
         <div
           onClick={() => setShowImageModal(false)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
         >
           <div className="max-w-3xl max-h-[90vh] p-2">
             <img
@@ -393,7 +394,8 @@ export default function PostCard({
               className="max-h-[85vh] w-auto rounded-2xl shadow-2xl mx-auto object-contain"
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 🔥 통합 PostModal (수정 모드 - 생성하기와 100% 동일한 넓고 쾌적한 UI!) */}

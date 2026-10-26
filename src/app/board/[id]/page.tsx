@@ -22,6 +22,7 @@ import {
   X,
   Palette,
   Globe,
+  GripVertical,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
@@ -69,6 +70,10 @@ export default function BoardDetailPage() {
   // 칸반 열 내/간 드래그 앤 드롭 상태
   const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
   const [dragOverPostId, setDragOverPostId] = useState<string | null>(null);
+
+  // 모둠(열) 드래그 앤 드롭 순서 변경 상태
+  const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
+  const [dragOverColIdx, setDragOverColIdx] = useState<number | null>(null);
 
   // 그리드 드래그 앤 드롭 순서 변경
   const dragItemIdx = useRef<number | null>(null);
@@ -217,10 +222,51 @@ export default function BoardDetailPage() {
     setDragOverPostId(null);
   };
 
+  // 모둠(열) 드래그 앤 드롭 이동 및 순서 변경 핸들러
+  const handleDragStartColumn = (e: React.DragEvent, idx: number) => {
+    e.stopPropagation();
+    e.dataTransfer.setData('application/column-index', String(idx));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedColIdx(idx);
+  };
+
+  const handleDragEndColumn = () => {
+    setDraggedColIdx(null);
+    setDragOverColIdx(null);
+  };
+
+  const handleColumnDrop = (sourceIdx: number, targetIdx: number) => {
+    if (sourceIdx === targetIdx || sourceIdx < 0 || targetIdx < 0) {
+      setDraggedColIdx(null);
+      setDragOverColIdx(null);
+      return;
+    }
+    const updatedCols = [...columns];
+    const [movedCol] = updatedCols.splice(sourceIdx, 1);
+    updatedCols.splice(targetIdx, 0, movedCol);
+
+    setColumns(updatedCols);
+    setDraggedColIdx(null);
+    setDragOverColIdx(null);
+
+    const data = getStoreData();
+    const updatedBoard = { ...board, columns: updatedCols };
+    saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+    setBoard(updatedBoard);
+  };
+
   // 같은 열 또는 다른 열의 특정 카드 위에 드롭했을 때 순서 변경
-  const handleDropOnCard = (e: React.DragEvent, targetPostId: string, colName: string) => {
+  const handleDropOnCard = (e: React.DragEvent, targetPostId: string, colName: string, targetColIdx: number) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // 열 자체를 드롭했을 경우
+    const colIdxStr = e.dataTransfer.getData('application/column-index');
+    if (colIdxStr !== '') {
+      handleColumnDrop(Number(colIdxStr), targetColIdx);
+      return;
+    }
+
     const sourceId = e.dataTransfer.getData('text/plain') || draggedPostId;
     if (!sourceId || sourceId === targetPostId) {
       setDraggedPostId(null);
@@ -256,8 +302,16 @@ export default function BoardDetailPage() {
   };
 
   // 열 빈 공간에 드롭했을 때 맨 뒤로 이동
-  const handleDropOnColumn = (e: React.DragEvent, colName: string) => {
+  const handleDropOnColumn = (e: React.DragEvent, colName: string, targetColIdx: number) => {
     e.preventDefault();
+
+    // 열 자체를 드롭했을 경우
+    const colIdxStr = e.dataTransfer.getData('application/column-index');
+    if (colIdxStr !== '') {
+      handleColumnDrop(Number(colIdxStr), targetColIdx);
+      return;
+    }
+
     const postId = e.dataTransfer.getData('text/plain') || draggedPostId;
     if (!postId) return;
 
@@ -595,13 +649,31 @@ export default function BoardDetailPage() {
               const colPosts = posts.filter(
                 (p) => p.column === colName || (!p.column && idx === 0)
               );
+              const isColDragged = draggedColIdx === idx;
+              const isColDragOver = dragOverColIdx === idx && draggedColIdx !== idx;
 
               return (
                 <div
                   key={colName}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => handleDropOnColumn(e, colName)}
-                  className="w-80 shrink-0 bg-white/85 backdrop-blur-md rounded-3xl p-4 border border-slate-200/90 shadow-sm flex flex-col min-h-[620px] transition hover:border-blue-300"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (draggedColIdx !== null && draggedColIdx !== idx) {
+                      setDragOverColIdx(idx);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverColIdx === idx) {
+                      setDragOverColIdx(null);
+                    }
+                  }}
+                  onDrop={(e) => handleDropOnColumn(e, colName, idx)}
+                  className={`w-80 shrink-0 bg-white/85 backdrop-blur-md rounded-3xl p-4 border shadow-sm flex flex-col min-h-[620px] transition-all duration-200 ${
+                    isColDragged ? 'opacity-40 scale-95 border-dashed border-blue-400' : ''
+                  } ${
+                    isColDragOver
+                      ? 'border-blue-500 ring-2 ring-blue-400 ring-offset-2 scale-[1.01]'
+                      : 'border-slate-200/90 hover:border-blue-300'
+                  }`}
                 >
                   {/* 열 헤더 */}
                   <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 group">
@@ -630,19 +702,33 @@ export default function BoardDetailPage() {
                       </div>
                     ) : (
                       <>
-                        <div
-                          onClick={() => {
-                            setEditingColIdx(idx);
-                            setEditingColName(colName);
-                          }}
-                          className="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-800 hover:text-blue-600"
-                          title="클릭하여 모둠/섹션 이름 수정"
-                        >
-                          <span>{colName}</span>
-                          <Pencil className="w-3 h-3 text-slate-400 opacity-60 group-hover:opacity-100" />
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          {/* 열 드래그 핸들 (모둠 위치 변경) */}
+                          {(!board.isLocked || isTeacherOrAdmin) && (
+                            <div
+                              draggable
+                              onDragStart={(e) => handleDragStartColumn(e, idx)}
+                              onDragEnd={handleDragEndColumn}
+                              className="p-1 -ml-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg cursor-grab active:cursor-grabbing transition shrink-0"
+                              title="모둠(열) 드래그하여 순서 변경"
+                            >
+                              <GripVertical className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div
+                            onClick={() => {
+                              setEditingColIdx(idx);
+                              setEditingColName(colName);
+                            }}
+                            className="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-800 hover:text-blue-600 truncate"
+                            title="클릭하여 모둠/섹션 이름 수정"
+                          >
+                            <span className="truncate">{colName}</span>
+                            <Pencil className="w-3 h-3 text-slate-400 opacity-60 group-hover:opacity-100 shrink-0" />
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
                             {colPosts.length}개
                           </span>
@@ -695,7 +781,7 @@ export default function BoardDetailPage() {
                             setDragOverPostId(post.id);
                           }
                         }}
-                        onDrop={(e) => handleDropOnCard(e, post.id, colName)}
+                        onDrop={(e) => handleDropOnCard(e, post.id, colName, idx)}
                         className={`cursor-grab active:cursor-grabbing transition-all duration-150 ${
                           draggedPostId === post.id ? 'opacity-40 scale-95' : 'opacity-100'
                         } ${
