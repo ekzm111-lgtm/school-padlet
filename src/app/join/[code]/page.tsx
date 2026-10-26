@@ -11,46 +11,128 @@ import {
   UserCheck,
   Hash,
   BookOpen,
+  Loader2,
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Board, User } from '@/lib/types';
 
 function JoinPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const code = params.code as string;
+  const code = (params.code as string)?.trim();
   const bData = searchParams?.get('b');
 
   const [board, setBoard] = useState<Board | null>(null);
   const [studentName, setStudentName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const data = getStoreData();
-    let found = data.boards.find((b) => b.code === code);
+    let isCancelled = false;
 
-    // 타 기기나 시크릿 창이라 로컬스토리지에 없는 경우, URL에 전달된 압축 보드 데이터(b)로 자동 복원
-    if (!found && bData) {
-      try {
-        const decoded = JSON.parse(decodeURIComponent(bData));
-        if (decoded && decoded.code === code) {
-          found = decoded;
-          // 이 기기의 로컬 저장소에도 보드 등록
-          const updatedBoards = [decoded, ...data.boards];
-          saveStoreData.boards(updatedBoards);
-        }
-      } catch (e) {
-        console.error('Failed to parse board payload', e);
-      }
-    }
-
-    if (found) {
-      setBoard(found);
+    async function resolveBoard() {
+      if (!code) return;
+      setIsLoading(true);
       setErrorMsg('');
-    } else {
-      setErrorMsg(`참여코드 [${code}]에 해당하는 수업 보드를 찾을 수 없습니다.`);
+
+      // 1. 로컬 저장소 우선 확인
+      const data = getStoreData();
+      let found = data.boards.find((b) => b.code === code);
+
+      // 2. URL 파라미터 bData 백업 확인
+      if (!found && bData) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(bData));
+          if (decoded && decoded.code === code) {
+            found = decoded;
+            saveStoreData.boards([decoded, ...data.boards]);
+          }
+        } catch (e) {
+          console.error('Failed to parse bData', e);
+        }
+      }
+
+      // 3. Supabase 클라우드 실시간 데이터베이스 직접 조회 (핵심!)
+      if (!found && isSupabaseConfigured && supabase) {
+        try {
+          const { data: dbBoard, error } = await supabase
+            .from('boards')
+            .select('*')
+            .eq('code', code)
+            .maybeSingle();
+
+          if (dbBoard && !error) {
+            found = {
+              id: dbBoard.id,
+              code: dbBoard.code,
+              title: dbBoard.title,
+              description: dbBoard.description || '',
+              layout: 'kanban',
+              theme: dbBoard.theme || 'blue',
+              coverImageUrl:
+                dbBoard.cover_image_url ||
+                'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+              customBgUrl: '',
+              authorId: dbBoard.author_id || 'user-admin',
+              authorName: dbBoard.author_name || '선생님',
+              authorRole: 'teacher',
+              columns: Array.isArray(dbBoard.columns)
+                ? dbBoard.columns
+                : ['모둠 1', '모둠 2', '모둠 3'],
+              allowStudentPost: true,
+              allowComments: true,
+              allowReactions: true,
+              isLocked: false,
+              isPublic: true,
+              category: '수업자료',
+              createdAt: dbBoard.created_at
+                ? new Date(dbBoard.created_at).toISOString().split('T')[0]
+                : '',
+            };
+
+            // 기기 로컬스토리지에도 저장하여 다음 방문 시 즉시 로드
+            const updatedBoards = [
+              found,
+              ...data.boards.filter((b) => b.id !== found!.id),
+            ];
+            saveStoreData.boards(updatedBoards);
+          }
+        } catch (dbErr) {
+          console.error('Supabase join query error', dbErr);
+        }
+      }
+
+      if (isCancelled) return;
+
+      if (found) {
+        setBoard(found);
+        setErrorMsg('');
+      } else {
+        setErrorMsg(`참여코드 [${code}]에 해당하는 수업 보드를 찾을 수 없습니다.`);
+      }
+      setIsLoading(false);
     }
+
+    resolveBoard();
+
+    // 전역 store_updated 이벤트 발생 시 재확인
+    const handleStoreUpdated = () => {
+      const data = getStoreData();
+      const updated = data.boards.find((b) => b.code === code);
+      if (updated) {
+        setBoard(updated);
+        setErrorMsg('');
+        setIsLoading(false);
+      }
+    };
+    window.addEventListener('store_updated', handleStoreUpdated);
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener('store_updated', handleStoreUpdated);
+    };
   }, [code, bData]);
 
   const handleJoin = (e: React.FormEvent) => {
@@ -86,10 +168,19 @@ function JoinPageContent() {
           <span>수업 참여 코드: {code}</span>
         </div>
 
-        {errorMsg ? (
+        {isLoading ? (
+          <div className="py-8 space-y-3">
+            <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+            <p className="text-xs font-bold text-slate-600">
+              클라우드에서 수업 보드를 안전하게 불러오고 있습니다...
+            </p>
+          </div>
+        ) : errorMsg ? (
           <div className="space-y-4">
             <h3 className="text-base font-bold text-red-600">{errorMsg}</h3>
-            <p className="text-xs text-slate-500">선생님께 올바른 6자리 참여 링크를 다시 확인해 주세요.</p>
+            <p className="text-xs text-slate-500">
+              선생님께 올바른 6자리 참여 링크를 다시 확인해 주세요.
+            </p>
             <Link
               href="/"
               className="inline-block px-5 py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold"
@@ -108,30 +199,33 @@ function JoinPageContent() {
 
             <div className="my-6 p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 flex items-center justify-center gap-2">
               <School className="w-4 h-4 text-blue-600" />
-              <span>개설 선생님: <strong>{board.authorName}</strong></span>
+              <span>개설자: {board.authorName || '선생님'}</span>
             </div>
 
             <form onSubmit={handleJoin} className="space-y-4 text-left">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  수업에서 사용할 이름 (또는 모둠명) *
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  학생 본인 이름 또는 모둠명을 입력해 주세요
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="예: 2학년 3반 홍길동 또는 1모둠"
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 outline-none text-sm font-bold text-slate-800 transition"
-                  autoFocus
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="예: 2반 김민우 (또는 3모둠)"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none pr-10"
+                    autoFocus
+                  />
+                  <UserCheck className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
+                </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 active:scale-95"
+                className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black transition flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 active:scale-98"
               >
-                <span>수업 보드 바로 입장하기</span>
+                <span>수업 보드로 바로 입장하기</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -142,9 +236,15 @@ function JoinPageContent() {
   );
 }
 
-export default function GlobalJoinPage() {
+export default function JoinPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-xs text-slate-500 font-bold">로딩 중...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+      }
+    >
       <JoinPageContent />
     </Suspense>
   );

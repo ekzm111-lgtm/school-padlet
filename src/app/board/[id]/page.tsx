@@ -24,6 +24,7 @@ import {
   Globe,
   GripVertical,
   QrCode,
+  Loader2,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
@@ -32,6 +33,8 @@ import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
 import QrModal from '@/components/QrModal';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { fetchRemotePosts } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
 
@@ -82,20 +85,80 @@ export default function BoardDetailPage() {
   const dragItemIdx = useRef<number | null>(null);
   const dragOverItemIdx = useRef<number | null>(null);
 
-  const loadData = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadData = async () => {
     const data = getStoreData();
     setCurrentUser(data.currentUser);
-    const foundBoard = data.boards.find((b) => b.id === boardId);
+    let foundBoard = data.boards.find((b) => b.id === boardId || b.code === boardId);
+
+    // 로컬에 없으면 Supabase 클라우드에서 직접 확인
+    if (!foundBoard && isSupabaseConfigured && supabase) {
+      try {
+        const { data: dbBoard } = await supabase
+          .from('boards')
+          .select('*')
+          .or(`id.eq.${boardId},code.eq.${boardId}`)
+          .maybeSingle();
+
+        if (dbBoard) {
+          foundBoard = {
+            id: dbBoard.id,
+            code: dbBoard.code,
+            title: dbBoard.title,
+            description: dbBoard.description || '',
+            layout: 'kanban',
+            theme: dbBoard.theme || 'blue',
+            coverImageUrl:
+              dbBoard.cover_image_url ||
+              'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+            customBgUrl: '',
+            authorId: dbBoard.author_id || 'user-admin',
+            authorName: dbBoard.author_name || '선생님',
+            authorRole: 'teacher',
+            columns: Array.isArray(dbBoard.columns) ? dbBoard.columns : DEFAULT_COLUMNS,
+            allowStudentPost: true,
+            allowComments: true,
+            allowReactions: true,
+            isLocked: false,
+            isPublic: true,
+            category: '수업자료',
+            createdAt: dbBoard.created_at
+              ? new Date(dbBoard.created_at).toISOString().split('T')[0]
+              : '',
+          };
+          saveStoreData.boards([foundBoard, ...data.boards]);
+        }
+      } catch (e) {
+        console.error('Supabase loadData error', e);
+      }
+    }
+
     if (foundBoard) {
       setBoard(foundBoard);
-      const cols = foundBoard.columns && foundBoard.columns.length > 0 ? foundBoard.columns : DEFAULT_COLUMNS;
+      const cols =
+        foundBoard.columns && foundBoard.columns.length > 0
+          ? foundBoard.columns
+          : DEFAULT_COLUMNS;
       setColumns(cols);
       if (foundBoard.layout) {
         setCurrentLayout(foundBoard.layout);
       }
+
+      // 게시글 취합 (로컬 + 원격)
+      let boardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
+      if (boardPosts.length === 0 && isSupabaseConfigured && supabase) {
+        try {
+          const remote = await fetchRemotePosts(foundBoard.id);
+          if (remote && remote.length > 0) {
+            boardPosts = remote;
+            saveStoreData.posts([...remote, ...data.posts]);
+          }
+        } catch (e) {}
+      }
+      setPosts(boardPosts);
     }
-    const boardPosts = data.posts.filter((p) => p.boardId === boardId);
-    setPosts(boardPosts);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -105,10 +168,20 @@ export default function BoardDetailPage() {
     return () => window.removeEventListener('store_updated', handleUpdate);
   }, [boardId]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-3" />
+        <h2 className="text-sm font-bold text-slate-700">클라우드에서 수업 보드를 불러오는 중입니다...</h2>
+      </div>
+    );
+  }
+
   if (!board) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <h2 className="text-xl font-bold text-slate-800">해당 수업 보드를 찾을 수 없습니다.</h2>
+        <p className="text-xs text-slate-500 mt-2">보드가 삭제되었거나 아직 생성되지 않은 번호입니다.</p>
         <Link href="/" className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl">
           메인으로 이동
         </Link>

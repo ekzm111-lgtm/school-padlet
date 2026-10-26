@@ -29,6 +29,8 @@ import CreateBoardModal from '@/components/CreateBoardModal';
 import EditBoardModal from '@/components/EditBoardModal';
 import QrModal from '@/components/QrModal';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { fetchRemoteBoards } from '@/lib/supabaseStore';
 import { Board, User } from '@/lib/types';
 import confetti from 'canvas-confetti';
 
@@ -47,10 +49,28 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'public' | 'my' | 'template'>('public');
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
 
-  const loadData = () => {
+  const loadData = async () => {
     const data = getStoreData();
     setCurrentUser(data.currentUser);
     setBoards(data.boards);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const remote = await fetchRemoteBoards();
+        if (remote && remote.length > 0) {
+          const combined = [...remote];
+          for (const lb of data.boards) {
+            if (!combined.some((b) => b.id === lb.id || b.code === lb.code)) {
+              combined.push(lb);
+            }
+          }
+          setBoards(combined);
+          localStorage.setItem('school_padlet_boards', JSON.stringify(combined));
+        }
+      } catch (e) {
+        console.error('Remote board fetch error', e);
+      }
+    }
   };
 
   useEffect(() => {

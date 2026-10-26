@@ -147,6 +147,28 @@ export default function PostModal({
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, [isOpen]);
 
+  // 브라우저 밖 탐색기에서 파일을 창 아무 데나 떨어뜨렸을 때 브라우저가 새 탭으로 파일을 여는 현상 방지
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const preventGlobalDrop = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+      }
+    };
+
+    window.addEventListener('dragenter', preventGlobalDrop);
+    window.addEventListener('dragover', preventGlobalDrop);
+    window.addEventListener('drop', preventGlobalDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', preventGlobalDrop);
+      window.removeEventListener('dragover', preventGlobalDrop);
+      window.removeEventListener('drop', preventGlobalDrop);
+    };
+  }, [isOpen]);
+
   // 🔥 다중 파일 처리 공통 함수 (Promise.all 및 Set 기반 중복 완전 박멸)
   const processFiles = async (fileList: FileList | File[]) => {
     setFileError('');
@@ -209,6 +231,15 @@ export default function PostModal({
       }
       return combined;
     });
+
+    // 드롭한 파일 중 이미지가 있고 대표 이미지가 비어있다면, 첫 번째 이미지를 대표 이미지로도 즉시 설정
+    const firstImg = validNewAttachments.find(
+      (a) => a.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(a.name)
+    );
+    if (firstImg && !imageUrl) {
+      setImageUrl(firstImg.dataUrl);
+      setShowImageTools(true);
+    }
   };
 
   // 탐색기 파일 드롭(Drop) 핸들러
@@ -216,8 +247,25 @@ export default function PostModal({
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
+
+    const files: File[] = [];
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFiles(e.dataTransfer.files);
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const f = e.dataTransfer.files[i];
+        if (f) files.push(f);
+      }
+    } else if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      for (let i = 0; i < e.dataTransfer.items.length; i++) {
+        const item = e.dataTransfer.items[i];
+        if (item.kind === 'file') {
+          const f = item.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      processFiles(files);
     }
   };
 
@@ -518,16 +566,29 @@ export default function PostModal({
 
           {/* 🔥 드래그 앤 드롭 파일 첨부 존 (여러 파일 지원) */}
           <div
-            onDragOver={(e) => {
+            onClick={() => docFileInputRef.current?.click()}
+            onDragEnter={(e) => {
               e.preventDefault();
+              e.stopPropagation();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
               setIsDragOver(true);
             }}
-            onDragLeave={() => setIsDragOver(false)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+              setIsDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragOver(false);
+            }}
             onDrop={handleDrop}
-            className={`p-4 rounded-2xl border-2 border-dashed transition text-center ${
+            className={`p-5 rounded-2xl border-2 border-dashed transition-all duration-150 cursor-pointer text-center select-none ${
               isDragOver
-                ? 'border-blue-500 bg-blue-50/50'
-                : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                ? 'border-blue-600 bg-blue-100/80 ring-4 ring-blue-200 scale-[1.01]'
+                : 'border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40'
             }`}
           >
             <input
@@ -538,24 +599,26 @@ export default function PostModal({
               onChange={handleDocFileSelect}
               className="hidden"
             />
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
-                <Upload className="w-5 h-5" />
+            <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition shadow-xs ${
+                  isDragOver ? 'bg-blue-600 text-white scale-110' : 'bg-indigo-100 text-indigo-600'
+                }`}
+              >
+                <Upload className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-xs font-bold text-slate-800">
-                  또는 컴퓨터 파일을 직접 올려도 됩니다 (드래그 앤 드롭)
+                <span className="text-xs sm:text-sm font-bold text-slate-800">
+                  {isDragOver
+                    ? '📂 마우스를 놓으면 파일이 바로 첨부됩니다!'
+                    : '컴퓨터 파일을 이곳에 끌어다 놓으세요 (드래그 앤 드롭)'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => docFileInputRef.current?.click()}
-                  className="ml-1 text-xs font-bold text-blue-600 hover:underline"
-                >
-                  직접 파일 선택하기
-                </button>
+                <span className="ml-1.5 text-xs font-bold text-blue-600 underline">
+                  또는 클릭하여 파일 찾기
+                </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                한글(HWP), PDF, 워드, PPT, 엑셀 등 (개당 최대 10MB)
+                한글(HWP), PDF, 워드, PPT, 엑셀, 이미지 등 모든 파일 지원 (개당 최대 10MB)
               </p>
             </div>
           </div>
