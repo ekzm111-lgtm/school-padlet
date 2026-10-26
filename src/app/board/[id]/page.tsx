@@ -32,7 +32,7 @@ import PostModal from '@/components/PostModal';
 import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
 import QrModal from '@/components/QrModal';
-import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
+import { getStoreData, saveStoreData, duplicateBoard, deletePost } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchRemotePosts } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
@@ -147,14 +147,17 @@ export default function BoardDetailPage() {
 
       // 게시글 취합 (로컬 + 원격)
       let boardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
-      if (boardPosts.length === 0 && isSupabaseConfigured && supabase) {
+      if (isSupabaseConfigured && supabase) {
         try {
           const remote = await fetchRemotePosts(foundBoard.id);
-          if (remote && remote.length > 0) {
+          if (remote) {
             boardPosts = remote;
-            saveStoreData.posts([...remote, ...data.posts]);
+            const otherPosts = data.posts.filter((p) => p.boardId !== foundBoard!.id);
+            saveStoreData.posts([...remote, ...otherPosts]);
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('Remote posts loadData error', e);
+        }
       }
       setPosts(boardPosts);
     }
@@ -166,6 +169,59 @@ export default function BoardDetailPage() {
     const handleUpdate = () => loadData();
     window.addEventListener('store_updated', handleUpdate);
     return () => window.removeEventListener('store_updated', handleUpdate);
+  }, [boardId]);
+
+  // 🔥 실시간 동기화 (Supabase Realtime 채널 + 3초 주기 자동 폴링 백업)
+  // 학생과 교사가 서로 다른 기기에서 작업할 때 1~3초 내에 자동 화면 반영!
+  useEffect(() => {
+    if (!boardId) return;
+
+    let channel: any = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        channel = supabase
+          .channel(`board_live_sub_${boardId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'posts',
+            },
+            async () => {
+              const remote = await fetchRemotePosts(boardId);
+              if (remote) {
+                setPosts(remote);
+                const data = getStoreData();
+                const other = data.posts.filter((p) => p.boardId !== boardId);
+                saveStoreData.posts([...remote, ...other]);
+              }
+            }
+          )
+          .subscribe();
+      } catch (e) {}
+    }
+
+    const pollTimer = setInterval(async () => {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const remote = await fetchRemotePosts(boardId);
+          if (remote) {
+            setPosts(remote);
+            const data = getStoreData();
+            const other = data.posts.filter((p) => p.boardId !== boardId);
+            saveStoreData.posts([...remote, ...other]);
+          }
+        } catch (e) {}
+      }
+    }, 3000);
+
+    return () => {
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+      clearInterval(pollTimer);
+    };
   }, [boardId]);
 
   if (isLoading) {
@@ -500,11 +556,11 @@ export default function BoardDetailPage() {
     setBoard(updatedBoard);
   };
 
-  // 포스트 삭제
-  const handleDeletePost = (postId: string) => {
-    const data = getStoreData();
-    saveStoreData.posts(data.posts.filter((p) => p.id !== postId));
-    setPosts(posts.filter((p) => p.id !== postId));
+  // 포스트 삭제 (로컬 + Supabase 클라우드 실시간 영구 삭제)
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('이 카드를 정말 삭제하시겠습니까?')) return;
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    await deletePost(postId);
   };
 
   // 카드 생성 콜백 (중복 생성 방어)

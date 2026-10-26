@@ -546,6 +546,23 @@ export const saveStoreData = {
   },
 };
 
+// 🔥 개별 쪽지/카드 영구 삭제 함수 (로컬 + Supabase 클라우드 DB 연동)
+export const deletePost = async (postId: string) => {
+  if (typeof window !== 'undefined') {
+    const data = getStoreData();
+    const updated = data.posts.filter((p) => p.id !== postId);
+    memoryPostsCache = updated;
+    fileStorage.set('school_padlet_posts_full', JSON.stringify(updated));
+    try {
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(updated));
+    } catch (e) {}
+    window.dispatchEvent(new Event('store_updated'));
+  }
+  if (isSupabaseConfigured) {
+    await deleteRemotePost(postId);
+  }
+};
+
 // 🔥 보드 복제(Copy/Remix) 함수: 다른 사람이 공유한 보드를 내 보드로 통째로 가져오기
 export const duplicateBoard = (sourceBoardId: string, currentUser: User): Board | null => {
   const data = getStoreData();
