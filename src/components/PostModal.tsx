@@ -447,77 +447,72 @@ export default function PostModal({
             />
           </div>
 
-          {/* 🔥 구글 드라이브(Google Drive) & 참고 링크(URL) 안내 및 입력 */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/90 via-indigo-50/70 to-emerald-50/80 border-2 border-blue-200 shadow-xs space-y-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-                  📁
-                </div>
-                <div>
-                  <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                    <span>구글 드라이브 자료 공유 / 참고 링크</span>
-                    <span className="px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
-                      적극 권장
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600">
-                    용량이 큰 한글(HWP), PPT, 동영상은 본인 <strong>구글 드라이브 링크</strong>로 공유해 보세요!
-                  </p>
+          {/* 🔗 참고 링크(URL) 및 웹사이트 주소 입력 (항상 열림) */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <LinkIcon className="w-4 h-4 text-blue-600" />
+                <span>참고 링크(URL) / 웹사이트 주소</span>
+              </label>
+              {linkUrl && (
+                <button
+                  type="button"
+                  onClick={() => setLinkUrl('')}
+                  className="text-[11px] text-slate-400 hover:text-red-500 font-medium transition"
+                >
+                  지우기
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="url"
+                  placeholder="https://... (웹사이트, 유튜브, 노션, 구글 드라이브 등 모든 링크 가능)"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs outline-none bg-white font-medium transition ${
+                    linkUrl.includes('drive.google.com') || linkUrl.includes('docs.google.com')
+                      ? 'border-emerald-500 ring-2 ring-emerald-200 text-emerald-950 font-bold'
+                      : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                />
+                {(linkUrl.includes('drive.google.com') || linkUrl.includes('docs.google.com')) && (
+                  <span className="absolute right-3 top-2.5 text-[11px] font-bold text-emerald-600 flex items-center gap-1 bg-white/90 px-1.5 rounded-md">
+                    <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>구글 드라이브 인식됨</span>
+                  </span>
+                )}
+              </div>
+              {linkUrl && (
+                <button
+                  type="button"
+                  onClick={() => setLinkUrl('')}
+                  className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shrink-0"
+                >
+                  비우기
+                </button>
+              )}
+            </div>
+
+            {/* 📁 구글 드라이브 자료 안내 & 원클릭 버튼 배너 */}
+            <div className="mt-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-base">📁</span>
+                <div className="text-[11px] text-slate-600 leading-snug">
+                  <strong>대용량 한글(HWP), PPT, 동영상 자료</strong>는 본인 구글 드라이브에 올린 뒤 공유 링크를 위 링크창에 넣어보세요!
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={() => window.open('https://drive.google.com', '_blank')}
-                className="px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0"
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 text-xs font-bold transition flex items-center gap-1 shadow-xs shrink-0"
                 title="새 창에서 내 구글 드라이브 열기"
               >
                 <span>내 구글 드라이브 열기</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
-            </div>
-
-            {/* 링크 입력 및 구글 드라이브 감지 */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="url"
-                    placeholder="구글 드라이브 링크 또는 웹사이트 URL (https://drive.google.com/...)"
-                    value={linkUrl}
-                    onChange={(e) => setLinkUrl(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl border text-xs outline-none bg-white font-medium transition ${
-                      linkUrl.includes('drive.google.com') || linkUrl.includes('docs.google.com')
-                        ? 'border-emerald-500 ring-2 ring-emerald-200 text-emerald-950 font-bold'
-                        : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
-                    }`}
-                  />
-                  {(linkUrl.includes('drive.google.com') || linkUrl.includes('docs.google.com')) && (
-                    <span className="absolute right-3 top-2.5 text-[11px] font-bold text-emerald-600 flex items-center gap-1 bg-white/90 px-1.5 rounded-md">
-                      <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>구글 드라이브 인식됨</span>
-                    </span>
-                  )}
-                </div>
-                {linkUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setLinkUrl('')}
-                    className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shrink-0"
-                  >
-                    지우기
-                  </button>
-                )}
-              </div>
-
-              {/* 구글 드라이브 공유 링크 가이드 팁 */}
-              <div className="text-[11px] text-slate-600 bg-white/80 p-2.5 rounded-xl border border-blue-100/80 leading-relaxed flex items-start gap-1.5">
-                <span className="text-amber-500 font-bold shrink-0">💡</span>
-                <span>
-                  <strong>구글 드라이브 링크 복사 방법:</strong> 구글 드라이브에서 파일 우클릭 ➡️ <strong>[공유]</strong> ➡️ 일반 액세스를 <strong>[링크가 있는 모든 사용자(뷰어)]</strong>로 변경 후 <strong>[링크 복사]</strong>를 눌러 붙여넣으시면 됩니다.
-                </span>
-              </div>
             </div>
           </div>
 
