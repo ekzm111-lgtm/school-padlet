@@ -25,6 +25,8 @@ import {
   GripVertical,
   QrCode,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
@@ -87,6 +89,26 @@ export default function BoardDetailPage() {
 
   // 사용자가 방금 카드를 조작(드래그 이동, 수정, 생성 등)한 시각 (원격 폴링 충돌 방어용)
   const lastUserActionTimeRef = useRef<number>(0);
+
+  // 보드 메인 가로 스크롤 Ref & 휠 조작 & 좌우 버튼 핸들러
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleMainWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    // 모둠 내부 카드 목록 세로 스크롤 중이 아닐 때만 보드 전체 가로 스크롤 작동
+    if (!target.closest('.slim-scrollbar') && mainScrollRef.current) {
+      if (e.deltaY !== 0) {
+        mainScrollRef.current.scrollLeft += e.deltaY * 1.2;
+      }
+    }
+  };
+
+  const scrollBoardHorizontally = (direction: 'left' | 'right') => {
+    if (mainScrollRef.current) {
+      const offset = direction === 'left' ? -350 : 350;
+      mainScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -214,33 +236,33 @@ export default function BoardDetailPage() {
           });
         }
 
-        // 2. 최신 모둠(열) 실시간 동기화 (게시글에 있는 열과 DB의 열을 안전하게 합집합으로 병합)
+        // 2. 최신 모둠(열) 실시간 동기화
+        // 사용자가 최근 5초 내에 열 이름을 바꾸거나 순서를 옮겼다면 원격 덮어쓰기 철저히 차단
+        if (Date.now() - lastUserActionTimeRef.current < 5000) return;
+
         const { data: dbBoard } = await supabase
           .from('boards')
           .select('columns')
           .or(`id.eq.${boardId},code.eq.${boardId}`)
           .maybeSingle();
 
-        const postCols = remote ? (remote.map((p) => p.column).filter(Boolean) as string[]) : [];
-
         if (dbBoard && Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
-          setColumns((prevCols) => {
-            const merged = Array.from(new Set([...dbBoard.columns, ...prevCols, ...postCols]));
-            if (merged.join('|') === prevCols.join('|')) return prevCols;
-            return merged;
-          });
-          setBoard((prev) => {
-            if (!prev) return prev;
-            const merged = Array.from(new Set([...dbBoard.columns, ...(prev.columns || []), ...postCols]));
-            if ((prev.columns || []).join('|') === merged.join('|')) return prev;
-            return { ...prev, columns: merged };
-          });
-        } else if (postCols.length > 0) {
-          setColumns((prevCols) => {
-            const merged = Array.from(new Set([...prevCols, ...postCols]));
-            if (merged.join('|') === prevCols.join('|')) return prevCols;
-            return merged;
-          });
+          // 중복 및 빈 문자열을 엄격하게 제거한 유효 열 목록만 반영 (무한 증식 원천 차단)
+          const cleanDbCols = Array.from(
+            new Set(dbBoard.columns.map((c: any) => String(c || '').trim()).filter(Boolean))
+          ) as string[];
+
+          if (cleanDbCols.length > 0) {
+            setColumns((prevCols) => {
+              if (prevCols.join('|') === cleanDbCols.join('|')) return prevCols;
+              return cleanDbCols;
+            });
+            setBoard((prev) => {
+              if (!prev) return prev;
+              if ((prev.columns || []).join('|') === cleanDbCols.join('|')) return prev;
+              return { ...prev, columns: cleanDbCols };
+            });
+          }
         }
       } catch (e) {
         console.error('syncRemoteData error', e);
@@ -368,51 +390,74 @@ export default function BoardDetailPage() {
   };
 
   // 모둠(열) 이름 수정
-  const handleSaveColName = (idx: number) => {
-    if (!editingColName.trim()) {
+  const handleSaveColName = async (idx: number) => {
+    const trimmed = editingColName.trim();
+    if (!trimmed) {
       setEditingColIdx(null);
       return;
     }
     const oldName = columns[idx];
-    const newName = editingColName.trim();
+    if (!oldName) {
+      setEditingColIdx(null);
+      return;
+    }
 
-    const updatedCols = [...columns];
-    updatedCols[idx] = newName;
-    setColumns(updatedCols);
+    lastUserActionTimeRef.current = Date.now(); // 5초간 원격 동기화 간섭 차단
+
+    // 1. 해당 인덱스의 열 이름을 새 이름으로 교체하고 중복/빈값 제거
+    const updatedCols = columns.map((c, i) => (i === idx ? trimmed : c));
+    const cleanCols = Array.from(new Set(updatedCols.map((c) => String(c || '').trim()).filter(Boolean)));
+
+    setColumns(cleanCols);
     setEditingColIdx(null);
 
-    const updatedPosts = posts.map((p) => (p.column === oldName ? { ...p, column: newName } : p));
+    // 2. 해당 열에 속한 모든 카드의 column도 새 이름으로 일괄 교체
+    const updatedPosts = posts.map((p) => (p.column === oldName ? { ...p, column: trimmed } : p));
     setPosts(updatedPosts);
 
+    // 3. 로컬 스토리지 즉시 반영
     const data = getStoreData();
-    const updatedBoard = { ...board, columns: updatedCols };
+    const updatedBoard = { ...board, columns: cleanCols };
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
-    saveStoreData.posts(data.posts.map((p) => (p.column === oldName ? { ...p, column: newName } : p)));
+    saveStoreData.posts(data.posts.map((p) => (p.column === oldName ? { ...p, column: trimmed } : p)));
     setBoard(updatedBoard);
+
+    // 4. Supabase 클라우드 DB에 즉시 확실하게 저장
     if (isSupabaseConfigured) {
-      saveRemoteBoard(updatedBoard);
-      updatedPosts.filter((p) => p.column === newName).forEach((p) => saveRemotePost(p));
+      await saveRemoteBoard(updatedBoard);
+      const affectedCards = updatedPosts.filter((p) => p.column === trimmed);
+      for (const card of affectedCards) {
+        await saveRemotePost(card);
+      }
     }
   };
 
   // 모둠(열) 삭제
-  const handleDeleteColumn = (colName: string) => {
+  const handleDeleteColumn = async (colName: string) => {
     if (confirm(`'${colName}' 열을 삭제하시겠습니까? (안에 있는 카드는 첫 번째 열로 이동됩니다)`)) {
-      const updatedCols = columns.filter((c) => c !== colName);
-      setColumns(updatedCols);
+      lastUserActionTimeRef.current = Date.now();
 
-      const targetCol = updatedCols[0] || '기본 모둠';
+      const updatedCols = columns.filter((c) => c !== colName);
+      const cleanCols = Array.from(new Set(updatedCols.map((c) => String(c || '').trim()).filter(Boolean)));
+      const targetCol = cleanCols[0] || '모둠 1';
+
+      setColumns(cleanCols);
+
       const updatedPosts = posts.map((p) => (p.column === colName ? { ...p, column: targetCol } : p));
       setPosts(updatedPosts);
 
       const data = getStoreData();
-      const updatedBoard = { ...board, columns: updatedCols };
+      const updatedBoard = { ...board, columns: cleanCols };
       saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
       saveStoreData.posts(data.posts.map((p) => (p.column === colName ? { ...p, column: targetCol } : p)));
       setBoard(updatedBoard);
+
       if (isSupabaseConfigured) {
-        saveRemoteBoard(updatedBoard);
-        updatedPosts.filter((p) => p.column === targetCol).forEach((p) => saveRemotePost(p));
+        await saveRemoteBoard(updatedBoard);
+        const affectedCards = updatedPosts.filter((p) => p.column === targetCol);
+        for (const card of affectedCards) {
+          await saveRemotePost(card);
+        }
       }
     }
   };
@@ -441,26 +486,32 @@ export default function BoardDetailPage() {
     setDragOverColIdx(null);
   };
 
-  const handleColumnDrop = (sourceIdx: number, targetIdx: number) => {
+  const handleColumnDrop = async (sourceIdx: number, targetIdx: number) => {
     if (sourceIdx === targetIdx || sourceIdx < 0 || targetIdx < 0) {
       setDraggedColIdx(null);
       setDragOverColIdx(null);
       return;
     }
+
+    lastUserActionTimeRef.current = Date.now(); // 5초간 원격 동기화 간섭 차단
+
     const updatedCols = [...columns];
     const [movedCol] = updatedCols.splice(sourceIdx, 1);
     updatedCols.splice(targetIdx, 0, movedCol);
 
-    setColumns(updatedCols);
+    const cleanCols = Array.from(new Set(updatedCols.map((c) => String(c || '').trim()).filter(Boolean)));
+
+    setColumns(cleanCols);
     setDraggedColIdx(null);
     setDragOverColIdx(null);
 
     const data = getStoreData();
-    const updatedBoard = { ...board, columns: updatedCols };
+    const updatedBoard = { ...board, columns: cleanCols };
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
     setBoard(updatedBoard);
+
     if (isSupabaseConfigured) {
-      saveRemoteBoard(updatedBoard);
+      await saveRemoteBoard(updatedBoard);
     }
   };
 
@@ -917,11 +968,36 @@ export default function BoardDetailPage() {
     </div>
 
       {/* 메인 콘텐츠 영역 (가로 스크롤 & 각 모둠별 독립 세로 스크롤 완벽 지원) */}
-      <main className="flex-1 w-full px-3 sm:px-5 pt-3 pb-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:snap-none flex flex-col min-h-0">
-        {currentLayout === 'kanban' ? (
-          /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤) */
-          <div className="flex gap-3 sm:gap-3.5 items-stretch h-full w-max min-w-full min-h-0">
-            {Array.from(new Set([...columns, ...posts.map((p) => p.column).filter(Boolean) as string[]])).map((colName, idx) => {
+      <div className="relative flex-1 w-full min-h-0 flex flex-col overflow-hidden">
+        {/* 좌측 스크롤 화살표 버튼 */}
+        <button
+          type="button"
+          onClick={() => scrollBoardHorizontally('left')}
+          className="no-print absolute left-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/95 hover:bg-white text-slate-700 hover:text-blue-600 shadow-xl border border-slate-200 flex items-center justify-center transition active:scale-95 opacity-80 hover:opacity-100"
+          title="왼쪽 모둠 보기"
+        >
+          <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+        </button>
+
+        {/* 우측 스크롤 화살표 버튼 */}
+        <button
+          type="button"
+          onClick={() => scrollBoardHorizontally('right')}
+          className="no-print absolute right-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/95 hover:bg-white text-slate-700 hover:text-blue-600 shadow-xl border border-slate-200 flex items-center justify-center transition active:scale-95 opacity-80 hover:opacity-100"
+          title="오른쪽 모둠 보기"
+        >
+          <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+        </button>
+
+        <main
+          ref={mainScrollRef}
+          onWheel={handleMainWheel}
+          className="flex-1 w-full px-3 sm:px-5 pt-3 pb-4 overflow-x-auto overflow-y-hidden board-h-scroll flex flex-col min-h-0"
+        >
+          {currentLayout === 'kanban' ? (
+            /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤) */
+            <div className="flex gap-3 sm:gap-3.5 items-stretch h-full w-max min-w-full min-h-0 pb-1">
+              {columns.map((colName, idx) => {
               const colPosts = posts.filter(
                 (p) => p.column === colName || (!p.column && idx === 0)
               );
@@ -1208,6 +1284,7 @@ export default function BoardDetailPage() {
           </div>
         )}
       </main>
+    </div>
 
       {/* 우측 하단 플로팅 글쓰기 버튼 */}
       {(!board.isLocked || isTeacherOrAdmin) && (
