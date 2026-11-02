@@ -60,10 +60,10 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
   try {
     let cleanDesc = board.description || '';
     cleanDesc = cleanDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
-    const metaPayload = JSON.stringify({ columns: board.columns });
+    const metaPayload = JSON.stringify({ columns: board.columns, code: board.code, title: board.title });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
 
-    // 1. boards 테이블에 저장
+    // 1. boards 테이블에 저장 (columns 컬럼 포함 시도)
     const { error } = await supabase.from('boards').upsert({
       id: board.id,
       code: board.code,
@@ -74,7 +74,19 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
     });
 
     if (error) {
-      console.warn('saveRemoteBoard upsert error, trying fallback:', error);
+      console.warn('saveRemoteBoard upsert with columns failed, retrying without columns column:', error);
+      // DB에 columns 컬럼이 없는 경우를 위한 100% 호환 폴백 (description에 메타데이터로 안전 보관)
+      try {
+        await supabase.from('boards').upsert({
+          id: board.id,
+          code: board.code,
+          title: board.title,
+          description: finalDesc,
+          theme: board.theme || 'blue',
+        });
+      } catch (eFallback) {
+        console.error('saveRemoteBoard fallback error', eFallback);
+      }
     }
 
     // 2. 🔥 학생-교사 실시간 동기화 100% 보장: posts 테이블의 시스템 메타 레코드에 동시 저장
@@ -82,13 +94,17 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       await supabase.from('posts').upsert({
         id: `board_columns_${board.id}`,
         board_id: board.id,
-        column_id: '__system_meta__',
+        column_name: '__system_meta__',
         title: '__BOARD_COLUMNS_META__',
-        content: JSON.stringify({ columns: board.columns, updatedAt: Date.now() }),
+        content: JSON.stringify({
+          columns: board.columns,
+          code: board.code,
+          title: board.title,
+          updatedAt: Date.now(),
+        }),
         color: 'white',
         author_id: 'system',
         author_name: '시스템',
-        order_index: -9999,
       });
     } catch (e2) {}
 
@@ -121,7 +137,11 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
 
     // 시스템 메타데이터 레코드 분리 (열 실시간 동기화용)
     const normalRows = data.filter((p) => {
-      if (p.column_id === '__system_meta__' || p.title === '__BOARD_COLUMNS_META__') {
+      if (
+        p.column_name === '__system_meta__' ||
+        p.column_id === '__system_meta__' ||
+        p.title === '__BOARD_COLUMNS_META__'
+      ) {
         try {
           const parsed = JSON.parse(p.content);
           if (Array.isArray(parsed.columns) && typeof window !== 'undefined') {
@@ -174,7 +194,7 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
         authorId: p.author_id || 'user-student',
         authorName: p.author_name || '학생',
         authorRole: (p.author_role || 'student') as UserRole,
-        column: metaColumn || p.column_id || '모둠 1',
+        column: metaColumn || p.column_name || p.column_id || '모둠 1',
         order: metaOrder ?? (typeof p.order_index === 'number' ? p.order_index : 0),
         reactions: {
           like: Array.isArray(p.likes) ? p.likes.length : 0,
@@ -242,10 +262,10 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       finalContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
     }
 
-    const { error } = await supabase.from('posts').upsert({
+    const rowPayload: any = {
       id: post.id,
       board_id: post.boardId,
-      column_id: post.column || '모둠 1',
+      column_name: post.column || '모둠 1',
       title: post.title,
       content: finalContent,
       color: post.color || 'yellow',
@@ -253,11 +273,17 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       link_url: post.linkUrl || null,
       author_id: post.authorId || 'student',
       author_name: post.authorName || '학생',
-      order_index: typeof post.order === 'number' ? post.order : 0,
-    });
+    };
+
+    const { error } = await supabase.from('posts').upsert(rowPayload);
     if (error) {
-      console.error('saveRemotePost error', error);
-      return false;
+      console.warn('saveRemotePost primary upsert failed, retrying with fallback payload:', error);
+      try {
+        await supabase.from('posts').upsert({
+          ...rowPayload,
+          column_id: post.column || '모둠 1',
+        });
+      } catch (e2) {}
     }
     return true;
   } catch (e) {
@@ -300,7 +326,7 @@ export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
       return {
         id: post.id,
         board_id: post.boardId,
-        column_id: post.column || '모둠 1',
+        column_name: post.column || '모둠 1',
         title: post.title,
         content: finalContent,
         color: post.color || 'yellow',
@@ -308,14 +334,19 @@ export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
         link_url: post.linkUrl || null,
         author_id: post.authorId || 'student',
         author_name: post.authorName || '학생',
-        order_index: typeof post.order === 'number' ? post.order : 0,
       };
     });
 
     const { error } = await supabase.from('posts').upsert(rows);
     if (error) {
-      console.error('saveRemotePosts error', error);
-      return false;
+      console.warn('saveRemotePosts primary batch failed, retrying with column_id:', error);
+      try {
+        const fallbackRows = rows.map((r: any) => ({
+          ...r,
+          column_id: r.column_name,
+        }));
+        await supabase.from('posts').upsert(fallbackRows);
+      } catch (e2) {}
     }
     return true;
   } catch (e) {

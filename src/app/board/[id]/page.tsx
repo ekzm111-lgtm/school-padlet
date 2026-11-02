@@ -209,23 +209,31 @@ export default function BoardDetailPage() {
     // store_updated 이벤트 발생 시 loadData()를 중복 호출하지 않음 (로컬 조작 직후 과거 원격 데이터로 덮어씌워지는 레이스 컨디션 차단)
   }, [boardId]);
 
-  // 🔥 실시간 동기화 (Supabase Realtime 채널 + 2초 주기 자동 폴링 백업)
+  // 🔥 실시간 동기화 (Supabase Realtime 채널 + 1초 주기 자동 폴링 백업)
   // 학생과 교사가 서로 다른 기기에서 작업할 때 1~2초 내에 자동 화면 반영 (게시글 + 모둠 열)!
+  const isSyncingRef = useRef(false);
+
   useEffect(() => {
     if (!boardId) return;
 
     const syncRemoteData = async () => {
       if (!isSupabaseConfigured || !supabase) return;
-      // 사용자가 최근 4초 내에 카드를 이동/수정/생성했다면 원격 폴링으로 인한 덮어쓰기 방지
-      if (Date.now() - lastUserActionTimeRef.current < 4000) return;
+      if (isSyncingRef.current) return;
+      // 사용자가 최근 1.2초 내에 카드를 조작했다면 간섭 방지
+      if (Date.now() - lastUserActionTimeRef.current < 1200) return;
 
+      isSyncingRef.current = true;
       try {
-        // 1. 최신 게시글 동기화 (내용이나 순서가 실제로 바뀌었을 때만 setPosts를 호출하여 불필요한 전체 리렌더링 차단)
-        const remote = await fetchRemotePosts(boardId);
-        if (remote) {
+        const targetBoardId = board?.id || boardId;
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+
+        // 1. 최신 게시글 동기화
+        const fetchPromise = fetchRemotePosts(targetBoardId);
+        const remote: any = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (remote && Array.isArray(remote)) {
           setPosts((prevPosts) => {
-            // 사용자가 카드를 옮기는 중이면 로컬 상태 최우선 보호
-            if (Date.now() - lastUserActionTimeRef.current < 4000) return prevPosts;
+            if (Date.now() - lastUserActionTimeRef.current < 1200) return prevPosts;
 
             const prevSig = prevPosts
               .map(
@@ -241,33 +249,41 @@ export default function BoardDetailPage() {
               .join('|');
             if (prevSig === remoteSig) return prevPosts;
 
-            // 로컬에만 있는 최신 카드가 있다면 보존하면서 원격 카드 병합
+            // 로컬에만 있는 작성 중인 카드가 있다면 보존하면서 원격 카드 병합
             const remoteMap = new Map(remote.map((p) => [p.id, p]));
             const localOnly = prevPosts.filter((p) => !remoteMap.has(p.id));
-            if (localOnly.length > 0) {
-              return [...remote, ...localOnly];
-            }
-            return remote;
+            const merged = localOnly.length > 0 ? [...remote, ...localOnly] : remote;
+
+            // 브라우저 캐시 동시 동기화
+            try {
+              const data = getStoreData();
+              const otherPosts = data.posts.filter((p) => p.boardId !== targetBoardId);
+              saveStoreData.posts([...merged, ...otherPosts]);
+            } catch (eStore) {}
+
+            return merged;
           });
         }
 
-        // 2. 최신 모둠(열) 실시간 동기화 (교사 <-> 학생 실시간 동기화)
-        // 사용자가 최근 4초 내에 열 이름을 바꾸거나 순서를 옮겼다면 덮어쓰기 방어
-        if (Date.now() - lastUserActionTimeRef.current >= 4000) {
+        // 2. 최신 모둠(열) 실시간 동기화
+        if (Date.now() - lastUserActionTimeRef.current >= 1200) {
           let latestCols: string[] | null = null;
 
-          // 2-1. posts 시스템 메타데이터로부터 실시간 열 목록 확인 (가장 빠르고 확실함)
+          // 2-1. posts 시스템 메타데이터로부터 실시간 열 목록 확인
           if (typeof window !== 'undefined' && Array.isArray((window as any).__LATEST_BOARD_COLUMNS__)) {
             latestCols = (window as any).__LATEST_BOARD_COLUMNS__;
           }
 
-          // 2-2. boards 테이블에서 columns 및 description 메타데이터 확인
+          // 2-2. boards 테이블에서 select('*')로 안전 조회
           if (!latestCols || latestCols.length === 0) {
-            const { data: dbBoard } = await supabase
+            const boardFetch = supabase
               .from('boards')
-              .select('columns, description')
-              .or(`id.eq.${boardId},code.eq.${boardId}`)
+              .select('*')
+              .or(`id.eq.${targetBoardId},code.eq.${targetBoardId}`)
               .maybeSingle();
+
+            const res: any = await Promise.race([boardFetch, timeoutPromise]);
+            const dbBoard = res?.data;
 
             if (dbBoard) {
               if (Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
@@ -297,23 +313,35 @@ export default function BoardDetailPage() {
               setBoard((prev) => {
                 if (!prev) return prev;
                 if ((prev.columns || []).join('|') === cleanCols.join('|')) return prev;
-                return { ...prev, columns: cleanCols };
+                const updatedBoard = { ...prev, columns: cleanCols };
+                try {
+                  const data = getStoreData();
+                  saveStoreData.boards(data.boards.map((b) => (b.id === updatedBoard.id ? updatedBoard : b)));
+                } catch (e) {}
+                return updatedBoard;
               });
             }
           }
         }
       } catch (e) {
         console.error('syncRemoteData error', e);
+      } finally {
+        isSyncingRef.current = false;
       }
     };
 
     let channel: any = null;
     if (isSupabaseConfigured && supabase) {
       try {
+        const subId = board?.id || boardId;
         channel = supabase
-          .channel(`board_live_sub_${boardId}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, syncRemoteData)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, syncRemoteData)
+          .channel(`board_live_sub_${subId}_${Date.now()}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+            syncRemoteData();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, () => {
+            syncRemoteData();
+          })
           .subscribe();
       } catch (e) {}
     }
@@ -327,7 +355,7 @@ export default function BoardDetailPage() {
       }
       clearInterval(pollTimer);
     };
-  }, [boardId]);
+  }, [boardId, board?.id]);
 
   if (isLoading) {
     return (
@@ -761,6 +789,10 @@ export default function BoardDetailPage() {
       if (prev.some((p) => p.id === newPost.id)) return prev;
       return [newPost, ...prev];
     });
+
+    if (isSupabaseConfigured) {
+      await saveRemotePost(newPost);
+    }
 
     const targetCol = newColName || newPost.column;
     if (targetCol && !columns.includes(targetCol)) {

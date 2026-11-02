@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Board, BoardLayout, BoardTheme, User } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
+import { saveRemoteBoard } from '@/lib/supabaseStore';
 
 interface CreateBoardModalProps {
   isOpen: boolean;
@@ -145,6 +146,7 @@ export default function CreateBoardModal({
 
     const currentData = getStoreData();
     saveStoreData.boards([newBoard, ...currentData.boards]);
+    saveRemoteBoard(newBoard).catch(() => {});
     onCreated(newBoard);
     onClose();
   };
