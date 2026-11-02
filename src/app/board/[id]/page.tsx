@@ -916,11 +916,11 @@ export default function BoardDetailPage() {
       </div>
     </div>
 
-      {/* 메인 콘텐츠 영역 (가로/세로 독립 스크롤 & 모바일 스냅 넘김 지원) */}
-      <main className="flex-1 w-full px-3 sm:px-6 pt-3 sm:pt-5 pb-20 overflow-x-auto overflow-y-auto select-none snap-x snap-mandatory sm:snap-none">
+      {/* 메인 콘텐츠 영역 (가로 스크롤 & 각 모둠별 독립 세로 스크롤 완벽 지원) */}
+      <main className="flex-1 w-full px-3 sm:px-5 pt-3 pb-3 overflow-x-auto overflow-y-hidden select-none snap-x snap-mandatory sm:snap-none flex flex-col min-h-0">
         {currentLayout === 'kanban' ? (
-          /* 1) 모둠 칸반 열 (모바일 너비 최적화 & 깔끔한 스냅 정렬) */
-          <div className="flex gap-3 sm:gap-5 items-start pb-12 w-max min-w-full">
+          /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤) */
+          <div className="flex gap-3 sm:gap-3.5 items-stretch h-full w-max min-w-full min-h-0">
             {Array.from(new Set([...columns, ...posts.map((p) => p.column).filter(Boolean) as string[]])).map((colName, idx) => {
               const colPosts = posts.filter(
                 (p) => p.column === colName || (!p.column && idx === 0)
@@ -943,7 +943,7 @@ export default function BoardDetailPage() {
                     }
                   }}
                   onDrop={(e) => handleDropOnColumn(e, colName, idx)}
-                  className={`w-[85vw] max-w-[320px] sm:w-80 shrink-0 snap-start bg-white/85 backdrop-blur-md rounded-2xl sm:rounded-3xl p-3 sm:p-4 border shadow-sm flex flex-col min-h-[500px] sm:min-h-[620px] transition-all duration-200 ${
+                  className={`w-[82vw] max-w-[285px] sm:w-[280px] shrink-0 snap-start bg-white/90 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border shadow-xs flex flex-col h-full max-h-full transition-all duration-200 min-h-0 ${
                     isColDragged ? 'opacity-40 scale-95 border-dashed border-blue-400' : ''
                   } ${
                     isColDragOver
@@ -951,8 +951,8 @@ export default function BoardDetailPage() {
                       : 'border-slate-200/90 hover:border-blue-300'
                   }`}
                 >
-                  {/* 열 헤더 */}
-                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 group">
+                  {/* 열 헤더 (상단 고정) */}
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 group shrink-0">
                     {editingColIdx === idx ? (
                       <div className="flex items-center gap-1 w-full">
                         <input
@@ -1022,7 +1022,7 @@ export default function BoardDetailPage() {
                     )}
                   </div>
 
-                  {/* 단정한 최상단 카드 추가 버튼 */}
+                  {/* 단정한 최상단 카드 추가 버튼 (상단 고정) */}
                   {(!board.isLocked || isTeacherOrAdmin) && (
                     <button
                       onClick={() => {
@@ -1031,15 +1031,15 @@ export default function BoardDetailPage() {
                         setActiveColumn(colName);
                         setShowPostModal(true);
                       }}
-                      className="mb-3 w-full py-2.5 rounded-xl bg-slate-100/90 hover:bg-blue-50 hover:text-blue-600 text-slate-600 text-xs font-bold transition flex items-center justify-center gap-1.5 border border-slate-200/60 shadow-xs"
+                      className="mb-2 w-full py-2 rounded-xl bg-slate-100/90 hover:bg-blue-50 hover:text-blue-600 text-slate-600 text-xs font-bold transition flex items-center justify-center gap-1.5 border border-slate-200/60 shadow-xs shrink-0"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>이 열에 카드 추가</span>
                     </button>
                   )}
 
-                  {/* 카드 목록 (같은 모둠 내 드래그 앤 드롭 순서 변경 지원) */}
-                  <div className="space-y-4 flex-1 min-h-[80px]">
+                  {/* 🔥 카드 목록: 해당 모둠만 독립적으로 부드럽게 세로 스크롤! */}
+                  <div className="space-y-2.5 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 slim-scrollbar">
                     {colPosts.map((post) => (
                       <div
                         key={post.id}
@@ -1086,11 +1086,11 @@ export default function BoardDetailPage() {
 
             {/* 새 모둠 추가 카드 */}
             {(!board.isLocked || isTeacherOrAdmin) && (
-              <div className="w-72 shrink-0">
+              <div className="w-[82vw] max-w-[285px] sm:w-[280px] shrink-0">
                 {showAddColInput ? (
                   <form
                     onSubmit={handleAddColumn}
-                    className="p-4 bg-white/95 backdrop-blur-md rounded-3xl border border-blue-300 shadow-md space-y-3"
+                    className="p-3.5 bg-white/95 backdrop-blur-md rounded-2xl border border-blue-300 shadow-md space-y-2.5"
                   >
                     <div className="text-xs font-bold text-slate-700">새 모둠(열) 추가</div>
                     <input
@@ -1120,7 +1120,7 @@ export default function BoardDetailPage() {
                 ) : (
                   <button
                     onClick={() => setShowAddColInput(true)}
-                    className="w-full py-4 rounded-3xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white/70 hover:bg-white text-slate-600 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
+                    className="w-full py-3.5 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white/70 hover:bg-white text-slate-600 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
                   >
                     <Plus className="w-4 h-4" />
                     <span>새 모둠(열) 추가</span>

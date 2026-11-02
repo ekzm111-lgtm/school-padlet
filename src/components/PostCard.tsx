@@ -152,15 +152,15 @@ export default function PostCard({
   return (
     <>
       <div
-        className={`relative rounded-2xl p-3.5 sm:p-5 border shadow-sm transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
+        className={`relative rounded-2xl p-3 sm:p-3.5 border shadow-xs transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
       >
         {/* 상단 핀 & 작성자 & 수정/삭제 버튼 */}
         <div>
-          <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               {currentPost.pinned && (
-                <span className="flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-600">
-                  <Pin className="w-3 h-3 fill-current rotate-45" />
+                <span className="flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+                  <Pin className="w-2.5 h-2.5 fill-current rotate-45" />
                   <span>공지</span>
                 </span>
               )}
@@ -215,7 +215,7 @@ export default function PostCard({
 
           {/* 제목 (긴 URL이나 단어도 박스를 넘어가지 않고 자동 줄바꿈) */}
           {currentPost.title && (
-            <h4 className="font-bold text-sm text-slate-900 mb-1.5 leading-snug break-all [overflow-wrap:anywhere]">
+            <h4 className="font-bold text-[13px] text-slate-900 mb-1 leading-snug break-all [overflow-wrap:anywhere]">
               {currentPost.title}
             </h4>
           )}
@@ -229,15 +229,15 @@ export default function PostCard({
 
           {/* 🔥 다중 첨부 파일 다운로드 목록 (한글, PDF, 워드, PPT 등) */}
           {allAttachments.length > 0 && (
-            <div className="mt-3 space-y-1.5">
+            <div className="mt-2.5 space-y-1">
               {allAttachments.map((file, idx) => (
                 <div
                   key={idx}
-                  className="p-2.5 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 transition flex items-center justify-between gap-2.5"
+                  className="p-2 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 transition flex items-center justify-between gap-2"
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                      <FileText className="w-3.5 h-3.5" />
+                    <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                      <FileText className="w-3 h-3" />
                     </div>
                     <div className="truncate text-left">
                       <div className="text-[11px] font-bold text-slate-800 truncate">
@@ -345,7 +345,7 @@ export default function PostCard({
         </div>
 
         {/* 하단 반응 및 댓글 바 */}
-        <div className="mt-4 pt-3 border-t border-black/10">
+        <div className="mt-2.5 pt-2 border-t border-black/10">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             {allowReactions && (
               <div className="flex items-center gap-1">
