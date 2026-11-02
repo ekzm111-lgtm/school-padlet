@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Board, Post, User, FileAttachment } from './types';
+import { Board, Post, User, FileAttachment, UserRole } from './types';
 
 // Supabase 테이블 데이터 <-> SchoolPad 로컬 타입 상호 변환기
 
@@ -81,12 +81,14 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
     }
     const { data, error } = await query;
     if (error || !data) return null;
-    return data.map((p) => {
+    const mapped = data.map((p) => {
       let rawContent = p.content || '';
       let attachments: FileAttachment[] = [];
       let comments: any[] = [];
+      let metaOrder: number | undefined = undefined;
+      let metaColumn: string | undefined = undefined;
 
-      // content 내에 인코딩된 첨부파일 및 댓글 메타데이터 복원
+      // content 내에 인코딩된 첨부파일 및 댓글, 순서 메타데이터 복원
       if (rawContent.includes('<!--SCHOOLPAD_META:')) {
         const metaMatch = rawContent.match(/<!--SCHOOLPAD_META:([\s\S]*?)-->/);
         if (metaMatch && metaMatch[1]) {
@@ -97,6 +99,12 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
             }
             if (Array.isArray(parsed.comments)) {
               comments = parsed.comments;
+            }
+            if (typeof parsed.order === 'number') {
+              metaOrder = parsed.order;
+            }
+            if (typeof parsed.column === 'string' && parsed.column) {
+              metaColumn = parsed.column;
             }
           } catch (e) {}
         }
@@ -113,8 +121,9 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
         linkUrl: p.link_url || '',
         authorId: p.author_id || 'user-student',
         authorName: p.author_name || '학생',
-        authorRole: 'student',
-        column: p.column_id || '모둠 1',
+        authorRole: (p.author_role || 'student') as UserRole,
+        column: metaColumn || p.column_id || '모둠 1',
+        order: metaOrder ?? (typeof p.order_index === 'number' ? p.order_index : 0),
         reactions: {
           like: Array.isArray(p.likes) ? p.likes.length : 0,
           clap: 0,
@@ -127,6 +136,16 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
         createdAt: p.created_at ? new Date(p.created_at).toLocaleString() : '',
       };
     });
+
+    // 사용자가 배치한 순서(order) 오름차순으로 정렬 (order가 같으면 등록일시 내림차순 유지)
+    mapped.sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : 99999;
+      const orderB = typeof b.order === 'number' ? b.order : 99999;
+      if (orderA !== orderB) return orderA - orderB;
+      return 0;
+    });
+
+    return mapped;
   } catch (e) {
     console.error('fetchRemotePosts error', e);
     return null;
@@ -139,8 +158,14 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     let cleanContent = post.content || '';
     cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
 
-    // 첨부파일과 댓글을 메타데이터로 함께 인코딩하여 저장
-    const meta: { attachments?: FileAttachment[]; comments?: any[] } = {};
+    // 첨부파일과 댓글, 순서, 컬럼을 메타데이터로 함께 인코딩하여 저장
+    const meta: {
+      attachments?: FileAttachment[];
+      comments?: any[];
+      order?: number;
+      column?: string;
+    } = {};
+
     const atts: FileAttachment[] = [];
     if (post.attachments && post.attachments.length > 0) {
       atts.push(...post.attachments);
@@ -152,6 +177,12 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     }
     if (post.comments && post.comments.length > 0) {
       meta.comments = post.comments;
+    }
+    if (typeof post.order === 'number') {
+      meta.order = post.order;
+    }
+    if (post.column) {
+      meta.column = post.column;
     }
 
     let finalContent = cleanContent;
@@ -170,7 +201,7 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       link_url: post.linkUrl || null,
       author_id: post.authorId || 'student',
       author_name: post.authorName || '학생',
-      order_index: post.order || 0,
+      order_index: typeof post.order === 'number' ? post.order : 0,
     });
     if (error) {
       console.error('saveRemotePost error', error);

@@ -85,6 +85,9 @@ export default function BoardDetailPage() {
   const dragItemIdx = useRef<number | null>(null);
   const dragOverItemIdx = useRef<number | null>(null);
 
+  // 사용자가 방금 카드를 조작(드래그 이동, 수정, 생성 등)한 시각 (원격 폴링 충돌 방어용)
+  const lastUserActionTimeRef = useRef<number>(0);
+
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
@@ -166,9 +169,7 @@ export default function BoardDetailPage() {
 
   useEffect(() => {
     loadData();
-    const handleUpdate = () => loadData();
-    window.addEventListener('store_updated', handleUpdate);
-    return () => window.removeEventListener('store_updated', handleUpdate);
+    // store_updated 이벤트 발생 시 loadData()를 중복 호출하지 않음 (로컬 조작 직후 과거 원격 데이터로 덮어씌워지는 레이스 컨디션 차단)
   }, [boardId]);
 
   // 🔥 실시간 동기화 (Supabase Realtime 채널 + 2초 주기 자동 폴링 백업)
@@ -178,24 +179,37 @@ export default function BoardDetailPage() {
 
     const syncRemoteData = async () => {
       if (!isSupabaseConfigured || !supabase) return;
+      // 사용자가 최근 4초 내에 카드를 이동/수정/생성했다면 원격 폴링으로 인한 덮어쓰기 방지
+      if (Date.now() - lastUserActionTimeRef.current < 4000) return;
+
       try {
-        // 1. 최신 게시글 동기화 (내용이 실제로 바뀌었을 때만 setPosts를 호출하여 불필요한 전체 리렌더링 차단)
+        // 1. 최신 게시글 동기화 (내용이나 순서가 실제로 바뀌었을 때만 setPosts를 호출하여 불필요한 전체 리렌더링 차단)
         const remote = await fetchRemotePosts(boardId);
         if (remote) {
           setPosts((prevPosts) => {
+            // 사용자가 카드를 옮기는 중이면 로컬 상태 최우선 보호
+            if (Date.now() - lastUserActionTimeRef.current < 4000) return prevPosts;
+
             const prevSig = prevPosts
               .map(
                 (p) =>
-                  `${p.id}_${p.column}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
+                  `${p.id}_${p.column}_${p.order ?? ''}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
               )
               .join('|');
             const remoteSig = remote
               .map(
                 (p) =>
-                  `${p.id}_${p.column}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
+                  `${p.id}_${p.column}_${p.order ?? ''}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
               )
               .join('|');
             if (prevSig === remoteSig) return prevPosts;
+
+            // 로컬에만 있는 최신 카드가 있다면 보존하면서 원격 카드 병합
+            const remoteMap = new Map(remote.map((p) => [p.id, p]));
+            const localOnly = prevPosts.filter((p) => !remoteMap.has(p.id));
+            if (localOnly.length > 0) {
+              return [...remote, ...localOnly];
+            }
             return remote;
           });
         }
@@ -451,7 +465,7 @@ export default function BoardDetailPage() {
   };
 
   // 같은 열 또는 다른 열의 특정 카드 위에 드롭했을 때 순서 변경
-  const handleDropOnCard = (e: React.DragEvent, targetPostId: string, colName: string, targetColIdx: number) => {
+  const handleDropOnCard = async (e: React.DragEvent, targetPostId: string, colName: string, targetColIdx: number) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -468,6 +482,8 @@ export default function BoardDetailPage() {
       setDragOverPostId(null);
       return;
     }
+
+    lastUserActionTimeRef.current = Date.now(); // 사용자 조작 보호
 
     const currentPosts = [...posts];
     const sourceIdx = currentPosts.findIndex((p) => p.id === sourceId);
@@ -487,20 +503,33 @@ export default function BoardDetailPage() {
     const newTargetIdx = currentPosts.findIndex((p) => p.id === targetPostId);
     currentPosts.splice(newTargetIdx, 0, updatedCard);
 
-    setPosts(currentPosts);
+    // 전체 카드 순서(order) 재부여
+    const reorderedPosts = currentPosts.map((p, idx) => ({
+      ...p,
+      order: idx,
+    }));
+
+    const finalUpdatedCard = reorderedPosts.find((p) => p.id === sourceId) || updatedCard;
+
+    setPosts(reorderedPosts);
     setDraggedPostId(null);
     setDragOverPostId(null);
 
     const data = getStoreData();
     const otherBoardPosts = data.posts.filter((p) => p.boardId !== boardId);
-    saveStoreData.posts([...otherBoardPosts, ...currentPosts]);
+    saveStoreData.posts([...otherBoardPosts, ...reorderedPosts]);
+
     if (isSupabaseConfigured) {
-      saveRemotePost(updatedCard);
+      await saveRemotePost(finalUpdatedCard);
+      const finalTargetCard = reorderedPosts.find((p) => p.id === targetPostId);
+      if (finalTargetCard) {
+        saveRemotePost(finalTargetCard);
+      }
     }
   };
 
   // 열 빈 공간에 드롭했을 때 맨 뒤로 이동
-  const handleDropOnColumn = (e: React.DragEvent, colName: string, targetColIdx: number) => {
+  const handleDropOnColumn = async (e: React.DragEvent, colName: string, targetColIdx: number) => {
     e.preventDefault();
 
     // 열 자체를 드롭했을 경우
@@ -512,6 +541,8 @@ export default function BoardDetailPage() {
 
     const postId = e.dataTransfer.getData('text/plain') || draggedPostId;
     if (!postId) return;
+
+    lastUserActionTimeRef.current = Date.now(); // 사용자 조작 보호
 
     const currentPosts = [...posts];
     const sourceIdx = currentPosts.findIndex((p) => p.id === postId);
@@ -525,15 +556,24 @@ export default function BoardDetailPage() {
     const updatedCard = { ...draggedCard, column: colName };
     currentPosts.push(updatedCard);
 
-    setPosts(currentPosts);
+    // 전체 카드 순서(order) 재부여
+    const reorderedPosts = currentPosts.map((p, idx) => ({
+      ...p,
+      order: idx,
+    }));
+
+    const finalUpdatedCard = reorderedPosts.find((p) => p.id === postId) || updatedCard;
+
+    setPosts(reorderedPosts);
     setDraggedPostId(null);
     setDragOverPostId(null);
 
     const data = getStoreData();
     const otherBoardPosts = data.posts.filter((p) => p.boardId !== boardId);
-    saveStoreData.posts([...otherBoardPosts, ...currentPosts]);
+    saveStoreData.posts([...otherBoardPosts, ...reorderedPosts]);
+
     if (isSupabaseConfigured) {
-      saveRemotePost(updatedCard);
+      await saveRemotePost(finalUpdatedCard);
     }
   };
 
@@ -616,6 +656,7 @@ export default function BoardDetailPage() {
 
   // 카드 생성 콜백 (중복 생성 방어 및 새 모둠 자동 반영)
   const handlePostCreated = async (newPost: Post, newColName?: string) => {
+    lastUserActionTimeRef.current = Date.now();
     setPosts((prev) => {
       if (prev.some((p) => p.id === newPost.id)) return prev;
       return [newPost, ...prev];
@@ -637,6 +678,7 @@ export default function BoardDetailPage() {
 
   // 카드 수정 콜백
   const handlePostUpdated = async (updated: Post) => {
+    lastUserActionTimeRef.current = Date.now();
     setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     const targetCol = updated.column;
     if (targetCol && !columns.includes(targetCol)) {
