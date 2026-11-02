@@ -179,22 +179,54 @@ export default function BoardDetailPage() {
     const syncRemoteData = async () => {
       if (!isSupabaseConfigured || !supabase) return;
       try {
-        // 1. 최신 게시글 동기화
+        // 1. 최신 게시글 동기화 (내용이 실제로 바뀌었을 때만 setPosts를 호출하여 불필요한 전체 리렌더링 차단)
         const remote = await fetchRemotePosts(boardId);
         if (remote) {
-          setPosts(remote);
+          setPosts((prevPosts) => {
+            const prevSig = prevPosts
+              .map(
+                (p) =>
+                  `${p.id}_${p.column}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
+              )
+              .join('|');
+            const remoteSig = remote
+              .map(
+                (p) =>
+                  `${p.id}_${p.column}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
+              )
+              .join('|');
+            if (prevSig === remoteSig) return prevPosts;
+            return remote;
+          });
         }
 
-        // 2. 최신 모둠(열) 실시간 동기화 (학생이 123 만들면 선생님 화면에도 123 컬럼 즉시 생성!)
+        // 2. 최신 모둠(열) 실시간 동기화 (게시글에 있는 열과 DB의 열을 안전하게 합집합으로 병합)
         const { data: dbBoard } = await supabase
           .from('boards')
           .select('columns')
           .or(`id.eq.${boardId},code.eq.${boardId}`)
           .maybeSingle();
 
+        const postCols = remote ? (remote.map((p) => p.column).filter(Boolean) as string[]) : [];
+
         if (dbBoard && Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
-          setColumns(dbBoard.columns);
-          setBoard((prev) => (prev ? { ...prev, columns: dbBoard.columns } : prev));
+          setColumns((prevCols) => {
+            const merged = Array.from(new Set([...dbBoard.columns, ...prevCols, ...postCols]));
+            if (merged.join('|') === prevCols.join('|')) return prevCols;
+            return merged;
+          });
+          setBoard((prev) => {
+            if (!prev) return prev;
+            const merged = Array.from(new Set([...dbBoard.columns, ...(prev.columns || []), ...postCols]));
+            if ((prev.columns || []).join('|') === merged.join('|')) return prev;
+            return { ...prev, columns: merged };
+          });
+        } else if (postCols.length > 0) {
+          setColumns((prevCols) => {
+            const merged = Array.from(new Set([...prevCols, ...postCols]));
+            if (merged.join('|') === prevCols.join('|')) return prevCols;
+            return merged;
+          });
         }
       } catch (e) {
         console.error('syncRemoteData error', e);
@@ -302,11 +334,12 @@ export default function BoardDetailPage() {
   };
 
   // 모둠(열) 추가
-  const handleAddColumn = (e: React.FormEvent) => {
+  const handleAddColumn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newColName.trim()) return;
+    const trimmed = newColName.trim();
+    if (!trimmed) return;
 
-    const updatedCols = [...columns, newColName.trim()];
+    const updatedCols = Array.from(new Set([...columns, trimmed]));
     setColumns(updatedCols);
     setNewColName('');
     setShowAddColInput(false);
@@ -316,7 +349,7 @@ export default function BoardDetailPage() {
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
     setBoard(updatedBoard);
     if (isSupabaseConfigured) {
-      saveRemoteBoard(updatedBoard);
+      await saveRemoteBoard(updatedBoard);
     }
   };
 
@@ -581,30 +614,44 @@ export default function BoardDetailPage() {
     await deletePost(postId);
   };
 
-  // 카드 생성 콜백 (중복 생성 방어)
-  const handlePostCreated = (newPost: Post, newColName?: string) => {
+  // 카드 생성 콜백 (중복 생성 방어 및 새 모둠 자동 반영)
+  const handlePostCreated = async (newPost: Post, newColName?: string) => {
     setPosts((prev) => {
       if (prev.some((p) => p.id === newPost.id)) return prev;
       return [newPost, ...prev];
     });
-    if (newColName && !columns.includes(newColName)) {
-      const updatedCols = [...columns, newColName];
+
+    const targetCol = newColName || newPost.column;
+    if (targetCol && !columns.includes(targetCol)) {
+      const updatedCols = Array.from(new Set([...columns, targetCol]));
       setColumns(updatedCols);
       const data = getStoreData();
       const updatedBoard = { ...board, columns: updatedCols };
       saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
       setBoard(updatedBoard);
       if (isSupabaseConfigured) {
-        saveRemoteBoard(updatedBoard);
+        await saveRemoteBoard(updatedBoard);
       }
     }
   };
 
   // 카드 수정 콜백
-  const handlePostUpdated = (updated: Post) => {
-    setPosts(posts.map((p) => (p.id === updated.id ? updated : p)));
+  const handlePostUpdated = async (updated: Post) => {
+    setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    const targetCol = updated.column;
+    if (targetCol && !columns.includes(targetCol)) {
+      const updatedCols = Array.from(new Set([...columns, targetCol]));
+      setColumns(updatedCols);
+      const data = getStoreData();
+      const updatedBoard = { ...board, columns: updatedCols };
+      saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+      setBoard(updatedBoard);
+      if (isSupabaseConfigured) {
+        await saveRemoteBoard(updatedBoard);
+      }
+    }
     if (isSupabaseConfigured) {
-      saveRemotePost(updated);
+      await saveRemotePost(updated);
     }
   };
 
@@ -832,7 +879,7 @@ export default function BoardDetailPage() {
         {currentLayout === 'kanban' ? (
           /* 1) 모둠 칸반 열 (모바일 너비 최적화 & 깔끔한 스냅 정렬) */
           <div className="flex gap-3 sm:gap-5 items-start pb-12 w-max min-w-full">
-            {columns.map((colName, idx) => {
+            {Array.from(new Set([...columns, ...posts.map((p) => p.column).filter(Boolean) as string[]])).map((colName, idx) => {
               const colPosts = posts.filter(
                 (p) => p.column === colName || (!p.column && idx === 0)
               );
@@ -980,7 +1027,9 @@ export default function BoardDetailPage() {
                         <PostCard
                           post={post}
                           currentUser={currentUser}
-                          columns={columns}
+                          columns={Array.from(
+                            new Set([...columns, ...posts.map((p) => p.column).filter(Boolean) as string[]])
+                          )}
                           allowComments={board.allowComments}
                           allowReactions={board.allowReactions}
                           onDelete={handleDeletePost}
@@ -1144,7 +1193,9 @@ export default function BoardDetailPage() {
           currentUser={currentUser}
           post={selectedPostForEdit}
           defaultColumn={activeColumn}
-          columns={columns}
+          columns={Array.from(
+            new Set([...columns, ...posts.map((p) => p.column).filter(Boolean) as string[]])
+          )}
           onCreated={handlePostCreated}
           onUpdated={handlePostUpdated}
         />

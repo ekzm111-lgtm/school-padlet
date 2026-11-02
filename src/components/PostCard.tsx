@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Heart,
@@ -47,6 +47,15 @@ export default function PostCard({
   const [reactions, setReactions] = useState(post?.reactions || { like: 0, clap: 0, heart: 0, insight: 0 });
   const [comments, setComments] = useState(post?.comments || []);
   const [showImageModal, setShowImageModal] = useState(false);
+
+  // 부모로부터 새 post 데이터가 내려왔을 때(실시간 동기화 등), 수정 모달이 열려있지 않은 동안에는 최신 내용으로 동기화
+  useEffect(() => {
+    if (!showEditModal && post) {
+      setCurrentPost(post);
+      setReactions(post.reactions || { like: 0, clap: 0, heart: 0, insight: 0 });
+      setComments(post.comments || []);
+    }
+  }, [post, showEditModal]);
 
   if (!currentPost) return null;
 

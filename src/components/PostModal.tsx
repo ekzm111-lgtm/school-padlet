@@ -78,9 +78,19 @@ export default function PostModal({
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const docFileInputRef = useRef<HTMLInputElement>(null);
 
-  // 모달이 열릴 때 데이터 초기화 (생성 vs 수정 완벽 동기화)
+  const prevIsOpenRef = useRef(false);
+
+  // 모달이 처음 열릴 때(false -> true)에만 데이터 초기화!
+  // 모달이 열려있는 동안 부모 컴포넌트의 리렌더링이나 폴링으로 인해 사용자가 작성 중인 내용(링크, 제목, 본문 등)이 절대 지워지지 않음!
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      return;
+    }
+
+    // 이미 열려있는 상태라면 부모의 props 변경으로 인한 덮어쓰기/리셋 방지
+    if (prevIsOpenRef.current) return;
+    prevIsOpenRef.current = true;
 
     if (mode === 'edit' && post) {
       setTitle(post.title || '');
@@ -471,7 +481,7 @@ export default function PostModal({
                 onChange={(e) => setSelectedColumn(e.target.value)}
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold outline-none bg-white focus:ring-2 focus:ring-blue-500"
               >
-                {Array.from(new Set([...columns, selectedColumn].filter(Boolean))).map((col) => (
+                {Array.from(new Set([...columns, defaultColumn, selectedColumn].filter(Boolean))).map((col) => (
                   <option key={col} value={col}>
                     {col}
                   </option>
