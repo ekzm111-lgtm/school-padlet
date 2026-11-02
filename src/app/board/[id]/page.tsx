@@ -251,32 +251,55 @@ export default function BoardDetailPage() {
           });
         }
 
-        // 2. 최신 모둠(열) 실시간 동기화
-        // 사용자가 최근 5초 내에 열 이름을 바꾸거나 순서를 옮겼다면 원격 덮어쓰기 철저히 차단
-        if (Date.now() - lastUserActionTimeRef.current < 5000) return;
+        // 2. 최신 모둠(열) 실시간 동기화 (교사 <-> 학생 실시간 동기화)
+        // 사용자가 최근 4초 내에 열 이름을 바꾸거나 순서를 옮겼다면 덮어쓰기 방어
+        if (Date.now() - lastUserActionTimeRef.current >= 4000) {
+          let latestCols: string[] | null = null;
 
-        const { data: dbBoard } = await supabase
-          .from('boards')
-          .select('columns')
-          .or(`id.eq.${boardId},code.eq.${boardId}`)
-          .maybeSingle();
+          // 2-1. posts 시스템 메타데이터로부터 실시간 열 목록 확인 (가장 빠르고 확실함)
+          if (typeof window !== 'undefined' && Array.isArray((window as any).__LATEST_BOARD_COLUMNS__)) {
+            latestCols = (window as any).__LATEST_BOARD_COLUMNS__;
+          }
 
-        if (dbBoard && Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
-          // 중복 및 빈 문자열을 엄격하게 제거한 유효 열 목록만 반영 (무한 증식 원천 차단)
-          const cleanDbCols = Array.from(
-            new Set(dbBoard.columns.map((c: any) => String(c || '').trim()).filter(Boolean))
-          ) as string[];
+          // 2-2. boards 테이블에서 columns 및 description 메타데이터 확인
+          if (!latestCols || latestCols.length === 0) {
+            const { data: dbBoard } = await supabase
+              .from('boards')
+              .select('columns, description')
+              .or(`id.eq.${boardId},code.eq.${boardId}`)
+              .maybeSingle();
 
-          if (cleanDbCols.length > 0) {
-            setColumns((prevCols) => {
-              if (prevCols.join('|') === cleanDbCols.join('|')) return prevCols;
-              return cleanDbCols;
-            });
-            setBoard((prev) => {
-              if (!prev) return prev;
-              if ((prev.columns || []).join('|') === cleanDbCols.join('|')) return prev;
-              return { ...prev, columns: cleanDbCols };
-            });
+            if (dbBoard) {
+              if (Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
+                latestCols = dbBoard.columns;
+              } else if (dbBoard.description && dbBoard.description.includes('<!--SCHOOLPAD_BOARD_META:')) {
+                const match = dbBoard.description.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
+                if (match && match[1]) {
+                  try {
+                    const parsed = JSON.parse(match[1]);
+                    if (Array.isArray(parsed.columns)) latestCols = parsed.columns;
+                  } catch (e) {}
+                }
+              }
+            }
+          }
+
+          if (latestCols && Array.isArray(latestCols) && latestCols.length > 0) {
+            const cleanCols = Array.from(
+              new Set(latestCols.map((c: any) => String(c || '').trim()).filter(Boolean))
+            ) as string[];
+
+            if (cleanCols.length > 0) {
+              setColumns((prevCols) => {
+                if (prevCols.join('|') === cleanCols.join('|')) return prevCols;
+                return cleanCols;
+              });
+              setBoard((prev) => {
+                if (!prev) return prev;
+                if ((prev.columns || []).join('|') === cleanCols.join('|')) return prev;
+                return { ...prev, columns: cleanCols };
+              });
+            }
           }
         }
       } catch (e) {
@@ -295,7 +318,8 @@ export default function BoardDetailPage() {
       } catch (e) {}
     }
 
-    const pollTimer = setInterval(syncRemoteData, 2000);
+    // 1초 주기로 실시간 동기화 실행 (교사-학생 간 실시간 딜레이 최소화)
+    const pollTimer = setInterval(syncRemoteData, 1000);
 
     return () => {
       if (channel && supabase) {
@@ -389,6 +413,8 @@ export default function BoardDetailPage() {
     e.preventDefault();
     const trimmed = newColName.trim();
     if (!trimmed) return;
+
+    lastUserActionTimeRef.current = Date.now(); // 사용자 조작 보호
 
     const updatedCols = Array.from(new Set([...columns, trimmed]));
     setColumns(updatedCols);

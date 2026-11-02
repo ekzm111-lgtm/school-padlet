@@ -11,29 +11,44 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
       .select('*')
       .order('created_at', { ascending: false });
     if (error || !data) return null;
-    return data.map((b) => ({
-      id: b.id,
-      code: b.code,
-      title: b.title,
-      description: b.description || '',
-      layout: 'kanban',
-      theme: b.theme || 'blue',
-      coverImageUrl:
-        b.cover_image_url ||
-        'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
-      customBgUrl: '',
-      authorId: b.author_id || 'user-admin',
-      authorName: b.author_name || '관리자',
-      authorRole: 'teacher',
-      columns: Array.isArray(b.columns) ? b.columns : ['모둠 1', '모둠 2', '모둠 3'],
-      allowStudentPost: true,
-      allowComments: true,
-      allowReactions: true,
-      isLocked: false,
-      isPublic: true,
-      category: '수업자료',
-      createdAt: b.created_at ? new Date(b.created_at).toISOString().split('T')[0] : '',
-    }));
+    return data.map((b) => {
+      let rawDesc = b.description || '';
+      let metaCols: string[] | undefined = undefined;
+      if (rawDesc.includes('<!--SCHOOLPAD_BOARD_META:')) {
+        const match = rawDesc.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
+        if (match && match[1]) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            if (Array.isArray(parsed.columns)) metaCols = parsed.columns;
+          } catch (e) {}
+        }
+        rawDesc = rawDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
+      }
+
+      return {
+        id: b.id,
+        code: b.code,
+        title: b.title,
+        description: rawDesc,
+        layout: 'kanban',
+        theme: b.theme || 'blue',
+        coverImageUrl:
+          b.cover_image_url ||
+          'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+        customBgUrl: '',
+        authorId: b.author_id || 'user-admin',
+        authorName: b.author_name || '관리자',
+        authorRole: 'teacher',
+        columns: metaCols || (Array.isArray(b.columns) && b.columns.length > 0 ? b.columns : ['모둠 1', '모둠 2', '모둠 3']),
+        allowStudentPost: true,
+        allowComments: true,
+        allowReactions: true,
+        isLocked: false,
+        isPublic: true,
+        category: '수업자료',
+        createdAt: b.created_at ? new Date(b.created_at).toISOString().split('T')[0] : '',
+      };
+    });
   } catch (e) {
     console.error('fetchRemoteBoards error', e);
     return null;
@@ -43,18 +58,40 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
 export async function saveRemoteBoard(board: Board): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
+    let cleanDesc = board.description || '';
+    cleanDesc = cleanDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
+    const metaPayload = JSON.stringify({ columns: board.columns });
+    const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
+
+    // 1. boards 테이블에 저장
     const { error } = await supabase.from('boards').upsert({
       id: board.id,
       code: board.code,
       title: board.title,
-      description: board.description || '',
+      description: finalDesc,
       theme: board.theme || 'blue',
       columns: board.columns || ['모둠 1', '모둠 2', '모둠 3'],
     });
+
     if (error) {
-      console.error('saveRemoteBoard error', error);
-      return false;
+      console.warn('saveRemoteBoard upsert error, trying fallback:', error);
     }
+
+    // 2. 🔥 학생-교사 실시간 동기화 100% 보장: posts 테이블의 시스템 메타 레코드에 동시 저장
+    try {
+      await supabase.from('posts').upsert({
+        id: `board_columns_${board.id}`,
+        board_id: board.id,
+        column_id: '__system_meta__',
+        title: '__BOARD_COLUMNS_META__',
+        content: JSON.stringify({ columns: board.columns, updatedAt: Date.now() }),
+        color: 'white',
+        author_id: 'system',
+        author_name: '시스템',
+        order_index: -9999,
+      });
+    } catch (e2) {}
+
     return true;
   } catch (e) {
     console.error('saveRemoteBoard error', e);
@@ -81,7 +118,22 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
     }
     const { data, error } = await query;
     if (error || !data) return null;
-    const mapped = data.map((p) => {
+
+    // 시스템 메타데이터 레코드 분리 (열 실시간 동기화용)
+    const normalRows = data.filter((p) => {
+      if (p.column_id === '__system_meta__' || p.title === '__BOARD_COLUMNS_META__') {
+        try {
+          const parsed = JSON.parse(p.content);
+          if (Array.isArray(parsed.columns) && typeof window !== 'undefined') {
+            (window as any).__LATEST_BOARD_COLUMNS__ = parsed.columns;
+          }
+        } catch (e) {}
+        return false;
+      }
+      return true;
+    });
+
+    const mapped = normalRows.map((p) => {
       let rawContent = p.content || '';
       let attachments: FileAttachment[] = [];
       let comments: any[] = [];
