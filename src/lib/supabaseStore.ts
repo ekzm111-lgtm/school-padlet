@@ -214,6 +214,64 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
   }
 }
 
+// 🔥 카드 일괄 순서 및 상태 저장 함수 (원자적 업데이트 지원)
+export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || postsList.length === 0) return false;
+  try {
+    const rows = postsList.map((post) => {
+      let cleanContent = post.content || '';
+      cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
+
+      const meta: {
+        attachments?: FileAttachment[];
+        comments?: any[];
+        order?: number;
+        column?: string;
+      } = {};
+
+      const atts: FileAttachment[] = [];
+      if (post.attachments && post.attachments.length > 0) {
+        atts.push(...post.attachments);
+      } else if (post.fileAttachment) {
+        atts.push(post.fileAttachment);
+      }
+      if (atts.length > 0) meta.attachments = atts;
+      if (post.comments && post.comments.length > 0) meta.comments = post.comments;
+      if (typeof post.order === 'number') meta.order = post.order;
+      if (post.column) meta.column = post.column;
+
+      let finalContent = cleanContent;
+      if (Object.keys(meta).length > 0) {
+        finalContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
+      }
+
+      return {
+        id: post.id,
+        board_id: post.boardId,
+        column_id: post.column || '모둠 1',
+        title: post.title,
+        content: finalContent,
+        color: post.color || 'yellow',
+        image_url: post.imageUrl || null,
+        link_url: post.linkUrl || null,
+        author_id: post.authorId || 'student',
+        author_name: post.authorName || '학생',
+        order_index: typeof post.order === 'number' ? post.order : 0,
+      };
+    });
+
+    const { error } = await supabase.from('posts').upsert(rows);
+    if (error) {
+      console.error('saveRemotePosts error', error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('saveRemotePosts error', e);
+    return false;
+  }
+}
+
 export async function deleteRemotePost(postId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {

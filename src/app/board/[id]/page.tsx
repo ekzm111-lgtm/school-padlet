@@ -36,7 +36,7 @@ import BackgroundModal from '@/components/BackgroundModal';
 import QrModal from '@/components/QrModal';
 import { getStoreData, saveStoreData, duplicateBoard, deletePost } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchRemotePosts, saveRemoteBoard, saveRemotePost } from '@/lib/supabaseStore';
+import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
 
@@ -515,12 +515,16 @@ export default function BoardDetailPage() {
     }
   };
 
-  // 같은 열 또는 다른 열의 특정 카드 위에 드롭했을 때 순서 변경
+  // 같은 열 또는 다른 열의 특정 카드 위에 드롭했을 때 순서 변경 (위/아래 정밀 위치 감지)
   const handleDropOnCard = async (e: React.DragEvent, targetPostId: string, colName: string, targetColIdx: number) => {
     e.preventDefault();
     e.stopPropagation();
 
     // 열 자체를 드롭했을 경우
+    if (draggedColIdx !== null) {
+      handleColumnDrop(draggedColIdx, targetColIdx);
+      return;
+    }
     const colIdxStr = e.dataTransfer.getData('application/column-index');
     if (colIdxStr !== '') {
       handleColumnDrop(Number(colIdxStr), targetColIdx);
@@ -534,48 +538,50 @@ export default function BoardDetailPage() {
       return;
     }
 
-    lastUserActionTimeRef.current = Date.now(); // 사용자 조작 보호
+    lastUserActionTimeRef.current = Date.now(); // 사용자 조작 보호 (5초간 원격 동기화 간섭 차단)
 
     const currentPosts = [...posts];
     const sourceIdx = currentPosts.findIndex((p) => p.id === sourceId);
-    const targetIdx = currentPosts.findIndex((p) => p.id === targetPostId);
-
-    if (sourceIdx === -1 || targetIdx === -1) {
+    if (sourceIdx === -1) {
       setDraggedPostId(null);
       setDragOverPostId(null);
       return;
     }
 
-    // 소스 카드 꺼내서 해당 모둠(열)으로 배정
+    // 마우스가 타겟 카드의 상단 절반인지, 하단 절반인지 계산 (아래로 드롭 시 뒤에 삽입)
+    const targetRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const isBelow = (e.clientY - targetRect.top) > (targetRect.height / 2);
+
+    // 1. 소스 카드 꺼내기
     const [draggedCard] = currentPosts.splice(sourceIdx, 1);
     const updatedCard = { ...draggedCard, column: colName };
 
-    // 타겟 카드의 인덱스 앞쪽에 삽입하여 순서 변경
-    const newTargetIdx = currentPosts.findIndex((p) => p.id === targetPostId);
-    currentPosts.splice(newTargetIdx, 0, updatedCard);
+    // 2. 타겟 카드의 인덱스 앞 또는 뒤에 정확히 삽입
+    const targetIdx = currentPosts.findIndex((p) => p.id === targetPostId);
+    if (targetIdx === -1) {
+      currentPosts.push(updatedCard);
+    } else {
+      const insertIdx = isBelow ? targetIdx + 1 : targetIdx;
+      currentPosts.splice(insertIdx, 0, updatedCard);
+    }
 
-    // 전체 카드 순서(order) 재부여
+    // 3. 전체 카드 순서(order) 재부여
     const reorderedPosts = currentPosts.map((p, idx) => ({
       ...p,
       order: idx,
     }));
 
-    const finalUpdatedCard = reorderedPosts.find((p) => p.id === sourceId) || updatedCard;
-
     setPosts(reorderedPosts);
     setDraggedPostId(null);
     setDragOverPostId(null);
 
+    // 4. 로컬 및 Supabase 일괄 저장 (순서 꼬임 원천 차단)
     const data = getStoreData();
     const otherBoardPosts = data.posts.filter((p) => p.boardId !== boardId);
     saveStoreData.posts([...otherBoardPosts, ...reorderedPosts]);
 
     if (isSupabaseConfigured) {
-      await saveRemotePost(finalUpdatedCard);
-      const finalTargetCard = reorderedPosts.find((p) => p.id === targetPostId);
-      if (finalTargetCard) {
-        saveRemotePost(finalTargetCard);
-      }
+      await saveRemotePosts(reorderedPosts);
     }
   };
 
@@ -584,6 +590,10 @@ export default function BoardDetailPage() {
     e.preventDefault();
 
     // 열 자체를 드롭했을 경우
+    if (draggedColIdx !== null) {
+      handleColumnDrop(draggedColIdx, targetColIdx);
+      return;
+    }
     const colIdxStr = e.dataTransfer.getData('application/column-index');
     if (colIdxStr !== '') {
       handleColumnDrop(Number(colIdxStr), targetColIdx);
@@ -613,8 +623,6 @@ export default function BoardDetailPage() {
       order: idx,
     }));
 
-    const finalUpdatedCard = reorderedPosts.find((p) => p.id === postId) || updatedCard;
-
     setPosts(reorderedPosts);
     setDraggedPostId(null);
     setDragOverPostId(null);
@@ -624,7 +632,7 @@ export default function BoardDetailPage() {
     saveStoreData.posts([...otherBoardPosts, ...reorderedPosts]);
 
     if (isSupabaseConfigured) {
-      await saveRemotePost(finalUpdatedCard);
+      await saveRemotePosts(reorderedPosts);
     }
   };
 
@@ -1145,9 +1153,7 @@ export default function BoardDetailPage() {
                         <PostCard
                           post={post}
                           currentUser={currentUser}
-                          columns={Array.from(
-                            new Set([...columns, ...posts.map((p) => p.column).filter(Boolean) as string[]])
-                          )}
+                          columns={columns}
                           allowComments={board.allowComments}
                           allowReactions={board.allowReactions}
                           onDelete={handleDeletePost}
