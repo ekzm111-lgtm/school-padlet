@@ -70,6 +70,26 @@ const INITIAL_USERS: User[] = [
 
 const INITIAL_BOARDS: Board[] = [
   {
+    id: 'board-1792975588752',
+    code: '105207',
+    title: '바이브코딩',
+    description: '바이브코딩 실습 및 AI 도구 활용 보드입니다.',
+    layout: 'kanban',
+    theme: 'blue',
+    coverImageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+    authorId: 'user-admin',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    allowStudentPost: true,
+    allowComments: true,
+    allowReactions: true,
+    isLocked: false,
+    isPublic: true,
+    category: '수업자료',
+    columns: ['Ai 모델', '몸플기 예제', '실습', 'util'],
+    createdAt: '2026-10-26',
+  },
+  {
     id: 'board-vibecoding',
     code: '999190',
     title: '바이브코딩 교육자료',
@@ -175,6 +195,104 @@ const INITIAL_BOARDS: Board[] = [
 ];
 
 const INITIAL_POSTS: Post[] = [
+  {
+    id: 'post-util-gh',
+    boardId: 'board-1792975588752',
+    column: 'util',
+    title: 'GitHub (School-Padlet)',
+    linkUrl: 'https://github.com/ekzm111-lgtm/school-padlet',
+    color: 'white',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    content: '스쿨패들(SchoolPad) 오픈소스 프로젝트 GitHub 소스코드 저장소',
+    reactions: { like: 1, clap: 0, heart: 0, insight: 0 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-util-ver',
+    boardId: 'board-1792975588752',
+    column: 'util',
+    title: 'Vercel 대시보드',
+    linkUrl: 'https://vercel.com',
+    color: 'yellow',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    content: 'Next.js 프로젝트 원클릭 클라우드 배포 및 실시간 호스팅 도메인 관리',
+    reactions: { like: 1, clap: 0, heart: 0, insight: 0 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-util-fb',
+    boardId: 'board-1792975588752',
+    column: 'util',
+    title: 'Firebase 콘솔',
+    linkUrl: 'https://console.firebase.google.com',
+    color: 'yellow',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    content: 'Google Cloud 기반 Firestore DB, 사용자 인증(Auth) 및 웹 백엔드 서비스 콘솔',
+    reactions: { like: 1, clap: 0, heart: 0, insight: 0 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-util-her',
+    boardId: 'board-1792975588752',
+    column: 'util',
+    title: 'Hermes Agent (헤르메스 에이전트)',
+    linkUrl: 'https://github.com/NousResearch/hermes-agent',
+    color: 'purple',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    content: 'NousResearch의 자율형 AI 에이전트 & Function Calling 오픈소스 프레임워크',
+    reactions: { like: 2, clap: 1, heart: 1, insight: 1 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-util-v0',
+    boardId: 'board-1792975588752',
+    column: 'util',
+    title: 'v0 by Vercel (UI 컴포넌트)',
+    linkUrl: 'https://v0.dev',
+    color: 'blue',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    content: '자연어 프롬프트로 Tailwind CSS + React 모던 컴포넌트 UI를 즉시 완성해 주는 바이브 코딩 필수 사이트',
+    reactions: { like: 3, clap: 2, heart: 2, insight: 2 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-util-blt',
+    boardId: 'board-1792975588752',
+    column: 'util',
+    title: 'Bolt.new (풀스택 AI 개발)',
+    linkUrl: 'https://bolt.new',
+    color: 'green',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    content: '브라우저 안에서 풀스택 Node.js 웹 앱을 대화형으로 개발, 실시간 실행 및 배포까지 해주는 개발 플랫폼',
+    reactions: { like: 2, clap: 1, heart: 2, insight: 1 },
+    comments: [],
+    createdAt: '방금 전',
+  },
+  {
+    id: 'post-util-lov',
+    boardId: 'board-1792975588752',
+    column: 'util',
+    title: 'Lovable.dev (아이디어 앱 제작)',
+    linkUrl: 'https://lovable.dev',
+    color: 'pink',
+    authorName: '김관리 (정보부장)',
+    authorRole: 'admin',
+    content: '기획 아이디어를 대화형으로 실서비스 수준 웹 애플리케이션으로 빠르게 완성해 주는 바이브 코딩 플랫폼',
+    reactions: { like: 3, clap: 2, heart: 1, insight: 1 },
+    comments: [],
+    createdAt: '방금 전',
+  },
   {
     id: 'post-vibe-1',
     boardId: 'board-vibecoding',
@@ -444,6 +562,26 @@ export const getStoreData = (): StoreData => {
   const storedCurrentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
 
   let boardsList: Board[] = storedBoards ? JSON.parse(storedBoards) : INITIAL_BOARDS;
+  // '바이브코딩 (105207)' 보드 및 util 카드 영구 자동 동기화
+  const myVibeBoard = INITIAL_BOARDS.find((b) => b.code === '105207');
+  if (myVibeBoard) {
+    const existing = boardsList.find((b) => b.code === '105207' || b.id === 'board-1792975588752');
+    if (!existing) {
+      boardsList = [myVibeBoard, ...boardsList];
+    } else {
+      existing.columns = ['Ai 모델', '몸플기 예제', '실습', 'util'];
+    }
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
+    } catch (e) {}
+  }
+
+  const utilPosts = INITIAL_POSTS.filter((p) => p.boardId === 'board-1792975588752');
+  for (const up of utilPosts) {
+    if (!postsList.some((p) => p.id === up.id)) {
+      postsList = [up, ...postsList];
+    }
+  }
   // '바이브코딩 교육자료' (999190) 및 '2025. 디지털튜터' 보드 자동 동기화
   const vibeBoard = INITIAL_BOARDS.find((b) => b.code === '999190');
   const dtBoard = INITIAL_BOARDS.find((b) => b.code === '202501');
