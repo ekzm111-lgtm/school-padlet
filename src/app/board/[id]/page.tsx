@@ -113,80 +113,95 @@ export default function BoardDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
-    const data = getStoreData();
-    setCurrentUser(data.currentUser);
-    let foundBoard = data.boards.find((b) => b.id === boardId || b.code === boardId);
+    if (!boardId) return;
+    try {
+      const data = getStoreData();
+      setCurrentUser(data.currentUser);
+      let foundBoard = data.boards.find((b) => b.id === boardId || b.code === boardId);
 
-    // 로컬에 없으면 Supabase 클라우드에서 직접 확인
-    if (!foundBoard && isSupabaseConfigured && supabase) {
-      try {
-        const { data: dbBoard } = await supabase
-          .from('boards')
-          .select('*')
-          .or(`id.eq.${boardId},code.eq.${boardId}`)
-          .maybeSingle();
-
-        if (dbBoard) {
-          foundBoard = {
-            id: dbBoard.id,
-            code: dbBoard.code,
-            title: dbBoard.title,
-            description: dbBoard.description || '',
-            layout: 'kanban',
-            theme: dbBoard.theme || 'blue',
-            coverImageUrl:
-              dbBoard.cover_image_url ||
-              'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
-            customBgUrl: '',
-            authorId: dbBoard.author_id || 'user-admin',
-            authorName: dbBoard.author_name || '선생님',
-            authorRole: 'teacher',
-            columns: Array.isArray(dbBoard.columns) ? dbBoard.columns : DEFAULT_COLUMNS,
-            allowStudentPost: true,
-            allowComments: true,
-            allowReactions: true,
-            isLocked: false,
-            isPublic: true,
-            category: '수업자료',
-            createdAt: dbBoard.created_at
-              ? new Date(dbBoard.created_at).toISOString().split('T')[0]
-              : '',
-          };
-          saveStoreData.boards([foundBoard, ...data.boards]);
+      // 1. 로컬에 보드가 있다면 즉시 0.05초 만에 화면 먼저 오픈 (무한 로딩 원천 차단)
+      if (foundBoard) {
+        setBoard(foundBoard);
+        const cols =
+          foundBoard.columns && foundBoard.columns.length > 0
+            ? foundBoard.columns
+            : DEFAULT_COLUMNS;
+        setColumns(cols);
+        if (foundBoard.layout) {
+          setCurrentLayout(foundBoard.layout);
         }
-      } catch (e) {
-        console.error('Supabase loadData error', e);
-      }
-    }
-
-    if (foundBoard) {
-      setBoard(foundBoard);
-      const cols =
-        foundBoard.columns && foundBoard.columns.length > 0
-          ? foundBoard.columns
-          : DEFAULT_COLUMNS;
-      setColumns(cols);
-      if (foundBoard.layout) {
-        setCurrentLayout(foundBoard.layout);
+        const boardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
+        setPosts(boardPosts);
+        setIsLoading(false);
       }
 
-      // 게시글 취합 (로컬 + 원격)
-      let boardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
+      // 2. 클라우드 최신 상태 조회 (3초 타임아웃 가드 적용)
       if (isSupabaseConfigured && supabase) {
         try {
-          const remote = await fetchRemotePosts(foundBoard.id);
-          if (remote) {
-            boardPosts = remote;
-            const otherPosts = data.posts.filter((p) => p.boardId !== foundBoard!.id);
-            saveStoreData.posts([...remote, ...otherPosts]);
+          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+
+          // 로컬에 보드가 없었던 경우 Supabase 조회
+          if (!foundBoard) {
+            const fetchBoardPromise = supabase
+              .from('boards')
+              .select('*')
+              .or(`id.eq.${boardId},code.eq.${boardId}`)
+              .maybeSingle();
+
+            const res: any = await Promise.race([fetchBoardPromise, timeoutPromise]);
+            const dbBoard = res?.data;
+
+            if (dbBoard) {
+              foundBoard = {
+                id: dbBoard.id,
+                code: dbBoard.code,
+                title: dbBoard.title,
+                description: dbBoard.description || '',
+                layout: 'kanban',
+                theme: dbBoard.theme || 'blue',
+                coverImageUrl:
+                  dbBoard.cover_image_url ||
+                  'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+                customBgUrl: '',
+                authorId: dbBoard.author_id || 'user-admin',
+                authorName: dbBoard.author_name || '선생님',
+                authorRole: 'teacher',
+                columns: Array.isArray(dbBoard.columns) ? dbBoard.columns : DEFAULT_COLUMNS,
+                allowStudentPost: true,
+                allowComments: true,
+                allowReactions: true,
+                isLocked: false,
+                isPublic: true,
+                category: '수업자료',
+                createdAt: dbBoard.created_at
+                  ? new Date(dbBoard.created_at).toISOString().split('T')[0]
+                  : '',
+              };
+              setBoard(foundBoard);
+              setColumns(foundBoard.columns || DEFAULT_COLUMNS);
+              saveStoreData.boards([foundBoard, ...data.boards]);
+            }
+          }
+
+          // 최신 게시글 원격 조회 (3초 타임아웃 가드)
+          if (foundBoard) {
+            const fetchPostsPromise = fetchRemotePosts(foundBoard.id);
+            const remote: any = await Promise.race([fetchPostsPromise, timeoutPromise]);
+            if (remote && Array.isArray(remote)) {
+              setPosts(remote);
+              const otherPosts = data.posts.filter((p) => p.boardId !== foundBoard!.id);
+              saveStoreData.posts([...remote, ...otherPosts]);
+            }
           }
         } catch (e) {
-          console.error('Remote posts loadData error', e);
+          console.error('Remote load error:', e);
         }
       }
-      setPosts(boardPosts);
+    } catch (err) {
+      console.error('loadData error:', err);
+    } finally {
+      setIsLoading(false); // 어떤 상황에서도 무조건 로딩 완료 해제
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
