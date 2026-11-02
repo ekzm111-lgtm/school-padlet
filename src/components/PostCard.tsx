@@ -15,6 +15,8 @@ import {
   Download,
   FileText,
   Paperclip,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Post, User, FileAttachment } from '@/lib/types';
 import { getStoreData, saveStoreData, getMyPostIds } from '@/lib/store';
@@ -47,6 +49,31 @@ export default function PostCard({
   const [reactions, setReactions] = useState(post?.reactions || { like: 0, clap: 0, heart: 0, insight: 0 });
   const [comments, setComments] = useState(post?.comments || []);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
+
+  // 글 내용 클립보드 복사 함수
+  const handleCopyContent = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const parts = [currentPost.title, displayContent, currentPost.linkUrl].filter(Boolean);
+    const fullText = parts.join('\n\n');
+    if (!fullText) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(fullText).then(() => {
+        setCopiedText(true);
+        setTimeout(() => setCopiedText(false), 2000);
+      });
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = fullText;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    }
+  };
 
   // 부모로부터 새 post 데이터가 내려왔을 때(실시간 동기화 등), 수정 모달이 열려있지 않은 동안에는 최신 내용으로 동기화
   useEffect(() => {
@@ -181,6 +208,20 @@ export default function PostCard({
                 {currentPost.updatedAt || currentPost.createdAt}
               </span>
 
+              {/* 글 전체 복사 버튼 */}
+              <button
+                type="button"
+                onClick={handleCopyContent}
+                className={`p-1 rounded-lg transition shadow-xs flex items-center justify-center ${
+                  copiedText
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-black/5 hover:bg-black/10 text-slate-600 hover:text-slate-900'
+                }`}
+                title={copiedText ? '복사 완료!' : '글 내용 전체 복사하기'}
+              >
+                {copiedText ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+
               {/* 연필 수정 버튼 */}
               {canEdit && (
                 <button
@@ -213,16 +254,22 @@ export default function PostCard({
             </div>
           </div>
 
-          {/* 제목 (긴 URL이나 단어도 박스를 넘어가지 않고 자동 줄바꿈) */}
+          {/* 제목 (마우스 드래그 선택 및 복사 완벽 지원) */}
           {currentPost.title && (
-            <h4 className="font-bold text-[13px] text-slate-900 mb-1 leading-snug break-all [overflow-wrap:anywhere]">
+            <h4
+              onMouseDown={(e) => e.stopPropagation()}
+              className="font-bold text-[13px] text-slate-900 mb-1 leading-snug break-all [overflow-wrap:anywhere] select-text cursor-text"
+            >
               {currentPost.title}
             </h4>
           )}
 
-          {/* 본문 */}
+          {/* 본문 (마우스 드래그 선택 및 복사 완벽 지원) */}
           {displayContent && (
-            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-all [overflow-wrap:anywhere]">
+            <p
+              onMouseDown={(e) => e.stopPropagation()}
+              className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-all [overflow-wrap:anywhere] select-text cursor-text"
+            >
               {displayContent}
             </p>
           )}

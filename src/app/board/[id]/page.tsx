@@ -917,7 +917,7 @@ export default function BoardDetailPage() {
     </div>
 
       {/* 메인 콘텐츠 영역 (가로 스크롤 & 각 모둠별 독립 세로 스크롤 완벽 지원) */}
-      <main className="flex-1 w-full px-3 sm:px-5 pt-3 pb-3 overflow-x-auto overflow-y-hidden select-none snap-x snap-mandatory sm:snap-none flex flex-col min-h-0">
+      <main className="flex-1 w-full px-3 sm:px-5 pt-3 pb-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:snap-none flex flex-col min-h-0">
         {currentLayout === 'kanban' ? (
           /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤) */
           <div className="flex gap-3 sm:gap-3.5 items-stretch h-full w-max min-w-full min-h-0">
