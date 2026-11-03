@@ -640,7 +640,15 @@ export const saveStoreData = {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(data));
       window.dispatchEvent(new Event('store_updated'));
       if (isSupabaseConfigured && data.length > 0) {
-        saveRemoteBoard(data[0]).catch(() => {});
+        // 가장 최근에 수정 또는 생성된 보드를 찾아서 안전 백업
+        const latest = [...data].sort((a, b) => {
+          const tA = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+          const tB = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+          return tB - tA;
+        })[0];
+        if (latest) {
+          saveRemoteBoard(latest).catch(() => {});
+        }
       }
     }
   },

@@ -58,14 +58,28 @@ export default function HomePage() {
       try {
         const remote = await fetchRemoteBoards();
         if (remote && remote.length > 0) {
-          const combined = [...remote];
-          for (const lb of data.boards) {
-            if (!combined.some((b) => b.id === lb.id || b.code === lb.code)) {
-              combined.push(lb);
+          const currentLocal = getStoreData().boards;
+          const localMap = new Map(currentLocal.map((b) => [b.id, b]));
+          const remoteMap = new Map(remote.map((b) => [b.id, b]));
+          const allIds = Array.from(new Set([...currentLocal.map((b) => b.id), ...remote.map((b) => b.id)]));
+
+          const merged: Board[] = [];
+          for (const id of allIds) {
+            const local = localMap.get(id);
+            const rem = remoteMap.get(id);
+            if (local && rem) {
+              const localTime = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
+              const remTime = typeof rem.updatedAt === 'number' ? rem.updatedAt : 0;
+              // 로컬이 더 최신이거나 같으면 로컬 우선 (사용자가 방금 수정한 보드가 원격 구버전으로 덮어씌워지는 것 차단)
+              merged.push(localTime >= remTime ? local : rem);
+            } else if (local) {
+              merged.push(local);
+            } else if (rem) {
+              merged.push(rem);
             }
           }
-          setBoards(combined);
-          localStorage.setItem('school_padlet_boards', JSON.stringify(combined));
+          setBoards(merged);
+          localStorage.setItem('school_padlet_boards', JSON.stringify(merged));
         }
       } catch (e) {
         console.error('Remote board fetch error', e);
@@ -75,7 +89,12 @@ export default function HomePage() {
 
   useEffect(() => {
     loadData();
-    const handleUpdate = () => loadData();
+    const handleUpdate = () => {
+      // 로컬 스토어 변경 시에는 원격 fetch 없이 로컬 상태만 즉각 반응 (경합으로 인한 덮어쓰기 방어)
+      const data = getStoreData();
+      setCurrentUser(data.currentUser);
+      setBoards(data.boards);
+    };
     window.addEventListener('store_updated', handleUpdate);
     return () => window.removeEventListener('store_updated', handleUpdate);
   }, []);

@@ -14,12 +14,25 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
     return data.map((b) => {
       let rawDesc = b.description || '';
       let metaCols: string[] | undefined = undefined;
+      let metaCover: string | undefined = undefined;
+      let metaBg: string | undefined = undefined;
+      let metaCategory: any = undefined;
+      let metaTheme: any = undefined;
+      let metaLayout: any = undefined;
+      let metaUpdatedAt: any = undefined;
+
       if (rawDesc.includes('<!--SCHOOLPAD_BOARD_META:')) {
         const match = rawDesc.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
         if (match && match[1]) {
           try {
             const parsed = JSON.parse(match[1]);
             if (Array.isArray(parsed.columns)) metaCols = parsed.columns;
+            if (parsed.coverImageUrl !== undefined) metaCover = parsed.coverImageUrl;
+            if (parsed.customBgUrl !== undefined) metaBg = parsed.customBgUrl;
+            if (parsed.category) metaCategory = parsed.category;
+            if (parsed.theme) metaTheme = parsed.theme;
+            if (parsed.layout) metaLayout = parsed.layout;
+            if (parsed.updatedAt) metaUpdatedAt = parsed.updatedAt;
           } catch (e) {}
         }
         rawDesc = rawDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
@@ -30,12 +43,13 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
         code: b.code,
         title: b.title,
         description: rawDesc,
-        layout: 'kanban',
-        theme: b.theme || 'blue',
+        layout: metaLayout || b.layout || 'kanban',
+        theme: metaTheme || b.theme || 'blue',
         coverImageUrl:
+          metaCover ||
           b.cover_image_url ||
           'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
-        customBgUrl: '',
+        customBgUrl: metaBg || b.custom_bg_url || '',
         authorId: b.author_id || 'user-admin',
         authorName: b.author_name || '관리자',
         authorRole: 'teacher',
@@ -45,8 +59,9 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
         allowReactions: true,
         isLocked: false,
         isPublic: true,
-        category: '수업자료',
+        category: metaCategory || b.category || '수업자료',
         createdAt: b.created_at ? new Date(b.created_at).toISOString().split('T')[0] : '',
+        updatedAt: metaUpdatedAt || (b.created_at ? new Date(b.created_at).getTime() : undefined),
       };
     });
   } catch (e) {
@@ -60,22 +75,37 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
   try {
     let cleanDesc = board.description || '';
     cleanDesc = cleanDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
-    const metaPayload = JSON.stringify({ columns: board.columns, code: board.code, title: board.title });
+    const metaPayload = JSON.stringify({
+      columns: board.columns,
+      code: board.code,
+      title: board.title,
+      description: cleanDesc,
+      coverImageUrl: board.coverImageUrl,
+      customBgUrl: board.customBgUrl,
+      category: board.category,
+      theme: board.theme,
+      layout: board.layout,
+      isPublic: board.isPublic,
+      updatedAt: board.updatedAt || Date.now(),
+    });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
 
-    // 1. boards 테이블에 저장 (columns 컬럼 포함 시도)
+    // 1. boards 테이블에 저장 (모든 수정 필드 포함)
     const { error } = await supabase.from('boards').upsert({
       id: board.id,
       code: board.code,
       title: board.title,
       description: finalDesc,
       theme: board.theme || 'blue',
+      cover_image_url: board.coverImageUrl || null,
+      custom_bg_url: board.customBgUrl || null,
+      category: board.category || '수업자료',
       columns: board.columns || ['모둠 1', '모둠 2', '모둠 3'],
     });
 
     if (error) {
-      console.warn('saveRemoteBoard upsert with columns failed, retrying without columns column:', error);
-      // DB에 columns 컬럼이 없는 경우를 위한 100% 호환 폴백 (description에 메타데이터로 안전 보관)
+      console.warn('saveRemoteBoard upsert with optional columns failed, retrying minimal fallback:', error);
+      // DB 스키마에 일부 컬럼이 없는 경우를 위한 100% 호환 폴백 (description에 메타데이터로 완벽 보관)
       try {
         await supabase.from('boards').upsert({
           id: board.id,
@@ -100,7 +130,9 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
           columns: board.columns,
           code: board.code,
           title: board.title,
-          updatedAt: Date.now(),
+          coverImageUrl: board.coverImageUrl,
+          category: board.category,
+          updatedAt: board.updatedAt || Date.now(),
         }),
         color: 'white',
         author_id: 'system',

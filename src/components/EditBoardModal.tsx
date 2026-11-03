@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { Board, BoardLayout, BoardTheme } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
+import { saveRemoteBoard, deleteRemoteBoard } from '@/lib/supabaseStore';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface EditBoardModalProps {
   board: Board;
@@ -133,10 +135,14 @@ export default function EditBoardModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
+  const [isSaving, setIsSaving] = useState(false);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || isSaving) return;
+    setIsSaving(true);
+
+    const now = Date.now();
     const updatedBoard: Board = {
       ...board,
       title: title.trim(),
@@ -151,21 +157,39 @@ export default function EditBoardModal({
       allowStudentPost,
       allowComments,
       allowReactions,
+      updatedAt: now,
     };
 
+    // 1. 로컬 스토리지 즉각 저장 및 UI 반영
     const currentData = getStoreData();
     saveStoreData.boards(
       currentData.boards.map((b) => (b.id === board.id ? updatedBoard : b))
     );
+
+    // 2. 클라우드 DB에 확실하게 먼저 원격 저장 (덮어쓰기 방어)
+    if (isSupabaseConfigured) {
+      try {
+        await saveRemoteBoard(updatedBoard);
+      } catch (err) {
+        console.error('Remote board update error:', err);
+      }
+    }
+
+    setIsSaving(false);
     onUpdated(updatedBoard);
     onClose();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm(`'${board.title}' 보드를 정말 삭제하시겠습니까? 보드 안의 모든 카드와 댓글도 함께 삭제됩니다.`)) {
       const currentData = getStoreData();
       saveStoreData.boards(currentData.boards.filter((b) => b.id !== board.id));
       saveStoreData.posts(currentData.posts.filter((p) => p.boardId !== board.id));
+
+      if (isSupabaseConfigured) {
+        deleteRemoteBoard(board.id).catch(() => {});
+      }
+
       if (onDeleted) onDeleted(board.id);
       onClose();
     }
@@ -457,9 +481,10 @@ export default function EditBoardModal({
               </button>
               <button
                 type="submit"
-                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/25 transition"
+                disabled={isSaving}
+                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold shadow-md shadow-blue-500/25 transition flex items-center gap-1.5"
               >
-                저장하기
+                {isSaving ? '저장 중...' : '저장하기'}
               </button>
             </div>
           </div>

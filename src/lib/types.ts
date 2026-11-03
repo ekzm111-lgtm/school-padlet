@@ -40,6 +40,7 @@ export interface Board {
   category?: '수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트';
   copiedFromTitle?: string;
   createdAt: string;
+  updatedAt?: string | number;
   postCount?: number;
 }
 
