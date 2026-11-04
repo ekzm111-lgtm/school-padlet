@@ -1294,7 +1294,7 @@ export default function BoardDetailPage() {
                               setEditingColIdx(idx);
                               setEditingColName(colName);
                             }}
-                            className="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-800 hover:text-blue-600 truncate"
+                            className="flex items-center gap-1.5 cursor-pointer font-bold text-sm text-slate-900 hover:text-blue-600 truncate"
                             title="클릭하여 모둠/섹션 이름 수정"
                           >
                             <span className="truncate">{colName}</span>

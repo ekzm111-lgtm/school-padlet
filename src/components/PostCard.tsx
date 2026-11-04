@@ -45,6 +45,49 @@ interface PostCardProps {
   canMoveDown?: boolean;
 }
 
+function formatPostDate(dateStr?: string | number): string {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim();
+  if (str.includes('전') || str.includes('초') || str.includes('방금')) {
+    return str;
+  }
+  try {
+    const date = new Date(str);
+    if (isNaN(date.getTime())) return str;
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHours = Math.floor(diffMin / 60);
+
+    if (diffSec < 60 && diffSec >= -30) {
+      return '방금 전';
+    }
+    if (diffMin < 60 && diffMin > 0) {
+      return `${diffMin}분 전`;
+    }
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    if (
+      diffHours < 24 &&
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    ) {
+      return `오늘 ${h}:${m}`;
+    }
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    if (date.getFullYear() === now.getFullYear()) {
+      return `${month}월 ${day}일 ${h}:${m}`;
+    }
+    return `${date.getFullYear()}.${month}.${day}`;
+  } catch (e) {
+    return '';
+  }
+}
+
 export default function PostCard({
   post,
   currentUser,
@@ -175,6 +218,7 @@ export default function PostCard({
   }[currentPost.color || 'white'] || 'card-color-white';
 
   // 첨부 파일 목록 취합 (다중 파일 + 단일 파일 호환 + 클라우드 메타데이터 복원)
+  const formattedDate = formatPostDate(currentPost.updatedAt || currentPost.createdAt);
   let displayContent = currentPost.content || '';
   const allAttachments: FileAttachment[] = [];
   if (currentPost.attachments && currentPost.attachments.length > 0) {
@@ -201,33 +245,45 @@ export default function PostCard({
       <div
         className={`relative rounded-2xl p-3 sm:p-3.5 border shadow-xs transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
       >
-        {/* 상단 핀 & 작성자 & 수정/삭제 버튼 */}
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {currentPost.pinned && (
-                <span className="flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
-                  <Pin className="w-2.5 h-2.5 fill-current rotate-45" />
-                  <span>공지</span>
+        {/* 상단 핀 & 작성자 & 작성일시 & 액션 버튼 */}
+        <div className="mb-2">
+          <div className="flex items-start justify-between gap-1.5">
+            {/* 작성자 정보 & 작성시간 (세로 찌그러짐 원천 방지) */}
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {currentPost.pinned && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 shrink-0">
+                    <Pin className="w-2.5 h-2.5 fill-current rotate-45" />
+                    <span>공지</span>
+                  </span>
+                )}
+                <span
+                  className="font-bold text-xs text-slate-800 truncate"
+                  title={currentPost.authorName || '작성자'}
+                >
+                  {currentPost.authorName || '작성자'}
+                </span>
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${
+                    currentPost.authorRole === 'teacher'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-black/10 text-slate-700'
+                  }`}
+                >
+                  {currentPost.authorRole === 'teacher' ? '선생님' : '학생'}
+                </span>
+              </div>
+
+              {/* 작성 시간 (작성자 바로 아래에 단정하게 표시) */}
+              {formattedDate && (
+                <span className="text-[10px] text-slate-400 font-normal mt-0.5 select-none truncate">
+                  {formattedDate}
                 </span>
               )}
-              <span className="font-bold text-xs text-slate-800">{currentPost.authorName}</span>
-              <span
-                className={`text-[9px] px-1.5 py-0.2 rounded-full font-semibold ${
-                  currentPost.authorRole === 'teacher'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-black/10 text-slate-700'
-                }`}
-              >
-                {currentPost.authorRole === 'teacher' ? '선생님' : '학생'}
-              </span>
             </div>
 
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-slate-500 font-medium mr-1">
-                {currentPost.updatedAt || currentPost.createdAt}
-              </span>
-
+            {/* 오른쪽: 순서 이동 & 복사/수정/삭제 버튼 그룹 */}
+            <div className="flex items-center gap-0.5 shrink-0">
               {/* 순서 이동 버튼: 위로 (▲) */}
               {onMoveUp && canMoveUp && (
                 <button
@@ -390,7 +446,7 @@ export default function PostCard({
           {currentPost.title && (
             <h4
               onMouseDown={(e) => e.stopPropagation()}
-              className="font-bold text-[13px] text-slate-900 mb-1 leading-snug break-all [overflow-wrap:anywhere] select-text cursor-text"
+              className="font-bold text-sm text-slate-900 mb-1.5 leading-snug break-words [word-break:keep-all] select-text cursor-text tracking-tight"
             >
               {currentPost.title}
             </h4>
@@ -400,7 +456,7 @@ export default function PostCard({
           {displayContent && (
             <p
               onMouseDown={(e) => e.stopPropagation()}
-              className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-all [overflow-wrap:anywhere] select-text cursor-text"
+              className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words [word-break:keep-all] select-text cursor-text"
             >
               {displayContent}
             </p>
