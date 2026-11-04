@@ -14,7 +14,10 @@ import {
   getRoomLeaderboard,
   mergeParticipantsList,
   mergeAnswersList,
+  getAllQuizRooms,
+  ROOMS_KEY,
 } from '@/utils/quizStorage';
+import { defaultEntryExamInfo, defaultEntryQuestions } from '@/data/defaultEntryExam';
 import {
   hostStartQuiz,
   hostRevealAnswer,
@@ -81,12 +84,42 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     setShowReviewMode(Boolean(initialReviewMode));
   }, [initialReviewMode, pin]);
 
-  // 룸 및 실시간 상태 로드 (로컬 + 서버 비동기 동기화)
+  // 룸 및 실시간 상태 로드 (로컬 + 서버 비동기 동기화 + 자동 복원)
   const reload = async () => {
     let r = getQuizRoom(pin);
     if (!r) {
       r = await loadQuizRoomAsync(pin);
     }
+    // 🔥 만약 이전 세션 만료 등으로 룸이 없는 경우에도 선생님의 현재 문제 목록으로 즉시 자동 복원!
+    if (!r) {
+      const allRooms = getAllQuizRooms();
+      const roomsList = Object.values(allRooms);
+      if (roomsList.length > 0) {
+        r = roomsList[roomsList.length - 1];
+      } else {
+        const savedQuestions = typeof window !== 'undefined' ? localStorage.getItem('quiz_questions') : null;
+        const savedExam = typeof window !== 'undefined' ? localStorage.getItem('quiz_exam_info') : null;
+        const qList = savedQuestions ? JSON.parse(savedQuestions) : defaultEntryQuestions;
+        const eInfo = savedExam ? JSON.parse(savedExam) : defaultEntryExamInfo;
+        r = {
+          pin,
+          title: `${eInfo.grade || '1학년'} ${eInfo.subject || '정보'} 퀴즈`,
+          subject: eInfo.subject || '정보',
+          createdAt: '방금 전',
+          examInfo: eInfo,
+          questions: qList,
+          timePerQuestion: 20,
+          allowAnonymous: true,
+          isActive: true,
+        };
+      }
+      if (r) {
+        const rooms = getAllQuizRooms();
+        rooms[pin] = r;
+        localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+      }
+    }
+
     if (r) {
       setRoom(r);
       // 서버에 방 정보 무조건 즉시 동기화 (원격 스마트폰 학생 100% 즉시 입장 보장)
@@ -452,15 +485,53 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     return () => clearInterval(countdownInterval);
   }, [liveState?.status, liveState?.currentQuestionIndex, isAutoAdvance]);
 
+  // 만약 마운트 후 0.8초가 지나도 room이나 liveState가 비어있으면 강제 복원 실행
+  useEffect(() => {
+    if (room && liveState) return;
+    const timer = setTimeout(() => {
+      if (!room || !liveState) {
+        reload();
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [room, liveState]);
+
+  // 호스트 화면이 켜져 있는 동안 참가자 명단을 서버에 주기적으로 동기화하여 서버리스 분산 인스턴스 전원 최신 유지
+  useEffect(() => {
+    if (!liveState || !pin) return;
+    const syncInterval = setInterval(() => {
+      fetch(`${getApiBaseUrl()}/api/quiz/live`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(liveState),
+      }).catch(() => {});
+    }, 2500);
+    return () => clearInterval(syncInterval);
+  }, [pin, liveState]);
+
   if (!room || !liveState) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-        <div className="text-center space-y-3">
-          <HelpCircle size={40} className="text-amber-400 mx-auto" />
-          <h2 className="text-lg font-bold">퀴즈룸 정보를 불러오는 중입니다...</h2>
-          <button onClick={onExit} className="px-4 py-2 bg-indigo-600 rounded-xl text-xs font-bold">
-            돌아가기
-          </button>
+        <div className="text-center space-y-4 max-w-sm w-full bg-slate-800/80 p-6 rounded-3xl border border-slate-700 shadow-2xl">
+          <HelpCircle size={44} className="text-amber-400 mx-auto animate-pulse" />
+          <div>
+            <h2 className="text-lg font-bold">대기실을 준비하고 있습니다...</h2>
+            <p className="text-xs text-slate-400 mt-1">네트워크 환경에 따라 잠시 소요될 수 있습니다.</p>
+          </div>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button
+              onClick={() => reload()}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md"
+            >
+              대기실 바로 열기
+            </button>
+            <button
+              onClick={onExit}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition"
+            >
+              돌아가기
+            </button>
+          </div>
         </div>
       </div>
     );

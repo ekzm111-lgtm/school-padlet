@@ -4,11 +4,11 @@ import { defaultExamInfo, defaultQuestions } from '@/data/defaultExam';
 import { defaultEntryExamInfo, defaultEntryQuestions } from '@/data/defaultEntryExam';
 import { getApiBaseUrl } from './hostNetwork';
 
-const ROOMS_KEY = 'quizn_rooms';
-const RESULTS_KEY = 'quizn_results';
-const PACKAGES_KEY = 'quizn_saved_packages';
-const LIVE_STATE_KEY_PREFIX = 'quizn_live_state_';
-const BROADCAST_CHANNEL_NAME = 'quizn_live_channel';
+export const ROOMS_KEY = 'quizn_rooms';
+export const RESULTS_KEY = 'quizn_results';
+export const PACKAGES_KEY = 'quizn_saved_packages';
+export const LIVE_STATE_KEY_PREFIX = 'quizn_live_state_';
+export const BROADCAST_CHANNEL_NAME = 'quizn_live_channel';
 
 // 6자리 랜덤 PIN 생성기
 export function generateQuizPin(): string {
