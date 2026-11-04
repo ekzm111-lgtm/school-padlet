@@ -527,14 +527,6 @@ export default function PostCard({
                 alt="첨부 이미지"
                 className="w-full max-h-56 object-cover group-hover:scale-105 transition duration-300"
               />
-
-              {/* 링크가 연결되어 있는 경우 새 탭 이동 힌트 오버레이 */}
-              {currentPost.linkUrl && (
-                <div className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1 shadow-md transition group-hover:scale-105">
-                  <ExternalLink className="w-3 h-3 text-sky-300" />
-                  <span>새 창 열기</span>
-                </div>
-              )}
             </div>
           )}
 
