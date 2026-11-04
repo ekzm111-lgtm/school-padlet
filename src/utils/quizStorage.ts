@@ -299,6 +299,80 @@ export function mergeAnswersList(existing: any[] = [], incoming: any[] = []): an
   return Array.from(map.values());
 }
 
+// 🔥 상태 역행 절대 방지: 퀴즈 진행 단방향 보장 헬퍼 (수상식/해설 깜빡임 및 문제 늦게 넘어감 완벽 해결)
+export function applyMonotonicQuizState(prev: LiveQuizState | null, incoming: LiveQuizState): LiveQuizState {
+  if (!prev) return incoming;
+
+  const mergedParticipants = mergeParticipantsList(prev.participants, incoming.participants);
+  const mergedAnswers = mergeAnswersList(prev.answersSubmitted, incoming.answersSubmitted);
+
+  // 1. 이미 퀴즈가 종료(finished)되었으면 절대로 다른 상태로 역행하지 않음 (수상식 깜빡임 방지)
+  if (prev.status === 'finished') {
+    return {
+      ...incoming,
+      status: 'finished',
+      currentQuestionIndex: Math.max(prev.currentQuestionIndex ?? 0, incoming.currentQuestionIndex ?? 0),
+      participants: mergedParticipants,
+      answersSubmitted: mergedAnswers,
+    };
+  }
+
+  const prevIdx = prev.currentQuestionIndex ?? 0;
+  const inIdx = incoming.currentQuestionIndex ?? 0;
+
+  // 2. 이미 이전 문제에서 다음 문제 번호로 넘어갔으면, 이전 문제 번호로 역행 방지
+  if (inIdx < prevIdx) {
+    return {
+      ...incoming,
+      status: prev.status,
+      currentQuestionIndex: prevIdx,
+      questionStartedAt: prev.questionStartedAt || incoming.questionStartedAt,
+      participants: mergedParticipants,
+      answersSubmitted: mergedAnswers,
+    };
+  }
+
+  // 3. 같은 문제 번호에서 이미 정답 공개(reveal) 상태인데 다시 question으로 역행 방지
+  if (inIdx === prevIdx && prev.status === 'reveal' && incoming.status === 'question') {
+    return {
+      ...incoming,
+      status: 'reveal',
+      currentQuestionIndex: prevIdx,
+      participants: mergedParticipants,
+      answersSubmitted: mergedAnswers,
+    };
+  }
+
+  // 4. 대기 상태(waiting) 역행 방지
+  if (prev.status !== 'waiting' && incoming.status === 'waiting') {
+    return {
+      ...incoming,
+      status: prev.status,
+      currentQuestionIndex: prevIdx,
+      participants: mergedParticipants,
+      answersSubmitted: mergedAnswers,
+    };
+  }
+
+  // 5. 타임스탬프가 더 오래된 경우 상태 변경 무시하고 명단만 병합
+  if (incoming.updatedAt && prev.updatedAt && incoming.updatedAt < prev.updatedAt) {
+    return {
+      ...incoming,
+      status: prev.status,
+      currentQuestionIndex: prevIdx,
+      questionStartedAt: prev.questionStartedAt || incoming.questionStartedAt,
+      participants: mergedParticipants,
+      answersSubmitted: mergedAnswers,
+    };
+  }
+
+  return {
+    ...incoming,
+    participants: mergedParticipants,
+    answersSubmitted: mergedAnswers,
+  };
+}
+
 export function setLiveQuizState(state: LiveQuizState): void {
   const prev = getLiveQuizState(state.pin);
   const mergedParticipants = mergeParticipantsList(prev?.participants, state.participants);
@@ -375,7 +449,7 @@ export function subscribeToQuizUpdates(
   };
   window.addEventListener('storage', storageHandler);
 
-  // 원격 스마트폰-PC 간 실시간 동기화를 위한 가벼운 1초 주기 서버 폴링
+  // 원격 스마트폰-PC 간 실시간 동기화를 위한 800ms 주기 서버 폴링
   let pollTimer: any = null;
   if (activePin && typeof window !== 'undefined') {
     pollTimer = setInterval(async () => {
@@ -388,25 +462,13 @@ export function subscribeToQuizUpdates(
               (data.liveState as any).serverElapsedSec = data.serverElapsedSec;
             }
             const prev = getLiveQuizState(activePin);
-            const combined: LiveQuizState = {
-              ...data.liveState,
-              status:
-                prev && prev.status !== 'waiting' && data.liveState.status === 'waiting'
-                  ? prev.status
-                  : data.liveState.status,
-              currentQuestionIndex: Math.max(
-                prev?.currentQuestionIndex || 0,
-                data.liveState.currentQuestionIndex || 0
-              ),
-              participants: mergeParticipantsList(prev?.participants, data.liveState.participants),
-              answersSubmitted: mergeAnswersList(prev?.answersSubmitted, data.liveState.answersSubmitted),
-            };
+            const combined = applyMonotonicQuizState(prev, data.liveState);
             localStorage.setItem(`${LIVE_STATE_KEY_PREFIX}${activePin}`, JSON.stringify(combined));
             callback({ type: 'LIVE_STATE_POLL', state: combined, serverElapsedSec: data.serverElapsedSec });
           }
         }
       } catch {}
-    }, 1000);
+    }, 800);
   }
 
   return () => {

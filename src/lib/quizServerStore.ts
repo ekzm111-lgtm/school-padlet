@@ -71,6 +71,54 @@ export function mergeAnswers(existing: any[] = [], incoming: any[] = []): any[] 
   return Array.from(map.values());
 }
 
+// 라이브 상태 단조 증가(Monotonic) 병합 규칙: 이전 단계(reveal -> question 또는 finished -> reveal)로의 역행 원천 차단
+export function mergeServerLiveStates(current: any, incoming: any): any {
+  if (!current) return incoming;
+  if (!incoming) return current;
+
+  // 새 게임 시작 등으로 waiting 상태로 명시적 리셋하는 경우
+  if (incoming.status === 'waiting' && (incoming.currentQuestionIndex === 0 || incoming.currentQuestionIndex === undefined)) {
+    return {
+      ...current,
+      ...incoming,
+      participants: mergeParticipants(current.participants, incoming.participants),
+      answersSubmitted: incoming.answersSubmitted || [],
+      updatedAt: Date.now(),
+    };
+  }
+
+  const currQ = typeof current.currentQuestionIndex === 'number' ? current.currentQuestionIndex : 0;
+  const inQ = typeof incoming.currentQuestionIndex === 'number' ? incoming.currentQuestionIndex : currQ;
+
+  let finalStatus = incoming.status || current.status;
+  let finalQuestionIndex = inQ;
+
+  // 1. 이미 finished 상태라면 어떤 경우에도 이전 상태(reveal, question)로 덮어쓰지 못함
+  if (current.status === 'finished') {
+    finalStatus = 'finished';
+    finalQuestionIndex = Math.max(currQ, inQ);
+  } else if (currQ > inQ) {
+    // 2. 현재 문제 인덱스가 더 앞서 있다면 이전 인덱스/상태로 되돌리지 않음
+    finalQuestionIndex = currQ;
+    finalStatus = current.status;
+  } else if (currQ === inQ) {
+    // 3. 동일 문제 번호에서는 reveal -> question 역행 불가
+    if (current.status === 'reveal' && incoming.status === 'question') {
+      finalStatus = 'reveal';
+    }
+  }
+
+  return {
+    ...current,
+    ...incoming,
+    status: finalStatus,
+    currentQuestionIndex: finalQuestionIndex,
+    participants: mergeParticipants(current.participants, incoming.participants),
+    answersSubmitted: mergeAnswers(current.answersSubmitted, incoming.answersSubmitted),
+    updatedAt: Math.max(current.updatedAt || 0, incoming.updatedAt || 0, Date.now()),
+  };
+}
+
 // 1. 퀴즈 룸 조회 (메모리 우선 조회 -> Supabase -> 자동 복원 Fallback 보장)
 export async function getQuizRoomServer(pin: string): Promise<any> {
   let room = serverQuizStore.rooms.get(pin);
@@ -162,16 +210,7 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
         try {
           const remoteState = JSON.parse(res.data.description);
           if (memoryState) {
-            memoryState = {
-              ...memoryState,
-              ...remoteState,
-              participants: mergeParticipants(memoryState.participants, remoteState.participants),
-              answersSubmitted: mergeAnswers(memoryState.answersSubmitted, remoteState.answersSubmitted),
-              status: remoteState.status || memoryState.status,
-              currentQuestionIndex: remoteState.currentQuestionIndex ?? memoryState.currentQuestionIndex,
-              timeLeft: remoteState.timeLeft ?? memoryState.timeLeft,
-              updatedAt: Math.max(memoryState.updatedAt || 0, remoteState.updatedAt || 0),
-            };
+            memoryState = mergeServerLiveStates(memoryState, remoteState);
           } else {
             memoryState = remoteState;
           }
@@ -200,17 +239,10 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
   return memoryState;
 }
 
-// 4. 퀴즈 라이브 상태 저장 (참가자/답변 누적 병합 후 메모리 + Supabase 비동기 저장)
+// 4. 퀴즈 라이브 상태 저장 (단조 증가 규칙 적용 메모리 + Supabase 비동기 저장)
 export async function saveQuizLiveStateServer(pin: string, patch: any): Promise<any> {
   const current = await getQuizLiveStateServer(pin);
-
-  const merged = {
-    ...current,
-    ...patch,
-    participants: mergeParticipants(current?.participants, patch?.participants),
-    answersSubmitted: mergeAnswers(current?.answersSubmitted, patch?.answersSubmitted),
-    updatedAt: Date.now(),
-  };
+  const merged = mergeServerLiveStates(current, patch);
 
   serverQuizStore.liveStates.set(pin, merged);
   asyncUpsertBoard(`quiz_live_${pin}`, `ql_${pin}`, '__QUIZ_LIVE__', JSON.stringify(merged));
@@ -221,13 +253,10 @@ export async function saveQuizLiveStateServer(pin: string, patch: any): Promise<
 // 5. 학생 참가자 등록 전용 함수 (원자적 추가 및 누적 보장)
 export async function joinQuizParticipantServer(pin: string, participant: any): Promise<any> {
   const current = await getQuizLiveStateServer(pin);
-  const updatedParticipants = mergeParticipants(current?.participants, [participant]);
-
-  const merged = {
-    ...current,
-    participants: updatedParticipants,
+  const merged = mergeServerLiveStates(current, {
+    participants: [participant],
     updatedAt: Date.now(),
-  };
+  });
 
   serverQuizStore.liveStates.set(pin, merged);
   asyncUpsertBoard(`quiz_live_${pin}`, `ql_${pin}`, '__QUIZ_LIVE__', JSON.stringify(merged));
@@ -238,8 +267,6 @@ export async function joinQuizParticipantServer(pin: string, participant: any): 
 // 6. 학생 정답 제출 전용 함수
 export async function submitQuizAnswerServer(pin: string, answer: any): Promise<any> {
   const current = await getQuizLiveStateServer(pin);
-  const updatedAnswers = mergeAnswers(current?.answersSubmitted, [answer]);
-
   let updatedParticipants = current?.participants || [];
   if (typeof answer.score === 'number') {
     updatedParticipants = updatedParticipants.map((p: any) => {
@@ -250,12 +277,11 @@ export async function submitQuizAnswerServer(pin: string, answer: any): Promise<
     });
   }
 
-  const merged = {
-    ...current,
+  const merged = mergeServerLiveStates(current, {
     participants: updatedParticipants,
-    answersSubmitted: updatedAnswers,
+    answersSubmitted: [answer],
     updatedAt: Date.now(),
-  };
+  });
 
   serverQuizStore.liveStates.set(pin, merged);
   asyncUpsertBoard(`quiz_live_${pin}`, `ql_${pin}`, '__QUIZ_LIVE__', JSON.stringify(merged));

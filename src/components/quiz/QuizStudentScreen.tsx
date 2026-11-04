@@ -8,6 +8,7 @@ import {
   fetchLiveQuizStateAsync,
   subscribeToQuizUpdates,
   submitQuizResult,
+  applyMonotonicQuizState,
 } from '@/utils/quizStorage';
 import {
   getSavedCollectedAvatars,
@@ -122,11 +123,11 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
       setRoom(r);
       const s = await fetchLiveQuizStateAsync(pin);
       if (s) {
-        setLiveState(s);
+        setLiveState((prev) => applyMonotonicQuizState(prev, s));
       } else {
         const localS = getLiveQuizState(pin);
         if (localS) {
-          setLiveState(localS);
+          setLiveState((prev) => applyMonotonicQuizState(prev, localS));
         } else {
           // 서버에서 라이브 상태가 없어도 대기실 상태로 즉시 입장 허용
           setLiveState({
@@ -146,26 +147,14 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
 
   useEffect(() => {
     reload();
-    // activePin을 전달하여 원격 스마트폰에서도 1초마다 실시간 서버 폴링이 작동하도록 설정
+    // activePin을 전달하여 원격 스마트폰에서도 800ms마다 실시간 서버 폴링이 작동하도록 설정
     const unsub = subscribeToQuizUpdates((msg: any) => {
       if (msg && msg.state && msg.state.pin === pin) {
-        setLiveState((prev) => {
-          if (!prev) return msg.state;
-          if (prev.status !== 'waiting' && msg.state.status === 'waiting') {
-            return { ...msg.state, status: prev.status, currentQuestionIndex: prev.currentQuestionIndex };
-          }
-          return msg.state;
-        });
+        setLiveState((prev) => applyMonotonicQuizState(prev, msg.state));
       } else if (msg && msg.type === 'STORAGE_CHANGED') {
         const latestLive = getLiveQuizState(pin);
         if (latestLive) {
-          setLiveState((prev) => {
-            if (!prev) return latestLive;
-            if (prev.status !== 'waiting' && latestLive.status === 'waiting') {
-              return { ...latestLive, status: prev.status, currentQuestionIndex: prev.currentQuestionIndex };
-            }
-            return latestLive;
-          });
+          setLiveState((prev) => applyMonotonicQuizState(prev, latestLive));
         }
       } else {
         reload();

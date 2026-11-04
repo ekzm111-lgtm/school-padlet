@@ -14,6 +14,7 @@ import {
   getRoomLeaderboard,
   mergeParticipantsList,
   mergeAnswersList,
+  applyMonotonicQuizState,
   getAllQuizRooms,
   ROOMS_KEY,
 } from '@/utils/quizStorage';
@@ -179,11 +180,7 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
           const mergedParticipants = mergeParticipantsList(prev.participants, msg.state.participants);
           const mergedAnswers = mergeAnswersList(prev.answersSubmitted, msg.state.answersSubmitted);
           return {
-            ...msg.state,
-            status: prev.status,
-            currentQuestionIndex: prev.currentQuestionIndex,
-            questionStartedAt: prev.questionStartedAt || msg.state.questionStartedAt,
-            timeLeft: prev.timeLeft,
+            ...prev,
             participants: mergedParticipants,
             answersSubmitted: mergedAnswers,
           };
@@ -196,11 +193,7 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
             const mergedParticipants = mergeParticipantsList(prev.participants, latestLive.participants);
             const mergedAnswers = mergeAnswersList(prev.answersSubmitted, latestLive.answersSubmitted);
             return {
-              ...latestLive,
-              status: prev.status,
-              currentQuestionIndex: prev.currentQuestionIndex,
-              questionStartedAt: prev.questionStartedAt || latestLive.questionStartedAt,
-              timeLeft: prev.timeLeft,
+              ...prev,
               participants: mergedParticipants,
               answersSubmitted: mergedAnswers,
             };
@@ -495,19 +488,6 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     }, 800);
     return () => clearTimeout(timer);
   }, [room, liveState]);
-
-  // 호스트 화면이 켜져 있는 동안 참가자 명단을 서버에 주기적으로 동기화하여 서버리스 분산 인스턴스 전원 최신 유지
-  useEffect(() => {
-    if (!liveState || !pin) return;
-    const syncInterval = setInterval(() => {
-      fetch(`${getApiBaseUrl()}/api/quiz/live`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(liveState),
-      }).catch(() => {});
-    }, 2500);
-    return () => clearInterval(syncInterval);
-  }, [pin, liveState]);
 
   if (!room || !liveState) {
     return (
