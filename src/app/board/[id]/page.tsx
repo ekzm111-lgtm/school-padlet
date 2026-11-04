@@ -210,8 +210,16 @@ export default function BoardDetailPage() {
             saveStoreData.posts([...remote, ...otherPosts]);
 
             // 🔥 중요: 게시글이 속한 모든 열 이름을 빠짐없이 취합하여 화면에서 숨겨지는 일 100% 방지
-            const postCols = remote.map((p: Post) => p.column).filter(Boolean) as string[];
-            activeCols = Array.from(new Set([...activeCols, ...postCols]));
+            const postCols = remote.map((p: Post) => {
+              let name = p.column;
+              if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+              return name;
+            }).filter(Boolean) as string[];
+            activeCols = Array.from(new Set([...activeCols, ...postCols].map((c) => {
+              let name = String(c || '').trim();
+              if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+              return name;
+            })));
           }
 
           if (foundBoard) {
@@ -239,7 +247,11 @@ export default function BoardDetailPage() {
   // 🔥 게시글에 존재하는 모든 모둠(열)이 columns 상태에 누락되지 않도록 자동 보존 및 Supabase 동기화
   useEffect(() => {
     if (!posts || posts.length === 0) return;
-    const postCols = posts.map((p) => p.column).filter(Boolean) as string[];
+    const postCols = posts.map((p) => {
+      let name = p.column;
+      if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+      return name;
+    }).filter(Boolean) as string[];
     const missingCols = postCols.filter((c) => !columns.includes(c));
     if (missingCols.length > 0) {
       const updated = Array.from(new Set([...columns, ...missingCols]));
@@ -349,8 +361,13 @@ export default function BoardDetailPage() {
 
           if (latestCols && Array.isArray(latestCols) && latestCols.length > 0) {
             const postCols = posts.map((p) => p.column).filter(Boolean) as string[];
+            // 🔥 원격 열 목록 + 현재 로컬 열 목록(방금 추가한 빈 모둠 등) + 게시글 열 목록을 통합 및 정규화
             const cleanCols = Array.from(
-              new Set([...latestCols, ...postCols].map((c: any) => String(c || '').trim()).filter(Boolean))
+              new Set([...latestCols, ...columns, ...postCols].map((c: any) => {
+                let name = String(c || '').trim();
+                if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+                return name;
+              }).filter(Boolean))
             ) as string[];
 
             if (cleanCols.length > 0) {

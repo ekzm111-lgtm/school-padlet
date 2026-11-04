@@ -90,33 +90,18 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
     });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
 
-    // 1. boards 테이블에 저장 (모든 수정 필드 포함)
+    // 1. boards 테이블에 실제 스키마에 맞는 컬럼(columns 포함)으로 즉시 저장
     const { error } = await supabase.from('boards').upsert({
       id: board.id,
       code: board.code,
       title: board.title,
       description: finalDesc,
       theme: board.theme || 'blue',
-      cover_image_url: board.coverImageUrl || null,
-      custom_bg_url: board.customBgUrl || null,
-      category: board.category || '수업자료',
       columns: board.columns || ['모둠 1', '모둠 2', '모둠 3'],
     });
 
     if (error) {
-      console.warn('saveRemoteBoard upsert with optional columns failed, retrying minimal fallback:', error);
-      // DB 스키마에 일부 컬럼이 없는 경우를 위한 100% 호환 폴백 (description에 메타데이터로 완벽 보관)
-      try {
-        await supabase.from('boards').upsert({
-          id: board.id,
-          code: board.code,
-          title: board.title,
-          description: finalDesc,
-          theme: board.theme || 'blue',
-        });
-      } catch (eFallback) {
-        console.error('saveRemoteBoard fallback error', eFallback);
-      }
+      console.error('saveRemoteBoard upsert failed:', error);
     }
 
     // 2. 🔥 학생-교사 실시간 동기화 100% 보장: posts 테이블의 시스템 메타 레코드에 동시 저장
@@ -215,6 +200,10 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
         rawContent = rawContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
       }
 
+let postCol = p.column_id || p.column_name || metaColumn || '모둠 1';
+      if (postCol === '몸플기 예제' || postCol === '몸풀기') {
+        postCol = '몸풀기 예제';
+      }
       return {
         id: p.id,
         boardId: p.board_id,
@@ -226,7 +215,7 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
         authorId: p.author_id || 'user-student',
         authorName: p.author_name || '학생',
         authorRole: (p.author_role || 'student') as UserRole,
-        column: metaColumn || p.column_name || p.column_id || '모둠 1',
+        column: postCol,
         order: metaOrder ?? (typeof p.order_index === 'number' ? p.order_index : 0),
         reactions: {
           like: Array.isArray(p.likes) ? p.likes.length : 0,

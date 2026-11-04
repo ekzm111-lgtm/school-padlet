@@ -86,7 +86,7 @@ const INITIAL_BOARDS: Board[] = [
     isLocked: false,
     isPublic: true,
     category: '수업자료',
-    columns: ['Ai 모델', '몸플기 예제', '실습', 'util', '바이브코딩 편집기', '무료 AI (api)'],
+    columns: ['Ai 모델', '몸풀기 예제', '실습', 'util', '바이브코딩 편집기', '무료 AI (api)'],
     createdAt: '2026-10-26',
   },
   {
