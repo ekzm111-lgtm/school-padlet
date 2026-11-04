@@ -219,8 +219,8 @@ export default function BoardDetailPage() {
     const syncRemoteData = async () => {
       if (!isSupabaseConfigured || !supabase) return;
       if (isSyncingRef.current) return;
-      // 사용자가 최근 4초 내에 카드를 조작했다면 원격 폴링으로 인한 덮어쓰기 방지
-      if (Date.now() - lastUserActionTimeRef.current < 4000) return;
+      // 사용자가 최근 8초 내에 카드를 조작했다면 원격 폴링으로 인한 덮어쓰기 방지
+      if (Date.now() - lastUserActionTimeRef.current < 8000) return;
 
       isSyncingRef.current = true;
       try {
@@ -233,7 +233,7 @@ export default function BoardDetailPage() {
 
         if (remote && Array.isArray(remote)) {
           setPosts((prevPosts) => {
-            if (Date.now() - lastUserActionTimeRef.current < 4000) return prevPosts;
+            if (Date.now() - lastUserActionTimeRef.current < 8000) return prevPosts;
 
             const buildSig = (list: Post[]) =>
               list
@@ -266,7 +266,7 @@ export default function BoardDetailPage() {
         }
 
         // 2. 최신 모둠(열) 실시간 동기화
-        if (Date.now() - lastUserActionTimeRef.current >= 4000) {
+        if (Date.now() - lastUserActionTimeRef.current >= 8000) {
           let latestCols: string[] | null = null;
 
           // 2-1. posts 시스템 메타데이터로부터 실시간 열 목록 확인
@@ -654,6 +654,13 @@ export default function BoardDetailPage() {
       }
     }
 
+    const includedIds = new Set(updatedAllPosts.map((p) => p.id));
+    for (const p of posts) {
+      if (!includedIds.has(p.id)) {
+        updatedAllPosts.push({ ...p, order: counter++ });
+      }
+    }
+
     await persistPostsOrder(updatedAllPosts);
   };
 
@@ -680,6 +687,12 @@ export default function BoardDetailPage() {
         updatedAllPosts.push({ ...card, order: counter++, updatedAt: nowIso });
       }
     }
+    const includedTop = new Set(updatedAllPosts.map((p) => p.id));
+    for (const p of posts) {
+      if (!includedTop.has(p.id)) {
+        updatedAllPosts.push({ ...p, order: counter++ });
+      }
+    }
     await persistPostsOrder(updatedAllPosts);
   };
 
@@ -704,6 +717,12 @@ export default function BoardDetailPage() {
       const cards = (c === colName ? reorderedColCards : posts.filter((p) => (p.column || columns[0]) === c));
       for (const card of cards) {
         updatedAllPosts.push({ ...card, order: counter++, updatedAt: nowIso });
+      }
+    }
+    const includedTop = new Set(updatedAllPosts.map((p) => p.id));
+    for (const p of posts) {
+      if (!includedTop.has(p.id)) {
+        updatedAllPosts.push({ ...p, order: counter++ });
       }
     }
     await persistPostsOrder(updatedAllPosts);
