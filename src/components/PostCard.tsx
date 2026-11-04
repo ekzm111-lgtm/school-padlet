@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { Post, User, FileAttachment } from '@/lib/types';
 import { getStoreData, saveStoreData, getMyPostIds } from '@/lib/store';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { saveRemotePost } from '@/lib/supabaseStore';
 import PostModal from './PostModal';
 import confetti from 'canvas-confetti';
 
@@ -149,7 +151,7 @@ export default function PostCard({
 
   if (!currentPost) return null;
 
-  const handleReaction = (type: 'like' | 'clap' | 'heart' | 'insight') => {
+  const handleReaction = async (type: 'like' | 'clap' | 'heart' | 'insight') => {
     if (!allowReactions) return;
     const newReactions = {
       ...reactions,
@@ -157,11 +159,25 @@ export default function PostCard({
     };
     setReactions(newReactions);
 
+    const updatedPost: Post = {
+      ...currentPost,
+      reactions: newReactions,
+    };
+    setCurrentPost(updatedPost);
+
     const data = getStoreData();
     const updatedPosts = data.posts.map((p) =>
-      p.id === currentPost.id ? { ...p, reactions: newReactions } : p
+      p.id === currentPost.id ? updatedPost : p
     );
     saveStoreData.posts(updatedPosts);
+
+    if (onUpdated) {
+      onUpdated(updatedPost);
+    }
+
+    if (isSupabaseConfigured) {
+      saveRemotePost(updatedPost).catch(() => {});
+    }
 
     try {
       confetti({
@@ -172,12 +188,12 @@ export default function PostCard({
     } catch (e) {}
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentInput.trim()) return;
 
     const newComment = {
-      id: `c-${Date.now()}`,
+      id: `c-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       postId: currentPost.id,
       authorName: currentUser?.name || '익명 참여자',
       content: commentInput.trim(),
@@ -188,11 +204,50 @@ export default function PostCard({
     setComments(newComments);
     setCommentInput('');
 
+    const updatedPost: Post = {
+      ...currentPost,
+      comments: newComments,
+    };
+    setCurrentPost(updatedPost);
+
     const data = getStoreData();
     const updatedPosts = data.posts.map((p) =>
-      p.id === currentPost.id ? { ...p, comments: newComments } : p
+      p.id === currentPost.id ? updatedPost : p
     );
     saveStoreData.posts(updatedPosts);
+
+    if (onUpdated) {
+      onUpdated(updatedPost);
+    }
+
+    if (isSupabaseConfigured) {
+      await saveRemotePost(updatedPost);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const newComments = comments.filter((c) => c.id !== commentId);
+    setComments(newComments);
+
+    const updatedPost: Post = {
+      ...currentPost,
+      comments: newComments,
+    };
+    setCurrentPost(updatedPost);
+
+    const data = getStoreData();
+    const updatedPosts = data.posts.map((p) =>
+      p.id === currentPost.id ? updatedPost : p
+    );
+    saveStoreData.posts(updatedPosts);
+
+    if (onUpdated) {
+      onUpdated(updatedPost);
+    }
+
+    if (isSupabaseConfigured) {
+      await saveRemotePost(updatedPost);
+    }
   };
 
   const myPostIds = getMyPostIds();
@@ -623,15 +678,38 @@ export default function PostCard({
           {/* 댓글 목록 */}
           {showComments && allowComments && (
             <div className="mt-3 pt-3 border-t border-black/5 space-y-2">
-              {comments.map((c) => (
-                <div key={c.id} className="bg-white/80 p-2.5 rounded-xl text-xs space-y-0.5">
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
-                    <span>{c.authorName}</span>
-                    <span>{c.createdAt}</span>
+              {comments.map((c) => {
+                const canDeleteThisComment =
+                  currentUser?.role === 'admin' ||
+                  currentUser?.role === 'teacher' ||
+                  currentUser?.name === c.authorName ||
+                  isAuthor;
+
+                return (
+                  <div key={c.id} className="bg-white/80 p-2.5 rounded-xl text-xs space-y-0.5 group/comment relative">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                      <span className="font-bold text-slate-700">{c.authorName}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>{c.createdAt}</span>
+                        {canDeleteThisComment && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteComment(c.id);
+                            }}
+                            className="text-slate-400 hover:text-red-500 p-0.5 rounded transition opacity-0 group-hover/comment:opacity-100"
+                            title="댓글 삭제"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-slate-800 font-normal break-words">{c.content}</div>
                   </div>
-                  <div className="text-slate-800 font-normal">{c.content}</div>
-                </div>
-              ))}
+                );
+              })}
 
               <form onSubmit={handleAddComment} className="flex gap-1.5 pt-1">
                 <input

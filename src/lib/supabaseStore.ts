@@ -174,6 +174,7 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
       let rawContent = p.content || '';
       let attachments: FileAttachment[] = [];
       let comments: any[] = [];
+      let metaReactions: any = undefined;
       let metaOrder: number | undefined = undefined;
       let metaColumn: string | undefined = undefined;
 
@@ -188,6 +189,9 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
             }
             if (Array.isArray(parsed.comments)) {
               comments = parsed.comments;
+            }
+            if (parsed.reactions && typeof parsed.reactions === 'object') {
+              metaReactions = parsed.reactions;
             }
             if (typeof parsed.order === 'number') {
               metaOrder = parsed.order;
@@ -217,7 +221,7 @@ let postCol = p.column_id || p.column_name || metaColumn || '모둠 1';
         authorRole: (p.author_role || 'student') as UserRole,
         column: postCol,
         order: metaOrder ?? (typeof p.order_index === 'number' ? p.order_index : 0),
-        reactions: {
+        reactions: metaReactions || {
           like: Array.isArray(p.likes) ? p.likes.length : 0,
           clap: 0,
           heart: 0,
@@ -255,6 +259,7 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     const meta: {
       attachments?: FileAttachment[];
       comments?: any[];
+      reactions?: any;
       order?: number;
       column?: string;
     } = {};
@@ -270,6 +275,9 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     }
     if (post.comments && post.comments.length > 0) {
       meta.comments = post.comments;
+    }
+    if (post.reactions) {
+      meta.reactions = post.reactions;
     }
     if (typeof post.order === 'number') {
       meta.order = post.order;

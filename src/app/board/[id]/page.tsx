@@ -298,7 +298,7 @@ export default function BoardDetailPage() {
               list
                 .map(
                   (p) =>
-                    `${p.id}_${p.column}_${p.order ?? ''}_${p.title}_${p.content}_${p.color || ''}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl ? p.imageUrl.substring(0, 50) : ''}`
+                    `${p.id}_${p.column}_${p.order ?? ''}_${p.title}_${p.content}_${p.color || ''}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl ? p.imageUrl.substring(0, 50) : ''}_${(p.comments || []).map((c) => c.id + ':' + c.content).join(',')}_${JSON.stringify(p.reactions || {})}`
                 )
                 .join('|');
 
