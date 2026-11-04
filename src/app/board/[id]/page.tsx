@@ -34,9 +34,9 @@ import PostModal from '@/components/PostModal';
 import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
 import QrModal from '@/components/QrModal';
-import { getStoreData, saveStoreData, duplicateBoard, deletePost } from '@/lib/store';
+import { getStoreData, saveStoreData, duplicateBoard, deletePost, getMyPostIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts } from '@/lib/supabaseStore';
+import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, deleteRemotePost } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
 
@@ -138,7 +138,7 @@ export default function BoardDetailPage() {
       // 2. 클라우드 최신 상태 조회 (3초 타임아웃 가드 적용)
       if (isSupabaseConfigured && supabase) {
         try {
-          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000));
 
           // 로컬에 보드가 없었던 경우 Supabase 조회
           if (!foundBoard) {
@@ -225,7 +225,7 @@ export default function BoardDetailPage() {
       isSyncingRef.current = true;
       try {
         const targetBoardId = board?.id || boardId;
-        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
 
         // 1. 최신 게시글 동기화
         const fetchPromise = fetchRemotePosts(targetBoardId);
@@ -235,24 +235,24 @@ export default function BoardDetailPage() {
           setPosts((prevPosts) => {
             if (Date.now() - lastUserActionTimeRef.current < 4000) return prevPosts;
 
-            const prevSig = prevPosts
-              .map(
-                (p) =>
-                  `${p.id}_${p.column}_${p.order ?? ''}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
-              )
-              .join('|');
-            const remoteSig = remote
-              .map(
-                (p) =>
-                  `${p.id}_${p.column}_${p.order ?? ''}_${p.title}_${p.content}_${p.updatedAt || p.createdAt}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl || ''}`
-              )
-              .join('|');
+            const buildSig = (list: Post[]) =>
+              list
+                .map(
+                  (p) =>
+                    `${p.id}_${p.column}_${p.order ?? ''}_${p.title}_${p.content}_${p.color || ''}_${(p.attachments || []).length}_${p.linkUrl || ''}_${p.imageUrl ? p.imageUrl.substring(0, 50) : ''}`
+                )
+                .join('|');
+
+            const prevSig = buildSig(prevPosts);
+            const remoteSig = buildSig(remote);
             if (prevSig === remoteSig) return prevPosts;
 
             // 로컬에만 있는 작성 중인 카드가 있다면 보존하면서 원격 카드 병합
+            // (내 브라우저에서 방금 생성한 카드만 임시 보존, 오래된 더미 카드는 부활 금지)
+            const myPostIds = getMyPostIds();
             const remoteMap = new Map(remote.map((p) => [p.id, p]));
-            const localOnly = prevPosts.filter((p) => !remoteMap.has(p.id));
-            const merged = localOnly.length > 0 ? [...remote, ...localOnly] : remote;
+            const localPending = prevPosts.filter((p) => !remoteMap.has(p.id) && myPostIds.includes(p.id));
+            const merged = localPending.length > 0 ? [...remote, ...localPending] : remote;
 
             // 브라우저 캐시 동시 동기화
             try {
@@ -919,8 +919,12 @@ export default function BoardDetailPage() {
   // 포스트 삭제 (로컬 + Supabase 클라우드 실시간 영구 삭제)
   const handleDeletePost = async (postId: string) => {
     if (!confirm('이 카드를 정말 삭제하시겠습니까?')) return;
+    lastUserActionTimeRef.current = Date.now();
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     await deletePost(postId);
+    if (isSupabaseConfigured) {
+      await deleteRemotePost(postId);
+    }
   };
 
   // 카드 생성 콜백 (중복 생성 방어 및 새 모둠 자동 반영)

@@ -297,7 +297,7 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     const rowPayload: any = {
       id: post.id,
       board_id: post.boardId,
-      column_name: post.column || '모둠 1',
+      column_id: post.column || '모둠 1',
       title: post.title,
       content: finalContent,
       color: post.color || 'white',
@@ -305,6 +305,7 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       link_url: post.linkUrl || null,
       author_id: post.authorId || 'student',
       author_name: post.authorName || '학생',
+      order_index: typeof post.order === 'number' ? post.order : 0,
     };
 
     const { error } = await supabase.from('posts').upsert(rowPayload);
@@ -358,7 +359,7 @@ export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
       return {
         id: post.id,
         board_id: post.boardId,
-        column_name: post.column || '모둠 1',
+        column_id: post.column || '모둠 1',
         title: post.title,
         content: finalContent,
         color: post.color || 'white',
@@ -366,6 +367,7 @@ export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
         link_url: post.linkUrl || null,
         author_id: post.authorId || 'student',
         author_name: post.authorName || '학생',
+      order_index: typeof post.order === 'number' ? post.order : 0,
       };
     });
 
@@ -375,7 +377,7 @@ export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
       try {
         const fallbackRows = rows.map((r: any) => ({
           ...r,
-          column_id: r.column_name,
+          column_id: r.column_id,
         }));
         await supabase.from('posts').upsert(fallbackRows);
       } catch (e2) {}
