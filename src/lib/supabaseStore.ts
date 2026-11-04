@@ -124,7 +124,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       await supabase.from('posts').upsert({
         id: `board_columns_${board.id}`,
         board_id: board.id,
-        column_name: '__system_meta__',
+        column_id: '__system_meta__',
         title: '__BOARD_COLUMNS_META__',
         content: JSON.stringify({
           columns: board.columns,

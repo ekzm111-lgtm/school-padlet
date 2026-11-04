@@ -135,63 +135,90 @@ export default function BoardDetailPage() {
         setIsLoading(false);
       }
 
-      // 2. 클라우드 최신 상태 조회 (3초 타임아웃 가드 적용)
+      // 2. 클라우드 최신 상태 조회 및 동기화
       if (isSupabaseConfigured && supabase) {
         try {
           const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000));
 
-          // 로컬에 보드가 없었던 경우 Supabase 조회
-          if (!foundBoard) {
-            const fetchBoardPromise = supabase
-              .from('boards')
-              .select('*')
-              .or(`id.eq.${boardId},code.eq.${boardId}`)
-              .maybeSingle();
+          // 2-1. 최신 보드 정보 조회 (항상 실행하여 서버의 최신 컬럼 및 설정 반영)
+          const targetLookup = foundBoard?.id || boardId;
+          const fetchBoardPromise = supabase
+            .from('boards')
+            .select('*')
+            .or(`id.eq.${targetLookup},code.eq.${targetLookup}`)
+            .maybeSingle();
 
-            const res: any = await Promise.race([fetchBoardPromise, timeoutPromise]);
-            const dbBoard = res?.data;
+          const res: any = await Promise.race([fetchBoardPromise, timeoutPromise]);
+          const dbBoard = res?.data;
 
-            if (dbBoard) {
-              foundBoard = {
-                id: dbBoard.id,
-                code: dbBoard.code,
-                title: dbBoard.title,
-                description: dbBoard.description || '',
-                layout: 'kanban',
-                theme: dbBoard.theme || 'blue',
-                coverImageUrl:
-                  dbBoard.cover_image_url ||
-                  'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
-                customBgUrl: '',
-                authorId: dbBoard.author_id || 'user-admin',
-                authorName: dbBoard.author_name || '선생님',
-                authorRole: 'teacher',
-                columns: Array.isArray(dbBoard.columns) ? dbBoard.columns : DEFAULT_COLUMNS,
-                allowStudentPost: true,
-                allowComments: true,
-                allowReactions: true,
-                isLocked: false,
-                isPublic: true,
-                category: '수업자료',
-                createdAt: dbBoard.created_at
-                  ? new Date(dbBoard.created_at).toISOString().split('T')[0]
-                  : '',
-              };
-              setBoard(foundBoard);
-              setColumns(foundBoard.columns || DEFAULT_COLUMNS);
-              saveStoreData.boards([foundBoard, ...data.boards]);
+          let activeCols = foundBoard?.columns || DEFAULT_COLUMNS;
+
+          if (dbBoard) {
+            let parsedCols: string[] = [];
+            if (Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
+              parsedCols = dbBoard.columns;
+            } else if (dbBoard.description && dbBoard.description.includes('<!--SCHOOLPAD_BOARD_META:')) {
+              const match = dbBoard.description.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
+              if (match && match[1]) {
+                try {
+                  const parsed = JSON.parse(match[1]);
+                  if (Array.isArray(parsed.columns)) parsedCols = parsed.columns;
+                } catch (e) {}
+              }
             }
+
+            if (parsedCols.length > 0) {
+              activeCols = parsedCols;
+            }
+
+            foundBoard = {
+              ...(foundBoard || {}),
+              id: dbBoard.id,
+              code: dbBoard.code,
+              title: dbBoard.title,
+              description: dbBoard.description || '',
+              layout: (dbBoard.layout || foundBoard?.layout || 'kanban') as any,
+              theme: dbBoard.theme || foundBoard?.theme || 'blue',
+              coverImageUrl:
+                dbBoard.cover_image_url ||
+                foundBoard?.coverImageUrl ||
+                'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+              customBgUrl: dbBoard.custom_bg_url || foundBoard?.customBgUrl || '',
+              authorId: dbBoard.author_id || foundBoard?.authorId || 'user-admin',
+              authorName: dbBoard.author_name || foundBoard?.authorName || '선생님',
+              authorRole: 'teacher',
+              columns: activeCols,
+              allowStudentPost: true,
+              allowComments: true,
+              allowReactions: true,
+              isLocked: false,
+              isPublic: true,
+              category: dbBoard.category || foundBoard?.category || '수업자료',
+              createdAt: dbBoard.created_at
+                ? new Date(dbBoard.created_at).toISOString().split('T')[0]
+                : foundBoard?.createdAt || '',
+            };
           }
 
-          // 최신 게시글 원격 조회 (3초 타임아웃 가드)
+          // 2-2. 최신 게시글 원격 조회 및 모든 모둠(열) 자동 복원 및 보존
+          const targetId = foundBoard?.id || boardId;
+          const fetchPostsPromise = fetchRemotePosts(targetId);
+          const remote: any = await Promise.race([fetchPostsPromise, timeoutPromise]);
+          if (remote && Array.isArray(remote)) {
+            setPosts(remote);
+            const otherPosts = data.posts.filter((p) => p.boardId !== targetId);
+            saveStoreData.posts([...remote, ...otherPosts]);
+
+            // 🔥 중요: 게시글이 속한 모든 열 이름을 빠짐없이 취합하여 화면에서 숨겨지는 일 100% 방지
+            const postCols = remote.map((p: Post) => p.column).filter(Boolean) as string[];
+            activeCols = Array.from(new Set([...activeCols, ...postCols]));
+          }
+
           if (foundBoard) {
-            const fetchPostsPromise = fetchRemotePosts(foundBoard.id);
-            const remote: any = await Promise.race([fetchPostsPromise, timeoutPromise]);
-            if (remote && Array.isArray(remote)) {
-              setPosts(remote);
-              const otherPosts = data.posts.filter((p) => p.boardId !== foundBoard!.id);
-              saveStoreData.posts([...remote, ...otherPosts]);
-            }
+            foundBoard.columns = activeCols;
+            setBoard(foundBoard);
+            setColumns(activeCols);
+            saveStoreData.boards([foundBoard, ...data.boards.filter((b) => b.id !== foundBoard!.id)]);
           }
         } catch (e) {
           console.error('Remote load error:', e);
@@ -208,6 +235,26 @@ export default function BoardDetailPage() {
     loadData();
     // store_updated 이벤트 발생 시 loadData()를 중복 호출하지 않음 (로컬 조작 직후 과거 원격 데이터로 덮어씌워지는 레이스 컨디션 차단)
   }, [boardId]);
+
+  // 🔥 게시글에 존재하는 모든 모둠(열)이 columns 상태에 누락되지 않도록 자동 보존 및 Supabase 동기화
+  useEffect(() => {
+    if (!posts || posts.length === 0) return;
+    const postCols = posts.map((p) => p.column).filter(Boolean) as string[];
+    const missingCols = postCols.filter((c) => !columns.includes(c));
+    if (missingCols.length > 0) {
+      const updated = Array.from(new Set([...columns, ...missingCols]));
+      setColumns(updated);
+      if (board) {
+        const updatedBoard = { ...board, columns: updated };
+        setBoard(updatedBoard);
+        const data = getStoreData();
+        saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+        if (isSupabaseConfigured) {
+          saveRemoteBoard(updatedBoard).catch(() => {});
+        }
+      }
+    }
+  }, [posts, columns, board]);
 
   // 🔥 실시간 동기화 (Supabase Realtime 채널 + 1초 주기 자동 폴링 백업)
   // 학생과 교사가 서로 다른 기기에서 작업할 때 1~2초 내에 자동 화면 반영 (게시글 + 모둠 열)!
@@ -301,8 +348,9 @@ export default function BoardDetailPage() {
           }
 
           if (latestCols && Array.isArray(latestCols) && latestCols.length > 0) {
+            const postCols = posts.map((p) => p.column).filter(Boolean) as string[];
             const cleanCols = Array.from(
-              new Set(latestCols.map((c: any) => String(c || '').trim()).filter(Boolean))
+              new Set([...latestCols, ...postCols].map((c: any) => String(c || '').trim()).filter(Boolean))
             ) as string[];
 
             if (cleanCols.length > 0) {
