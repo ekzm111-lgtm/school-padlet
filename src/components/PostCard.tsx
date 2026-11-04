@@ -17,6 +17,11 @@ import {
   Paperclip,
   Copy,
   Check,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUp,
+  ChevronsDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Post, User, FileAttachment } from '@/lib/types';
 import { getStoreData, saveStoreData, getMyPostIds } from '@/lib/store';
@@ -31,6 +36,13 @@ interface PostCardProps {
   allowReactions?: boolean;
   onDelete: (postId: string) => void;
   onUpdated?: (updated: Post) => void;
+  onMoveUp?: (postId: string) => void;
+  onMoveDown?: (postId: string) => void;
+  onMoveToTop?: (postId: string) => void;
+  onMoveToBottom?: (postId: string) => void;
+  onMoveToColumn?: (postId: string, targetCol: string) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 }
 
 export default function PostCard({
@@ -41,9 +53,17 @@ export default function PostCard({
   allowReactions = true,
   onDelete,
   onUpdated,
+  onMoveUp,
+  onMoveDown,
+  onMoveToTop,
+  onMoveToBottom,
+  onMoveToColumn,
+  canMoveUp = false,
+  canMoveDown = false,
 }: PostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [currentPost, setCurrentPost] = useState(post);
   const [commentInput, setCommentInput] = useState('');
   const [reactions, setReactions] = useState(post?.reactions || { like: 0, clap: 0, heart: 0, insight: 0 });
@@ -207,6 +227,118 @@ export default function PostCard({
               <span className="text-[10px] text-slate-500 font-medium mr-1">
                 {currentPost.updatedAt || currentPost.createdAt}
               </span>
+
+              {/* 순서 이동 버튼: 위로 (▲) */}
+              {onMoveUp && canMoveUp && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveUp(currentPost.id);
+                  }}
+                  className="p-1 rounded-lg bg-black/5 hover:bg-blue-100 hover:text-blue-700 text-slate-600 transition shadow-xs"
+                  title="카드를 위로 한 칸 이동 (▲)"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* 순서 이동 버튼: 아래로 (▼) */}
+              {onMoveDown && canMoveDown && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveDown(currentPost.id);
+                  }}
+                  className="p-1 rounded-lg bg-black/5 hover:bg-blue-100 hover:text-blue-700 text-slate-600 transition shadow-xs"
+                  title="카드를 아래로 한 칸 이동 (▼)"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* 위치 및 다른 모둠 빠른 이동 메뉴 (맨위/맨아래/모둠변경) */}
+              {(onMoveToTop || onMoveToBottom || onMoveToColumn) && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMoveMenu((prev) => !prev);
+                    }}
+                    className={`p-1 rounded-lg transition shadow-xs flex items-center justify-center ${
+                      showMoveMenu
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-black/5 hover:bg-black/10 text-slate-600'
+                    }`}
+                    title="카드 위치(맨위/맨아래) 및 다른 모둠으로 이동"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5" />
+                  </button>
+
+                  {showMoveMenu && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-0 top-7 z-30 w-44 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      <div className="px-3 py-1 text-[10px] font-bold text-slate-400 border-b border-slate-100">
+                        순서 빠른 이동
+                      </div>
+                      {canMoveUp && onMoveToTop && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowMoveMenu(false);
+                            onMoveToTop(currentPost.id);
+                          }}
+                          className="w-full px-3 py-1.5 text-left hover:bg-blue-50 hover:text-blue-600 flex items-center gap-1.5 font-medium"
+                        >
+                          <ChevronsUp className="w-3.5 h-3.5 text-blue-500" />
+                          <span>맨 위로 이동</span>
+                        </button>
+                      )}
+                      {canMoveDown && onMoveToBottom && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowMoveMenu(false);
+                            onMoveToBottom(currentPost.id);
+                          }}
+                          className="w-full px-3 py-1.5 text-left hover:bg-blue-50 hover:text-blue-600 flex items-center gap-1.5 font-medium"
+                        >
+                          <ChevronsDown className="w-3.5 h-3.5 text-blue-500" />
+                          <span>맨 아래로 이동</span>
+                        </button>
+                      )}
+
+                      {columns.filter((c) => c !== (currentPost.column || columns[0])).length > 0 && (
+                        <>
+                          <div className="px-3 py-1 text-[10px] font-bold text-slate-400 border-t border-slate-100 mt-1">
+                            다른 모둠으로 이동
+                          </div>
+                          {columns
+                            .filter((c) => c !== (currentPost.column || columns[0]))
+                            .map((col) => (
+                              <button
+                                key={col}
+                                type="button"
+                                onClick={() => {
+                                  setShowMoveMenu(false);
+                                  if (onMoveToColumn) onMoveToColumn(currentPost.id, col);
+                                }}
+                                className="w-full px-3 py-1.5 text-left hover:bg-blue-50 hover:text-blue-600 truncate font-medium flex items-center gap-1.5"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                <span className="truncate">{col}</span>
+                              </button>
+                            ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 글 전체 복사 버튼 */}
               <button

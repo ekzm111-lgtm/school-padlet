@@ -26,7 +26,7 @@ export interface Board {
   description: string;
   layout: BoardLayout;
   theme: BoardTheme;
-  authorId: string;
+  authorId?: string;
   authorName: string;
   authorRole?: UserRole;
   allowStudentPost: boolean;

@@ -197,6 +197,7 @@ const INITIAL_BOARDS: Board[] = [
 const INITIAL_POSTS: Post[] = [
   {
     id: 'post-util-gh',
+    authorId: 'user-admin',
     boardId: 'board-1792975588752',
     column: 'util',
     title: 'GitHub (School-Padlet)',
@@ -211,6 +212,7 @@ const INITIAL_POSTS: Post[] = [
   },
   {
     id: 'post-util-ver',
+    authorId: 'user-admin',
     boardId: 'board-1792975588752',
     column: 'util',
     title: 'Vercel 대시보드',
@@ -225,6 +227,7 @@ const INITIAL_POSTS: Post[] = [
   },
   {
     id: 'post-util-fb',
+    authorId: 'user-admin',
     boardId: 'board-1792975588752',
     column: 'util',
     title: 'Firebase 콘솔',
@@ -239,6 +242,7 @@ const INITIAL_POSTS: Post[] = [
   },
   {
     id: 'post-util-her',
+    authorId: 'user-admin',
     boardId: 'board-1792975588752',
     column: 'util',
     title: 'Hermes Agent (헤르메스 에이전트)',
@@ -253,6 +257,7 @@ const INITIAL_POSTS: Post[] = [
   },
   {
     id: 'post-util-v0',
+    authorId: 'user-admin',
     boardId: 'board-1792975588752',
     column: 'util',
     title: 'v0 by Vercel (UI 컴포넌트)',
@@ -267,6 +272,7 @@ const INITIAL_POSTS: Post[] = [
   },
   {
     id: 'post-util-blt',
+    authorId: 'user-admin',
     boardId: 'board-1792975588752',
     column: 'util',
     title: 'Bolt.new (풀스택 AI 개발)',
@@ -281,6 +287,7 @@ const INITIAL_POSTS: Post[] = [
   },
   {
     id: 'post-util-lov',
+    authorId: 'user-admin',
     boardId: 'board-1792975588752',
     column: 'util',
     title: 'Lovable.dev (아이디어 앱 제작)',
@@ -576,12 +583,6 @@ export const getStoreData = (): StoreData => {
     } catch (e) {}
   }
 
-  const utilPosts = INITIAL_POSTS.filter((p) => p.boardId === 'board-1792975588752');
-  for (const up of utilPosts) {
-    if (!postsList.some((p) => p.id === up.id)) {
-      postsList = [up, ...postsList];
-    }
-  }
   // '바이브코딩 교육자료' (999190) 및 '2025. 디지털튜터' 보드 자동 동기화
   const vibeBoard = INITIAL_BOARDS.find((b) => b.code === '999190');
   const dtBoard = INITIAL_BOARDS.find((b) => b.code === '202501');
@@ -601,6 +602,12 @@ export const getStoreData = (): StoreData => {
   }
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
+  const utilPosts = INITIAL_POSTS.filter((p) => p.boardId === 'board-1792975588752');
+  for (const up of utilPosts) {
+    if (!postsList.some((p) => p.id === up.id)) {
+      postsList = [up, ...postsList];
+    }
+  }
   const hasVibePost = postsList.some((p) => p.boardId === 'board-vibecoding');
   if (!hasVibePost) {
     const vibePosts = INITIAL_POSTS.filter((p) => p.boardId === 'board-vibecoding');
