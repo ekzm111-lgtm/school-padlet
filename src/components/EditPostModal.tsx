@@ -30,7 +30,7 @@ export default function EditPostModal({
 }: EditPostModalProps) {
   const [title, setTitle] = useState(post?.title || '');
   const [content, setContent] = useState(post?.content || '');
-  const [color, setColor] = useState<Post['color']>(post?.color || 'yellow');
+  const [color, setColor] = useState<Post['color']>(post?.color || 'white');
   const [imageUrl, setImageUrl] = useState(post?.imageUrl || '');
   const [linkUrl, setLinkUrl] = useState(post?.linkUrl || '');
   const [customAuthor, setCustomAuthor] = useState(post?.authorName || '');
@@ -46,7 +46,7 @@ export default function EditPostModal({
     if (post) {
       setTitle(post.title || '');
       setContent(post.content || '');
-      setColor(post.color || 'yellow');
+      setColor(post.color || 'white');
       setImageUrl(post.imageUrl || '');
       setLinkUrl(post.linkUrl || '');
       setCustomAuthor(post.authorName || '');
@@ -345,12 +345,12 @@ export default function EditPostModal({
             <label className="block text-[11px] font-bold text-slate-600 mb-1.5">포스트잇 색상</label>
             <div className="flex items-center gap-2">
               {[
+                { id: 'white', name: '흰색', bg: 'bg-white border-slate-300' },
                 { id: 'yellow', name: '노랑', bg: 'bg-yellow-200 border-yellow-400' },
                 { id: 'pink', name: '분홍', bg: 'bg-pink-200 border-pink-400' },
                 { id: 'blue', name: '하늘', bg: 'bg-sky-200 border-sky-400' },
                 { id: 'green', name: '연두', bg: 'bg-green-200 border-green-400' },
                 { id: 'purple', name: '보라', bg: 'bg-purple-200 border-purple-400' },
-                { id: 'white', name: '흰색', bg: 'bg-white border-slate-300' },
               ].map((c) => (
                 <button
                   key={c.id}

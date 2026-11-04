@@ -166,13 +166,13 @@ export default function PostCard({
   const canDelete = canEdit;
 
   const cardColorClass = {
+    white: 'card-color-white',
     yellow: 'card-color-yellow',
     pink: 'card-color-pink',
     blue: 'card-color-blue',
     green: 'card-color-green',
     purple: 'card-color-purple',
-    white: 'card-color-white',
-  }[currentPost.color || 'yellow'] || 'card-color-yellow';
+  }[currentPost.color || 'white'] || 'card-color-white';
 
   // 첨부 파일 목록 취합 (다중 파일 + 단일 파일 호환 + 클라우드 메타데이터 복원)
   let displayContent = currentPost.content || '';

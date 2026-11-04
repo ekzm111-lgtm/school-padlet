@@ -51,7 +51,7 @@ export default function PostModal({
 }: PostModalProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [color, setColor] = useState<Post['color']>('yellow');
+  const [color, setColor] = useState<Post['color']>('white');
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [customAuthor, setCustomAuthor] = useState('');
@@ -114,7 +114,7 @@ export default function PostModal({
         cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
       }
       setContent(cleanContent);
-      setColor(post.color || 'yellow');
+      setColor(post.color || 'white');
       setImageUrl(post.imageUrl || '');
       setLinkUrl(post.linkUrl || '');
       setCustomAuthor(post.authorName || '');
@@ -125,7 +125,7 @@ export default function PostModal({
       // 생성 모드
       setTitle('');
       setContent('');
-      setColor('yellow');
+      setColor('white');
       setImageUrl('');
       setLinkUrl('');
       setCustomAuthor(currentUser?.name || '');
@@ -771,12 +771,12 @@ export default function PostModal({
             <label className="block text-xs font-bold text-slate-700 mb-1.5">포스트잇 색상</label>
             <div className="flex items-center gap-2">
               {[
+                { id: 'white', name: '흰색', bg: 'bg-white border-slate-300' },
                 { id: 'yellow', name: '노랑', bg: 'bg-yellow-200 border-yellow-400' },
                 { id: 'pink', name: '분홍', bg: 'bg-pink-200 border-pink-400' },
                 { id: 'blue', name: '하늘', bg: 'bg-sky-200 border-sky-400' },
                 { id: 'green', name: '연두', bg: 'bg-green-200 border-green-400' },
                 { id: 'purple', name: '보라', bg: 'bg-purple-200 border-purple-400' },
-                { id: 'white', name: '흰색', bg: 'bg-white border-slate-300' },
               ].map((c) => (
                 <button
                   key={c.id}
