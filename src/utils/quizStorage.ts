@@ -266,9 +266,48 @@ export async function fetchLiveQuizStateAsync(pin: string): Promise<LiveQuizStat
   return getLiveQuizState(pin);
 }
 
+export function mergeParticipantsList(existing: any[] = [], incoming: any[] = []): any[] {
+  const map = new Map<string, any>();
+  (existing || []).forEach((p) => {
+    if (p && p.id) map.set(p.id, p);
+  });
+  (incoming || []).forEach((p) => {
+    if (p && p.id) {
+      const prev = map.get(p.id);
+      map.set(p.id, {
+        ...prev,
+        ...p,
+        score: Math.max(prev?.score || 0, p.score || 0),
+      });
+    }
+  });
+  return Array.from(map.values());
+}
+
+export function mergeAnswersList(existing: any[] = [], incoming: any[] = []): any[] {
+  const map = new Map<string, any>();
+  (existing || []).forEach((a) => {
+    if (a && a.participantId) {
+      map.set(`${a.participantId}_${a.questionIndex ?? 0}`, a);
+    }
+  });
+  (incoming || []).forEach((a) => {
+    if (a && a.participantId) {
+      map.set(`${a.participantId}_${a.questionIndex ?? 0}`, a);
+    }
+  });
+  return Array.from(map.values());
+}
+
 export function setLiveQuizState(state: LiveQuizState): void {
+  const prev = getLiveQuizState(state.pin);
+  const mergedParticipants = mergeParticipantsList(prev?.participants, state.participants);
+  const mergedAnswers = mergeAnswersList(prev?.answersSubmitted, state.answersSubmitted);
+
   const stateWithTime: LiveQuizState = {
     ...state,
+    participants: mergedParticipants,
+    answersSubmitted: mergedAnswers,
     updatedAt: state.updatedAt || Date.now(),
   };
   localStorage.setItem(`${LIVE_STATE_KEY_PREFIX}${stateWithTime.pin}`, JSON.stringify(stateWithTime));
@@ -348,8 +387,22 @@ export function subscribeToQuizUpdates(
             if (typeof data.serverElapsedSec === 'number') {
               (data.liveState as any).serverElapsedSec = data.serverElapsedSec;
             }
-            localStorage.setItem(`${LIVE_STATE_KEY_PREFIX}${activePin}`, JSON.stringify(data.liveState));
-            callback({ type: 'LIVE_STATE_POLL', state: data.liveState, serverElapsedSec: data.serverElapsedSec });
+            const prev = getLiveQuizState(activePin);
+            const combined: LiveQuizState = {
+              ...data.liveState,
+              status:
+                prev && prev.status !== 'waiting' && data.liveState.status === 'waiting'
+                  ? prev.status
+                  : data.liveState.status,
+              currentQuestionIndex: Math.max(
+                prev?.currentQuestionIndex || 0,
+                data.liveState.currentQuestionIndex || 0
+              ),
+              participants: mergeParticipantsList(prev?.participants, data.liveState.participants),
+              answersSubmitted: mergeAnswersList(prev?.answersSubmitted, data.liveState.answersSubmitted),
+            };
+            localStorage.setItem(`${LIVE_STATE_KEY_PREFIX}${activePin}`, JSON.stringify(combined));
+            callback({ type: 'LIVE_STATE_POLL', state: combined, serverElapsedSec: data.serverElapsedSec });
           }
         }
       } catch {}

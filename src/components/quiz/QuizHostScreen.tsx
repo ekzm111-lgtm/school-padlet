@@ -12,6 +12,8 @@ import {
   subscribeToQuizUpdates,
   submitQuizResult,
   getRoomLeaderboard,
+  mergeParticipantsList,
+  mergeAnswersList,
 } from '@/utils/quizStorage';
 import {
   hostStartQuiz,
@@ -98,11 +100,25 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     // 서버의 실시간 최신 상태(스마트폰 참가자 포함) 조회
     const s = await fetchLiveQuizStateAsync(pin);
     if (s) {
-      setLiveState(s);
+      setLiveState((prev) => {
+        if (!prev) return s;
+        return {
+          ...s,
+          participants: mergeParticipantsList(prev.participants, s.participants),
+          answersSubmitted: mergeAnswersList(prev.answersSubmitted, s.answersSubmitted),
+        };
+      });
     } else {
       const localS = getLiveQuizState(pin);
       if (localS) {
-        setLiveState(localS);
+        setLiveState((prev) => {
+          if (!prev) return localS;
+          return {
+            ...localS,
+            participants: mergeParticipantsList(prev.participants, localS.participants),
+            answersSubmitted: mergeAnswersList(prev.answersSubmitted, localS.answersSubmitted),
+          };
+        });
       } else if (r) {
         const initialLive: LiveQuizState = {
           pin: r.pin,
@@ -127,14 +143,16 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
       if (msg && msg.state && msg.state.pin === pin) {
         setLiveState((prev) => {
           if (!prev) return msg.state;
+          const mergedParticipants = mergeParticipantsList(prev.participants, msg.state.participants);
+          const mergedAnswers = mergeAnswersList(prev.answersSubmitted, msg.state.answersSubmitted);
           return {
             ...msg.state,
             status: prev.status,
             currentQuestionIndex: prev.currentQuestionIndex,
             questionStartedAt: prev.questionStartedAt || msg.state.questionStartedAt,
             timeLeft: prev.timeLeft,
-            participants: msg.state.participants || prev.participants,
-            answersSubmitted: msg.state.answersSubmitted || prev.answersSubmitted,
+            participants: mergedParticipants,
+            answersSubmitted: mergedAnswers,
           };
         });
       } else if (msg && msg.type === 'STORAGE_CHANGED') {
@@ -142,14 +160,16 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
         if (latestLive) {
           setLiveState((prev) => {
             if (!prev) return latestLive;
+            const mergedParticipants = mergeParticipantsList(prev.participants, latestLive.participants);
+            const mergedAnswers = mergeAnswersList(prev.answersSubmitted, latestLive.answersSubmitted);
             return {
               ...latestLive,
               status: prev.status,
               currentQuestionIndex: prev.currentQuestionIndex,
               questionStartedAt: prev.questionStartedAt || latestLive.questionStartedAt,
               timeLeft: prev.timeLeft,
-              participants: latestLive.participants || prev.participants,
-              answersSubmitted: latestLive.answersSubmitted || prev.answersSubmitted,
+              participants: mergedParticipants,
+              answersSubmitted: mergedAnswers,
             };
           });
         }

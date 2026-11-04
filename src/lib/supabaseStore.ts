@@ -11,7 +11,9 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
       .select('*')
       .order('created_at', { ascending: false });
     if (error || !data) return null;
-    return data.map((b) => {
+    return data
+      .filter((b) => !b.id?.startsWith('quiz_') && !b.title?.startsWith('__QUIZ_'))
+      .map((b) => {
       let rawDesc = b.description || '';
       let metaCols: string[] | undefined = undefined;
       let metaCover: string | undefined = undefined;
