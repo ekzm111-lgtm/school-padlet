@@ -23,8 +23,8 @@ import {
   ChevronsDown,
   ArrowUpDown,
 } from 'lucide-react';
-import { Post, User, FileAttachment } from '@/lib/types';
-import { getStoreData, saveStoreData, getMyPostIds } from '@/lib/store';
+import { Post, User, FileAttachment, PostComment } from '@/lib/types';
+import { getStoreData, saveStoreData, getMyPostIds, getMyCommentIds, addMyCommentId } from '@/lib/store';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { saveRemotePost } from '@/lib/supabaseStore';
 import PostModal from './PostModal';
@@ -113,6 +113,8 @@ export default function PostCard({
   const [commentInput, setCommentInput] = useState('');
   const [reactions, setReactions] = useState(post?.reactions || { like: 0, clap: 0, heart: 0, insight: 0 });
   const [comments, setComments] = useState(post?.comments || []);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
   const [showImageModal, setShowImageModal] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
 
@@ -192,14 +194,17 @@ export default function PostCard({
     e.preventDefault();
     if (!commentInput.trim()) return;
 
-    const newComment = {
-      id: `c-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    const commentId = `c-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newComment: PostComment = {
+      id: commentId,
       postId: currentPost.id,
       authorName: currentUser?.name || '익명 참여자',
+      authorId: currentUser?.id,
       content: commentInput.trim(),
       createdAt: '방금 전',
     };
 
+    addMyCommentId(commentId);
     const newComments = [...comments, newComment];
     setComments(newComments);
     setCommentInput('');
@@ -225,9 +230,51 @@ export default function PostCard({
     }
   };
 
+  const handleUpdateComment = async (commentId: string) => {
+    if (!editCommentText.trim()) return;
+
+    const newComments = comments.map((c) =>
+      c.id === commentId
+        ? {
+            ...c,
+            content: editCommentText.trim(),
+            updatedAt: '방금 전 (수정됨)',
+          }
+        : c
+    );
+    setComments(newComments);
+    setEditingCommentId(null);
+    setEditCommentText('');
+
+    const updatedPost: Post = {
+      ...currentPost,
+      comments: newComments,
+    };
+    setCurrentPost(updatedPost);
+
+    const data = getStoreData();
+    const updatedPosts = data.posts.map((p) =>
+      p.id === currentPost.id ? updatedPost : p
+    );
+    saveStoreData.posts(updatedPosts);
+
+    if (onUpdated) {
+      onUpdated(updatedPost);
+    }
+
+    if (isSupabaseConfigured) {
+      await saveRemotePost(updatedPost);
+    }
+  };
+
   const handleDeleteComment = async (commentId: string) => {
+    if (typeof window !== 'undefined' && !window.confirm('댓글을 삭제하시겠습니까?')) return;
     const newComments = comments.filter((c) => c.id !== commentId);
     setComments(newComments);
+    if (editingCommentId === commentId) {
+      setEditingCommentId(null);
+      setEditCommentText('');
+    }
 
     const updatedPost: Post = {
       ...currentPost,
@@ -679,18 +726,44 @@ export default function PostCard({
           {showComments && allowComments && (
             <div className="mt-3 pt-3 border-t border-black/5 space-y-2">
               {comments.map((c) => {
+                const myCommentIds = getMyCommentIds();
+                const isMyComment =
+                  (currentUser && c.authorId && currentUser.id === c.authorId) ||
+                  (currentUser && currentUser.name === c.authorName) ||
+                  myCommentIds.includes(c.id);
+
+                const canEditThisComment =
+                  currentUser?.role === 'admin' ||
+                  isMyComment;
+
                 const canDeleteThisComment =
                   currentUser?.role === 'admin' ||
                   currentUser?.role === 'teacher' ||
-                  currentUser?.name === c.authorName ||
-                  isAuthor;
+                  isAuthor ||
+                  isMyComment;
+
+                const isEditing = editingCommentId === c.id;
 
                 return (
-                  <div key={c.id} className="bg-white/80 p-2.5 rounded-xl text-xs space-y-0.5 group/comment relative">
+                  <div key={c.id} className="bg-white/90 p-2.5 rounded-xl text-xs space-y-1 group/comment relative border border-slate-100/90 shadow-2xs">
                     <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
                       <span className="font-bold text-slate-700">{c.authorName}</span>
                       <div className="flex items-center gap-1.5">
-                        <span>{c.createdAt}</span>
+                        <span className="text-[9px] text-slate-400">{c.updatedAt || c.createdAt}</span>
+                        {canEditThisComment && !isEditing && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCommentId(c.id);
+                              setEditCommentText(c.content);
+                            }}
+                            className="text-slate-400 hover:text-blue-600 p-0.5 rounded transition"
+                            title="댓글 수정"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
                         {canDeleteThisComment && (
                           <button
                             type="button"
@@ -698,7 +771,7 @@ export default function PostCard({
                               e.stopPropagation();
                               handleDeleteComment(c.id);
                             }}
-                            className="text-slate-400 hover:text-red-500 p-0.5 rounded transition opacity-0 group-hover/comment:opacity-100"
+                            className="text-slate-400 hover:text-red-500 p-0.5 rounded transition"
                             title="댓글 삭제"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -706,7 +779,45 @@ export default function PostCard({
                         )}
                       </div>
                     </div>
-                    <div className="text-slate-800 font-normal break-words">{c.content}</div>
+
+                    {isEditing ? (
+                      <div className="pt-1 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={editCommentText}
+                          onChange={(e) => setEditCommentText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleUpdateComment(c.id);
+                            } else if (e.key === 'Escape') {
+                              setEditingCommentId(null);
+                            }
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-white border border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                          placeholder="수정할 댓글 내용을 입력하세요..."
+                          autoFocus
+                        />
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingCommentId(null)}
+                            className="px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 hover:bg-slate-200 transition"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateComment(c.id)}
+                            className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-2xs"
+                          >
+                            수정 완료
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-slate-800 font-normal break-words leading-relaxed">{c.content}</div>
+                    )}
                   </div>
                 );
               })}

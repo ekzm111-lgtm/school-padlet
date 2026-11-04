@@ -396,6 +396,7 @@ const STORAGE_KEYS = {
   POSTS: 'school_padlet_posts',
   CURRENT_USER: 'school_padlet_current_user',
   MY_POST_IDS: 'school_padlet_my_post_ids',
+  MY_COMMENT_IDS: 'school_padlet_my_comment_ids',
 };
 
 export const getMyPostIds = (): string[] => {
@@ -409,6 +410,20 @@ export const addMyPostId = (postId: string) => {
   const list = getMyPostIds();
   if (!list.includes(postId)) {
     localStorage.setItem(STORAGE_KEYS.MY_POST_IDS, JSON.stringify([...list, postId]));
+  }
+};
+
+export const getMyCommentIds = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(STORAGE_KEYS.MY_COMMENT_IDS);
+  return stored ? JSON.parse(stored) : [];
+};
+
+export const addMyCommentId = (commentId: string) => {
+  if (typeof window === 'undefined') return;
+  const list = getMyCommentIds();
+  if (!list.includes(commentId)) {
+    localStorage.setItem(STORAGE_KEYS.MY_COMMENT_IDS, JSON.stringify([...list, commentId]));
   }
 };
 

@@ -22,7 +22,18 @@ interface QuestionEditorProps {
   subject?: 'music' | 'entry';
 }
 
-const CATEGORIES: QuestionCategory[] = ['기초이론', '청음/감상', '악곡분석', '서양음악사', '국악', '엔트리 코딩'];
+const CATEGORIES: QuestionCategory[] = [
+  '일반 퀴즈',
+  '바이브 코딩',
+  '컴퓨터/AI',
+  '상식',
+  '엔트리 코딩',
+  '기초이론',
+  '청음/감상',
+  '악곡분석',
+  '서양음악사',
+  '국악',
+];
 const DIFFICULTIES: DifficultyLevel[] = ['하', '중', '상'];
 const QUICK_SYMBOLS = ['♩', '♪', '♫', '♬', '𝄽', '𝄾', '♯', '♭', '♮', '𝄐', '4/4', '3/4', '①', '②', '③', '④', '⑤'];
 

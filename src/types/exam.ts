@@ -1,6 +1,17 @@
 export type QuestionType = 'multiple-choice' | 'short-answer';
 
-export type QuestionCategory = '기초이론' | '청음/감상' | '악곡분석' | '서양음악사' | '국악' | '엔트리 코딩';
+export type QuestionCategory =
+  | '일반 퀴즈'
+  | '바이브 코딩'
+  | '컴퓨터/AI'
+  | '상식'
+  | '엔트리 코딩'
+  | '기초이론'
+  | '청음/감상'
+  | '악곡분석'
+  | '서양음악사'
+  | '국악'
+  | string;
 
 export type DifficultyLevel = '하' | '중' | '상';
 

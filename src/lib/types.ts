@@ -55,8 +55,10 @@ export interface PostComment {
   id: string;
   postId: string;
   authorName: string;
+  authorId?: string;
   content: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface FileAttachment {
