@@ -25,6 +25,7 @@ import {
   GripVertical,
   QrCode,
   Loader2,
+  Cloud,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -36,7 +37,7 @@ import BackgroundModal from '@/components/BackgroundModal';
 import QrModal from '@/components/QrModal';
 import { getStoreData, saveStoreData, duplicateBoard, deletePost, getMyPostIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, deleteRemotePost } from '@/lib/supabaseStore';
+import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, saveAllRemotePosts, deleteRemotePost } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
 
@@ -118,6 +119,7 @@ export default function BoardDetailPage() {
       const data = getStoreData();
       setCurrentUser(data.currentUser);
       let foundBoard = data.boards.find((b) => b.id === boardId || b.code === boardId);
+      let localBoardPosts: Post[] = [];
 
       // 1. 로컬에 보드가 있다면 즉시 0.05초 만에 화면 먼저 오픈 (무한 로딩 원천 차단)
       if (foundBoard) {
@@ -130,8 +132,8 @@ export default function BoardDetailPage() {
         if (foundBoard.layout) {
           setCurrentLayout(foundBoard.layout);
         }
-        const boardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
-        setPosts(boardPosts);
+        localBoardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
+        setPosts(localBoardPosts);
         setIsLoading(false);
       }
 
@@ -205,9 +207,20 @@ export default function BoardDetailPage() {
           const fetchPostsPromise = fetchRemotePosts(targetId);
           const remote: any = await Promise.race([fetchPostsPromise, timeoutPromise]);
           if (remote && Array.isArray(remote)) {
-            setPosts(remote);
-            const otherPosts = data.posts.filter((p) => p.boardId !== targetId);
-            saveStoreData.posts([...remote, ...otherPosts]);
+            const isTeacherOrAdmin = currentUser?.role === 'admin' || currentUser?.role === 'teacher';
+            // 만약 관리자/선생님 화면에 로컬 카드가 원격보다 더 많이 존재한다면 (예: 32개 vs 2개)
+            // 원격 데이터로 덮어쓰지 않고, 로컬의 풍부한 카드들을 새 Supabase DB로 즉시 일괄 업로드(동기화)!
+            if (isTeacherOrAdmin && localBoardPosts && localBoardPosts.length > remote.length) {
+              setPosts(localBoardPosts);
+              saveAllRemotePosts(localBoardPosts).catch(() => {});
+              if (foundBoard) {
+                saveRemoteBoard(foundBoard).catch(() => {});
+              }
+            } else if (remote.length > 0 || !localBoardPosts.length) {
+              setPosts(remote);
+              const otherPosts = data.posts.filter((p) => p.boardId !== targetId);
+              saveStoreData.posts([...remote, ...otherPosts]);
+            }
 
             // 🔥 중요: 게시글이 속한 모든 열 이름을 빠짐없이 취합하여 화면에서 숨겨지는 일 100% 방지
             const postCols = remote.map((p: Post) => {
@@ -482,6 +495,22 @@ export default function BoardDetailPage() {
   };
 
   // 학생 초대 단축 링크 복사
+    const [isSyncingToCloud, setIsSyncingToCloud] = useState(false);
+
+  const handleManualCloudSync = async () => {
+    if (!board || !posts || posts.length === 0) return;
+    setIsSyncingToCloud(true);
+    try {
+      await saveRemoteBoard(board);
+      await saveAllRemotePosts(posts);
+      alert('현재 화면의 모든 모둠(' + (columns.length) + '개)과 카드(' + posts.length + '개)가 클라우드 DB에 동기화되었습니다!\n학생 화면에서도 100% 동일하게 보입니다.');
+    } catch (e) {
+      alert('동기화 실패: ' + String(e));
+    } finally {
+      setIsSyncingToCloud(false);
+    }
+  };
+
   const handleCopyInviteLink = async () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const minimalBoard = {
@@ -1121,6 +1150,19 @@ export default function BoardDetailPage() {
 
           {/* 도구 모음: 모바일에서는 1줄로 부드럽게 가로 스크롤되어 화면을 가리지 않음 */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 shrink-0 max-w-full">
+            {/* 학생 화면과 전체 동기화 버튼 (관리자/선생님 전용) */}
+            {(currentUser?.role === 'admin' || currentUser?.role === 'teacher') && (
+              <button
+                onClick={handleManualCloudSync}
+                disabled={isSyncingToCloud}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition shadow-sm shrink-0 whitespace-nowrap bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white active:scale-95 disabled:opacity-50"
+                title="선생님 화면의 모든 모둠과 카드를 클라우드 DB에 즉시 올려 학생 화면과 똑같게 맞춥니다."
+              >
+                <Cloud className="w-3.5 h-3.5" />
+                <span>{isSyncingToCloud ? '동기화 중...' : '학생 화면과 전체 동기화 (' + posts.length + '개)'}</span>
+              </button>
+            )}
+
             {/* 학생 참여링크 복사 */}
             <button
               onClick={handleCopyInviteLink}
