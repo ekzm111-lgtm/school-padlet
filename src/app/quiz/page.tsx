@@ -44,10 +44,10 @@ function QuizAppContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // 과목 선택 ('entry': 엔트리/코딩, 'music': 음악/기타)
-  const [activeSubject, setActiveSubject] = useState<'entry' | 'music'>('entry');
+  // 과목 선택 ('entry': 엔트리/코딩, 'music': 음악/기타) - 기본 음악
+  const [activeSubject, setActiveSubject] = useState<'entry' | 'music'>('music');
 
-  // 시험 정보 및 문제 목록
+  // 시험 정보 및 문제 목록 (기본 음악 시험 지필평가)
   const [examInfo, setExamInfo] = useState<ExamInfo>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('quiz_exam_info');
@@ -55,7 +55,7 @@ function QuizAppContent() {
         try { return JSON.parse(saved); } catch {}
       }
     }
-    return defaultEntryExamInfo;
+    return defaultExamInfo;
   });
 
   const [questions, setQuestions] = useState<Question[]>(() => {
@@ -68,8 +68,38 @@ function QuizAppContent() {
         } catch {}
       }
     }
-    return defaultEntryQuestions;
+    return defaultQuestions;
   });
+
+  // DB(서버)에서 최신 퀴즈 동기화
+  useEffect(() => {
+    let isMounted = true;
+    async function loadFromDb() {
+      try {
+        const res = await fetch('/api/quiz/current');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && isMounted) {
+            if (json.data.examInfo) {
+              setExamInfo(json.data.examInfo);
+              localStorage.setItem('quiz_exam_info', JSON.stringify(json.data.examInfo));
+            }
+            if (json.data.questions && json.data.questions.length > 0) {
+              setQuestions(json.data.questions);
+              localStorage.setItem('quiz_questions', JSON.stringify(json.data.questions));
+            }
+            if (json.data.subject) {
+              setActiveSubject(json.data.subject);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load quiz from DB/server:', e);
+      }
+    }
+    loadFromDb();
+    return () => { isMounted = false; };
+  }, []);
 
   // 활성 탭: 'questions' (문제 출제 및 관리) | 'lobby' (퀴즈앤 대기실) | 'student' (학생 참여) | 'leaderboard' (순위표) | 'library' (보관함)
   const [activeTab, setActiveTab] = useState<'questions' | 'student' | 'leaderboard' | 'library'>('questions');
@@ -118,7 +148,7 @@ function QuizAppContent() {
     }
   }, [searchParams]);
 
-  // 로컬 저장
+  // 로컬 저장 및 DB(서버) 자동 동기화
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('quiz_exam_info', JSON.stringify(examInfo));
@@ -130,6 +160,24 @@ function QuizAppContent() {
       localStorage.setItem('quiz_questions', JSON.stringify(questions));
     }
   }, [questions]);
+
+  // DB(서버)로 실시간 저장 (디바운스 800ms)
+  useEffect(() => {
+    if (!examInfo || !questions || questions.length === 0) return;
+    const timer = setTimeout(() => {
+      fetch('/api/quiz/current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examInfo,
+          questions,
+          subject: activeSubject,
+        }),
+      }).catch((e) => console.warn('Failed to sync quiz to DB:', e));
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [examInfo, questions, activeSubject]);
 
   // 과목 변경
   const handleSwitchSubject = (subj: 'entry' | 'music') => {

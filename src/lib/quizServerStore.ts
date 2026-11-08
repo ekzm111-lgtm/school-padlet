@@ -1,10 +1,12 @@
 // Next.js API 라우트 간 실시간 퀴즈 룸 및 라이브 상태 저장소 (메모리 + 비동기 Supabase 연동)
 import { supabase } from '@/lib/supabase';
+import { defaultExamInfo, defaultQuestions } from '@/data/defaultExam';
 import { defaultEntryExamInfo, defaultEntryQuestions } from '@/data/defaultEntryExam';
 
 interface QuizServerStorage {
   rooms: Map<string, any>;
   liveStates: Map<string, any>;
+  currentQuiz?: any;
 }
 
 declare global {
@@ -157,11 +159,11 @@ export async function getQuizRoomServer(pin: string): Promise<any> {
   // 🔥 절대 404가 나지 않도록 즉석 안전 복원 룸 생성
   const defaultRoom = {
     pin,
-    title: '정보 & 바이브 코딩 퀴즈',
-    subject: '정보',
+    title: '대한중학교 2학년 음악 지필평가',
+    subject: '음악',
     createdAt: '방금 전',
-    examInfo: defaultEntryExamInfo,
-    questions: defaultEntryQuestions,
+    examInfo: defaultExamInfo,
+    questions: defaultQuestions,
     timePerQuestion: 20,
     allowAnonymous: true,
     isActive: true,
@@ -287,4 +289,55 @@ export async function submitQuizAnswerServer(pin: string, answer: any): Promise<
   asyncUpsertBoard(`quiz_live_${pin}`, `ql_${pin}`, '__QUIZ_LIVE__', JSON.stringify(merged));
 
   return merged;
+}
+
+// 7. 현재 활성 퀴즈(전체 기기 공통 DB 동기화) 조회
+export async function getCurrentQuizServer(): Promise<{ examInfo: any; questions: any[]; subject?: string }> {
+  // 1. 메모리 캐시 확인
+  if (serverQuizStore.currentQuiz) {
+    return serverQuizStore.currentQuiz;
+  }
+
+  // 2. Supabase 조회
+  if (supabase) {
+    try {
+      const res = await withTimeout(
+        supabase
+          .from('boards')
+          .select('description')
+          .eq('id', 'quiz_current_active')
+          .maybeSingle(),
+        800
+      );
+      if (res && !res.error && res.data && res.data.description) {
+        try {
+          const parsed = JSON.parse(res.data.description);
+          if (parsed && parsed.questions && parsed.examInfo) {
+            serverQuizStore.currentQuiz = parsed;
+            return parsed;
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
+  // 3. Fallback: 기본 음악 시험 문제 반환
+  const defaultQuiz = {
+    examInfo: defaultExamInfo,
+    questions: defaultQuestions,
+    subject: 'music',
+  };
+  serverQuizStore.currentQuiz = defaultQuiz;
+  return defaultQuiz;
+}
+
+// 8. 현재 활성 퀴즈 DB 저장
+export async function saveCurrentQuizServer(data: { examInfo: any; questions: any[]; subject?: string }): Promise<void> {
+  serverQuizStore.currentQuiz = data;
+  asyncUpsertBoard(
+    'quiz_current_active',
+    'quiz_active',
+    '__CURRENT_ACTIVE_QUIZ__',
+    JSON.stringify(data)
+  );
 }
