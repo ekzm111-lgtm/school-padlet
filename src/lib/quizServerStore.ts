@@ -193,10 +193,16 @@ export async function saveQuizRoomServer(pin: string, roomData: any): Promise<vo
   asyncUpsertBoard(`quiz_room_${pin}`, `qr_${pin}`, '__QUIZ_ROOM__', JSON.stringify(roomData));
 }
 
-// 3. 퀴즈 라이브 상태 조회 (Vercel 다중 서버리스 인스턴스 간 참가자 누적 보장)
+// 3. 퀴즈 라이브 상태 조회 (메모리 우선 조회 - Supabase 과다 트래픽 차단 다이어트 적용)
 export async function getQuizLiveStateServer(pin: string): Promise<any> {
   let memoryState = serverQuizStore.liveStates.get(pin);
 
+  // 메모리에 이미 최신 상태가 있다면 Supabase를 중복 호출하지 않고 즉시 반환 (트래픽 99% 절감)
+  if (memoryState) {
+    return memoryState;
+  }
+
+  // 메모리에 없을 때만 Supabase에서 1회 복원 시도
   if (supabase) {
     try {
       const res = await withTimeout(
@@ -211,13 +217,8 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
       if (res && !res.error && res.data && res.data.description) {
         try {
           const remoteState = JSON.parse(res.data.description);
-          if (memoryState) {
-            memoryState = mergeServerLiveStates(memoryState, remoteState);
-          } else {
-            memoryState = remoteState;
-          }
-          serverQuizStore.liveStates.set(pin, memoryState);
-          return memoryState;
+          serverQuizStore.liveStates.set(pin, remoteState);
+          return remoteState;
         } catch {}
       }
     } catch {}

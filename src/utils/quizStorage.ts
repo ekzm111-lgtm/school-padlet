@@ -449,10 +449,13 @@ export function subscribeToQuizUpdates(
   };
   window.addEventListener('storage', storageHandler);
 
-  // 원격 스마트폰-PC 간 실시간 동기화를 위한 800ms 주기 서버 폴링
+  // 원격 스마트폰-PC 간 실시간 동기화를 위한 스마트 폴링 (탭 비활성화 시 자동 절약)
   let pollTimer: any = null;
   if (activePin && typeof window !== 'undefined') {
     pollTimer = setInterval(async () => {
+      // 탭이 숨겨져 있거나 화면이 꺼진 경우 폴링 생략 (트래픽 다이어트)
+      if (document.hidden) return;
+
       try {
         const res = await fetch(`${getApiBaseUrl()}/api/quiz/live?pin=${activePin}`);
         if (res.ok) {
@@ -468,7 +471,7 @@ export function subscribeToQuizUpdates(
           }
         }
       } catch {}
-    }, 800);
+    }, 1200);
   }
 
   return () => {

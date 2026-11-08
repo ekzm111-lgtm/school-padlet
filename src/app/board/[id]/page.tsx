@@ -417,13 +417,25 @@ export default function BoardDetailPage() {
       } catch (e) {}
     }
 
-    // 1초 주기로 실시간 동기화 실행 (교사-학생 간 실시간 딜레이 최소화)
-    const pollTimer = setInterval(syncRemoteData, 1000);
+    // 1초 무한 폴링 대신 스마트 폴링 (8초 주기 + 탭 활성화 시에만 실행)으로 트래픽 90% 절약
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        syncRemoteData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const pollTimer = setInterval(() => {
+      if (!document.hidden) {
+        syncRemoteData();
+      }
+    }, 8000);
 
     return () => {
       if (channel && supabase) {
         supabase.removeChannel(channel);
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(pollTimer);
     };
   }, [boardId, board?.id]);
