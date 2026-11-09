@@ -6,6 +6,7 @@ import {
   fetchRemotePosts,
   saveRemoteBoard,
   saveRemotePost,
+  saveAllRemotePosts,
   deleteRemoteBoard,
   deleteRemotePost,
 } from './supabaseStore';

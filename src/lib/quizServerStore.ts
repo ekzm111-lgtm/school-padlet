@@ -95,8 +95,11 @@ export function mergeServerLiveStates(current: any, incoming: any): any {
   let finalStatus = incoming.status || current.status;
   let finalQuestionIndex = inQ;
 
-  // 1. 이미 finished 상태라면 어떤 경우에도 이전 상태(reveal, question)로 덮어쓰지 못함
-  if (current.status === 'finished') {
+  // 1. finished 상태라면 어떤 경우에도 다른 상태(reveal, question)로 역행하지 않음
+  if (incoming.status === 'finished') {
+    finalStatus = 'finished';
+    finalQuestionIndex = Math.max(currQ, inQ);
+  } else if (current.status === 'finished') {
     finalStatus = 'finished';
     finalQuestionIndex = Math.max(currQ, inQ);
   } else if (currQ > inQ) {
@@ -156,14 +159,14 @@ export async function getQuizRoomServer(pin: string): Promise<any> {
     return recovered;
   }
 
-  // 🔥 절대 404가 나지 않도록 즉석 안전 복원 룸 생성
+  // 🔥 절대 404가 나지 않도록 즉석 안전 복원 룸 생성 (기본 엔트리 코딩)
   const defaultRoom = {
     pin,
-    title: '대한중학교 2학년 음악 지필평가',
-    subject: '음악',
+    title: '중학교 코딩 교육 엔트리(Entry) 지필평가',
+    subject: 'entry',
     createdAt: '방금 전',
-    examInfo: defaultExamInfo,
-    questions: defaultQuestions,
+    examInfo: defaultEntryExamInfo,
+    questions: defaultEntryQuestions,
     timePerQuestion: 20,
     allowAnonymous: true,
     isActive: true,
@@ -322,11 +325,11 @@ export async function getCurrentQuizServer(): Promise<{ examInfo: any; questions
     } catch {}
   }
 
-  // 3. Fallback: 기본 음악 시험 문제 반환
+  // 3. Fallback: 기본 엔트리 코딩 시험 문제 반환
   const defaultQuiz = {
-    examInfo: defaultExamInfo,
-    questions: defaultQuestions,
-    subject: 'music',
+    examInfo: defaultEntryExamInfo,
+    questions: defaultEntryQuestions,
+    subject: 'entry',
   };
   serverQuizStore.currentQuiz = defaultQuiz;
   return defaultQuiz;

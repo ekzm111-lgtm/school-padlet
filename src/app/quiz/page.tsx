@@ -44,10 +44,10 @@ function QuizAppContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // 과목 선택 ('entry': 엔트리/코딩, 'music': 음악/기타) - 기본 음악
-  const [activeSubject, setActiveSubject] = useState<'entry' | 'music'>('music');
+  // 과목 선택 ('entry': 엔트리/코딩, 'music': 음악/기타) - 기본 엔트리 코딩
+  const [activeSubject, setActiveSubject] = useState<'entry' | 'music'>('entry');
 
-  // 시험 정보 및 문제 목록 (기본 음악 시험 지필평가)
+  // 시험 정보 및 문제 목록 (기본 엔트리 코딩 시험 지필평가)
   const [examInfo, setExamInfo] = useState<ExamInfo>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('quiz_exam_info');
@@ -55,7 +55,7 @@ function QuizAppContent() {
         try { return JSON.parse(saved); } catch {}
       }
     }
-    return defaultExamInfo;
+    return defaultEntryExamInfo;
   });
 
   const [questions, setQuestions] = useState<Question[]>(() => {
@@ -68,8 +68,11 @@ function QuizAppContent() {
         } catch {}
       }
     }
-    return defaultQuestions;
+    return defaultEntryQuestions;
   });
+
+  // DB 최초 로드 완료 플래그 (로드 전에 기본값으로 DB를 덮어쓰는 버그 원천 차단)
+  const isInitialLoaded = React.useRef(false);
 
   // DB(서버)에서 최신 퀴즈 동기화
   useEffect(() => {
@@ -95,6 +98,10 @@ function QuizAppContent() {
         }
       } catch (e) {
         console.warn('Failed to load quiz from DB/server:', e);
+      } finally {
+        if (isMounted) {
+          isInitialLoaded.current = true;
+        }
       }
     }
     loadFromDb();
@@ -161,8 +168,9 @@ function QuizAppContent() {
     }
   }, [questions]);
 
-  // DB(서버)로 실시간 저장 (디바운스 800ms)
+  // DB(서버)로 실시간 저장 (디바운스 800ms) - 초기 DB 로드 완료 이후에만 실행
   useEffect(() => {
+    if (!isInitialLoaded.current) return;
     if (!examInfo || !questions || questions.length === 0) return;
     const timer = setTimeout(() => {
       fetch('/api/quiz/current', {
@@ -179,16 +187,24 @@ function QuizAppContent() {
     return () => clearTimeout(timer);
   }, [examInfo, questions, activeSubject]);
 
-  // 과목 변경
+  // 과목 변경 (즉시 DB에 영구 반영)
   const handleSwitchSubject = (subj: 'entry' | 'music') => {
     setActiveSubject(subj);
-    if (subj === 'entry') {
-      setExamInfo(defaultEntryExamInfo);
-      setQuestions(defaultEntryQuestions);
-    } else {
-      setExamInfo(defaultExamInfo);
-      setQuestions(defaultQuestions);
-    }
+    const nextExam = subj === 'entry' ? defaultEntryExamInfo : defaultExamInfo;
+    const nextQuestions = subj === 'entry' ? defaultEntryQuestions : defaultQuestions;
+    setExamInfo(nextExam);
+    setQuestions(nextQuestions);
+
+    // 즉시 DB에 저장
+    fetch('/api/quiz/current', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        examInfo: nextExam,
+        questions: nextQuestions,
+        subject: subj,
+      }),
+    }).catch((e) => console.warn('Failed to switch subject in DB:', e));
   };
 
   // 문항 추가/수정/삭제/순서변경

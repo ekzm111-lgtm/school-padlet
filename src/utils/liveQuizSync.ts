@@ -24,7 +24,7 @@ export function hostStartQuiz(pin: string): LiveQuizState | null {
     answersSubmitted: [],
   };
 
-  setLiveQuizState(nextState);
+  setLiveQuizState(nextState, true);
   return nextState;
 }
 
@@ -40,7 +40,7 @@ export function hostRevealAnswer(pin: string): LiveQuizState | null {
     showExplanation: true,
   };
 
-  setLiveQuizState(nextState);
+  setLiveQuizState(nextState, true);
   return nextState;
 }
 
@@ -56,10 +56,11 @@ export function hostNextQuestion(pin: string): LiveQuizState | null {
     const finishState: LiveQuizState = {
       ...state,
       status: 'finished',
+      currentQuestionIndex: Math.max(0, room.questions.length - 1),
       updatedAt: Date.now(),
       showExplanation: false,
     };
-    setLiveQuizState(finishState);
+    setLiveQuizState(finishState, true);
     return finishState;
   }
 
@@ -75,7 +76,7 @@ export function hostNextQuestion(pin: string): LiveQuizState | null {
     answersSubmitted: state.answersSubmitted || [],
   };
 
-  setLiveQuizState(nextState);
+  setLiveQuizState(nextState, true);
   return nextState;
 }
 
@@ -141,7 +142,7 @@ export async function clientJoinRoom(
     participants: updatedParticipants,
   };
 
-  setLiveQuizState(nextState);
+  setLiveQuizState(nextState, false);
   return nextState;
 }
 
@@ -239,6 +240,6 @@ export async function clientSubmitLiveAnswer(
     participants: updatedParticipants,
   };
 
-  setLiveQuizState(nextState);
+  setLiveQuizState(nextState, false);
   return nextState;
 }

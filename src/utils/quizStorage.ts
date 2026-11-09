@@ -306,6 +306,17 @@ export function applyMonotonicQuizState(prev: LiveQuizState | null, incoming: Li
   const mergedParticipants = mergeParticipantsList(prev.participants, incoming.participants);
   const mergedAnswers = mergeAnswersList(prev.answersSubmitted, incoming.answersSubmitted);
 
+  // 0. 🔥 최우선: 퀴즈 종료(finished) 신호 수신 시 즉시 최종 순위표 화면으로 전환 보장!
+  if (incoming.status === 'finished') {
+    return {
+      ...incoming,
+      status: 'finished',
+      currentQuestionIndex: Math.max(prev.currentQuestionIndex ?? 0, incoming.currentQuestionIndex ?? 0),
+      participants: mergedParticipants,
+      answersSubmitted: mergedAnswers,
+    };
+  }
+
   // 1. 이미 퀴즈가 종료(finished)되었으면 절대로 다른 상태로 역행하지 않음 (수상식 깜빡임 방지)
   if (prev.status === 'finished') {
     return {
@@ -373,7 +384,7 @@ export function applyMonotonicQuizState(prev: LiveQuizState | null, incoming: Li
   };
 }
 
-export function setLiveQuizState(state: LiveQuizState): void {
+export function setLiveQuizState(state: LiveQuizState, syncRemote: boolean = true): void {
   const prev = getLiveQuizState(state.pin);
   const mergedParticipants = mergeParticipantsList(prev?.participants, state.participants);
   const mergedAnswers = mergeAnswersList(prev?.answersSubmitted, state.answersSubmitted);
@@ -387,14 +398,16 @@ export function setLiveQuizState(state: LiveQuizState): void {
   localStorage.setItem(`${LIVE_STATE_KEY_PREFIX}${stateWithTime.pin}`, JSON.stringify(stateWithTime));
   notifyChannel({ type: 'LIVE_STATE_CHANGED', state: stateWithTime });
 
-  // 서버 API에도 동기화 (원격 모바일 기기 접속 지원)
-  try {
-    fetch(`${getApiBaseUrl()}/api/quiz/live`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(stateWithTime),
-    }).catch(() => {});
-  } catch {}
+  // 서버 API에도 동기화 (원격 모바일 기기 접속 지원 - 호스트 액션 시 전송)
+  if (syncRemote) {
+    try {
+      fetch(`${getApiBaseUrl()}/api/quiz/live`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stateWithTime),
+      }).catch(() => {});
+    } catch {}
+  }
 }
 
 // ==========================================
@@ -471,7 +484,7 @@ export function subscribeToQuizUpdates(
           }
         }
       } catch {}
-    }, 1200);
+    }, 500);
   }
 
   return () => {

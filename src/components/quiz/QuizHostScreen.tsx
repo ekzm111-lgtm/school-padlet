@@ -323,11 +323,13 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
   const handleStartQuiz = () => {
     const now = Date.now();
     questionStartTimesRef.current[0] = now;
+    questionStartedAtRef.current = now;
     const updated = hostStartQuiz(pin);
     if (updated) {
       updated.questionStartedAt = now;
       updated.updatedAt = now;
       setLiveState(updated);
+      setLiveQuizState(updated, true);
     }
   };
 
@@ -337,6 +339,7 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     if (updated) {
       updated.updatedAt = Date.now();
       setLiveState(updated);
+      setLiveQuizState(updated, true);
     }
     playCorrectSound();
   };
@@ -346,11 +349,13 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     const nextIdx = (liveState?.currentQuestionIndex ?? 0) + 1;
     const now = Date.now();
     questionStartTimesRef.current[nextIdx] = now;
+    questionStartedAtRef.current = now;
     const updated = hostNextQuestion(pin);
     if (updated) {
       updated.questionStartedAt = now;
       updated.updatedAt = now;
       setLiveState(updated);
+      setLiveQuizState(updated, true);
       if (updated.status === 'finished') {
         playVictorySound();
         confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
@@ -1133,7 +1138,7 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
           )}
 
           {/* 3. 퀴즈 완주 시상식 상태 (사용자 요청: 전체 순위가 확실히 나오도록 바로 표시) */}
-          {liveState.status === 'finished' && (
+          {(liveState.status === 'finished' || (room && room.questions && liveState.currentQuestionIndex >= room.questions.length)) && (
             <div className="my-auto text-center space-y-6 max-w-2xl mx-auto py-6">
               <div className="text-6xl animate-bounce">🏆</div>
               <div className="space-y-1">

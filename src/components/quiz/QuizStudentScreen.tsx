@@ -243,7 +243,8 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
 
   // 퀴즈 종료 시 학생 본인 최종 점수 및 순위 영구 저장 커밋
   useEffect(() => {
-    if (liveState?.status === 'finished' && room && isJoined && !isResultCommitted) {
+    const isFinished = liveState?.status === 'finished' || (room && room.questions && liveState && liveState.currentQuestionIndex >= room.questions.length);
+    if (isFinished && room && isJoined && !isResultCommitted) {
       setIsResultCommitted(true);
       const studentResult = {
         id: studentIdRef.current,
@@ -268,7 +269,7 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
         body: JSON.stringify(studentResult),
       }).catch(() => {});
     }
-  }, [liveState?.status, room, isJoined, isResultCommitted, nickname, score, correctCount, combo, selectedAvatar]);
+  }, [liveState?.status, liveState?.currentQuestionIndex, room, isJoined, isResultCommitted, nickname, score, correctCount, combo, selectedAvatar]);
 
   const currentQ = (room && liveState && liveState.currentQuestionIndex >= 0)
     ? room.questions[liveState.currentQuestionIndex]
@@ -853,7 +854,7 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
         )}
 
         {/* 4. 최종 종료 (실시간 순위, 1~3위 시상대, 내 등수 및 전원 순위표) */}
-        {liveState.status === 'finished' && (() => {
+        {(liveState.status === 'finished' || (room && room.questions && liveState.currentQuestionIndex >= room.questions.length)) && (() => {
           // 순위 계산
           const rawList = Array.isArray(liveState.participants) ? [...liveState.participants] : [];
           // 내가 목록에 없으면 추가, 있으면 내 최신 점수 반영
