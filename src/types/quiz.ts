@@ -39,7 +39,7 @@ export const QUIZ_AVATARS: QuizAvatar[] = [
   },
   {
     id: 'bubble-frog',
-    emoji: '🫧',
+    emoji: '🐸',
     imageUrl: 'https://api.dicebear.com/9.x/bottts/svg?seed=BubbleGreenFrog&backgroundColor=ffd5dc&radius=20',
     name: '방울 개구리',
     title: '비눗방울 요정',

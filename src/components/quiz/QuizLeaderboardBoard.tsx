@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { QuizRoom, QuizParticipantResult } from '@/types/quiz';
 import { QUIZ_AVATARS } from '@/types/quiz';
+import { getSavedCollectedAvatars } from '@/utils/avatarCollector';
 import {
   getAllQuizRooms,
   fetchAllQuizRoomsAsync,
@@ -254,9 +255,13 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
     setTimeout(() => setCopiedPin(null), 2000);
   };
 
-  // 아바타 이모지 찾기
+  // 아바타 정보 찾기 (수집된 커스텀 아바타 + 기본 프리셋)
+  const allAvatars = [...getSavedCollectedAvatars(), ...QUIZ_AVATARS];
+  const getAvatar = (avatarId?: string) => {
+    return allAvatars.find((a) => a.id === avatarId) || QUIZ_AVATARS[0];
+  };
   const getAvatarEmoji = (avatarId: string) => {
-    const found = QUIZ_AVATARS.find((a) => a.id === avatarId);
+    const found = getAvatar(avatarId);
     return found ? found.emoji : '👤';
   };
 
@@ -866,20 +871,29 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                         <>
                           {/* 2위 슬롯 (좌측) */}
                           <div className="text-center order-1">
-                            {top2 && top2Style ? (
-                              <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <div className="text-3xl md:text-4xl">{getAvatarEmoji(top2.avatarId)}</div>
-                                <div className="text-xs font-bold text-slate-800 truncate">{top2.nickname}</div>
-                                <div className={`text-xs font-black ${top2Style.scoreColor} font-mono`}>
-                                  {(top2.score || 0).toLocaleString()}점
+                            {top2 && top2Style ? (() => {
+                              const av2 = getAvatar(top2.avatarId);
+                              return (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                  <div className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm">
+                                    {av2.imageUrl ? (
+                                      <img src={av2.imageUrl} alt={av2.name} className="w-full h-full object-contain p-1" />
+                                    ) : (
+                                      <span className="text-3xl md:text-4xl">{av2.emoji}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs font-bold text-slate-800 truncate">{top2.nickname}</div>
+                                  <div className={`text-xs font-black ${top2Style.scoreColor} font-mono`}>
+                                    {(top2.score || 0).toLocaleString()}점
+                                  </div>
+                                  <div
+                                    className={`${top2Style.bg} rounded-t-2xl ${top2Style.py} border-t-4 font-black text-white text-lg shadow-sm transition-all duration-300`}
+                                  >
+                                    {top2Style.label}
+                                  </div>
                                 </div>
-                                <div
-                                  className={`${top2Style.bg} rounded-t-2xl ${top2Style.py} border-t-4 font-black text-white text-lg shadow-sm transition-all duration-300`}
-                                >
-                                  {top2Style.label}
-                                </div>
-                              </div>
-                            ) : (
+                              );
+                            })() : (
                               <div className="h-24 bg-slate-100 rounded-t-2xl flex items-center justify-center text-xs text-slate-400">
                                 -
                               </div>
@@ -888,25 +902,32 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
 
                           {/* 1위 슬롯 (중앙) */}
                           <div className="text-center order-2">
-                            {top1 && top1Style ? (
-                              <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="text-4xl md:text-5xl animate-bounce">
-                                  {getAvatarEmoji(top1.avatarId)}
+                            {top1 && top1Style ? (() => {
+                              const av1 = getAvatar(top1.avatarId);
+                              return (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                  <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-2xl bg-amber-50 border-2 border-amber-300 flex items-center justify-center overflow-hidden shadow-md animate-bounce">
+                                    {av1.imageUrl ? (
+                                      <img src={av1.imageUrl} alt={av1.name} className="w-full h-full object-contain p-1" />
+                                    ) : (
+                                      <span className="text-4xl md:text-5xl">{av1.emoji}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs md:text-sm font-black text-slate-900 truncate">
+                                    {top1Style.crown ? '👑 ' : ''}
+                                    {top1.nickname}
+                                  </div>
+                                  <div className={`text-sm font-black ${top1Style.scoreColor} font-mono`}>
+                                    {(top1.score || 0).toLocaleString()}점
+                                  </div>
+                                  <div
+                                    className={`${top1Style.bg} rounded-t-2xl ${top1Style.py} border-t-4 font-black text-white text-xl shadow-md transition-all duration-300`}
+                                  >
+                                    {top1Style.label}
+                                  </div>
                                 </div>
-                                <div className="text-xs md:text-sm font-black text-slate-900 truncate">
-                                  {top1Style.crown ? '👑 ' : ''}
-                                  {top1.nickname}
-                                </div>
-                                <div className={`text-sm font-black ${top1Style.scoreColor} font-mono`}>
-                                  {(top1.score || 0).toLocaleString()}점
-                                </div>
-                                <div
-                                  className={`${top1Style.bg} rounded-t-2xl ${top1Style.py} border-t-4 font-black text-white text-xl shadow-md transition-all duration-300`}
-                                >
-                                  {top1Style.label}
-                                </div>
-                              </div>
-                            ) : (
+                              );
+                            })() : (
                               <div className="h-32 bg-slate-100 rounded-t-2xl flex items-center justify-center text-xs text-slate-400">
                                 -
                               </div>
@@ -915,20 +936,29 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
 
                           {/* 3위 슬롯 (우측) */}
                           <div className="text-center order-3">
-                            {top3 && top3Style ? (
-                              <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <div className="text-3xl md:text-4xl">{getAvatarEmoji(top3.avatarId)}</div>
-                                <div className="text-xs font-bold text-slate-800 truncate">{top3.nickname}</div>
-                                <div className={`text-xs font-black ${top3Style.scoreColor} font-mono`}>
-                                  {(top3.score || 0).toLocaleString()}점
+                            {top3 && top3Style ? (() => {
+                              const av3 = getAvatar(top3.avatarId);
+                              return (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                  <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm">
+                                    {av3.imageUrl ? (
+                                      <img src={av3.imageUrl} alt={av3.name} className="w-full h-full object-contain p-1" />
+                                    ) : (
+                                      <span className="text-3xl md:text-4xl">{av3.emoji}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs font-bold text-slate-800 truncate">{top3.nickname}</div>
+                                  <div className={`text-xs font-black ${top3Style.scoreColor} font-mono`}>
+                                    {(top3.score || 0).toLocaleString()}점
+                                  </div>
+                                  <div
+                                    className={`${top3Style.bg} rounded-t-2xl ${top3Style.py} border-t-4 font-black text-white text-lg shadow-sm transition-all duration-300`}
+                                  >
+                                    {top3Style.label}
+                                  </div>
                                 </div>
-                                <div
-                                  className={`${top3Style.bg} rounded-t-2xl ${top3Style.py} border-t-4 font-black text-white text-lg shadow-sm transition-all duration-300`}
-                                >
-                                  {top3Style.label}
-                                </div>
-                              </div>
-                            ) : (
+                              );
+                            })() : (
                               <div className="h-20 bg-slate-100 rounded-t-2xl flex items-center justify-center text-xs text-slate-400">
                                 -
                               </div>
@@ -1025,15 +1055,26 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                               )}
                             </td>
                             <td className="py-3.5 px-4 font-bold text-slate-900">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xl">{getAvatarEmoji(res.avatarId)}</span>
-                                <span>{res.nickname}</span>
-                                {res.isAnonymous && (
-                                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal">
-                                    익명
-                                  </span>
-                                )}
-                              </div>
+                              {(() => {
+                                const av = getAvatar(res.avatarId);
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                                      {av.imageUrl ? (
+                                        <img src={av.imageUrl} alt={av.name} className="w-full h-full object-contain p-0.5" />
+                                      ) : (
+                                        <span className="text-base">{av.emoji}</span>
+                                      )}
+                                    </div>
+                                    <span>{res.nickname}</span>
+                                    {res.isAnonymous && (
+                                      <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal">
+                                        익명
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="py-3.5 px-4 text-right font-black text-sm text-indigo-600 font-mono">
                               {res.score.toLocaleString()}점
