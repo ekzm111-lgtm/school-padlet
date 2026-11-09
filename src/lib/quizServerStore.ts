@@ -263,9 +263,9 @@ export async function deleteQuizRoomServer(pin: string): Promise<void> {
 // 2. 퀴즈 실시간 진행 상태 (public.quiz_live_states)
 // =========================================================================
 export async function getQuizLiveStateServer(pin: string): Promise<any> {
-  let memoryState = serverQuizStore.liveStates.get(pin);
-  if (memoryState) return memoryState;
+  let remoteState: any = null;
 
+  // 1. Supabase에서 최신 상태 조회 (서버리스 인스턴스 간 실시간 단일 진실 공급원)
   if (supabase) {
     try {
       const res = await withTimeout(
@@ -279,7 +279,7 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
 
       if (res && !res.error && res.data) {
         const row = res.data;
-        memoryState = {
+        remoteState = {
           pin: row.pin,
           status: row.status,
           currentQuestionIndex: row.current_question_index,
@@ -290,28 +290,33 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
           questionStartedAt: row.question_started_at ? Number(row.question_started_at) : undefined,
           updatedAt: row.updated_at ? Number(row.updated_at) : Date.now(),
         };
-        serverQuizStore.liveStates.set(pin, memoryState);
-        return memoryState;
       }
     } catch {}
   }
 
-  if (!memoryState) {
-    const room = await getQuizRoomServer(pin);
-    memoryState = {
-      pin,
-      status: 'waiting',
-      currentQuestionIndex: 0,
-      timeLeft: room?.timePerQuestion || 20,
-      showExplanation: false,
-      participants: [],
-      answersSubmitted: [],
-      updatedAt: Date.now(),
-    };
-    serverQuizStore.liveStates.set(pin, memoryState);
+  const memoryState = serverQuizStore.liveStates.get(pin);
+  // 메모리와 DB 중 더 최신 상태로 단조 증가 병합 (진행 상태가 절대 누락되거나 지연되지 않음)
+  const finalState = mergeServerLiveStates(remoteState || memoryState, memoryState || remoteState);
+
+  if (finalState) {
+    serverQuizStore.liveStates.set(pin, finalState);
+    return finalState;
   }
 
-  return memoryState;
+  // 둘 다 없으면 방 정보로부터 초기 생성
+  const room = await getQuizRoomServer(pin);
+  const initialState = {
+    pin,
+    status: 'waiting',
+    currentQuestionIndex: 0,
+    timeLeft: room?.timePerQuestion || 20,
+    showExplanation: false,
+    participants: [],
+    answersSubmitted: [],
+    updatedAt: Date.now(),
+  };
+  serverQuizStore.liveStates.set(pin, initialState);
+  return initialState;
 }
 
 export async function saveQuizLiveStateServer(pin: string, patch: any): Promise<any> {
@@ -321,21 +326,27 @@ export async function saveQuizLiveStateServer(pin: string, patch: any): Promise<
   serverQuizStore.liveStates.set(pin, merged);
 
   if (supabase) {
-    Promise.resolve(
-      supabase
-        .from('quiz_live_states')
-        .upsert({
-          pin,
-          status: merged.status,
-          current_question_index: merged.currentQuestionIndex,
-          time_left: merged.timeLeft,
-          show_explanation: merged.showExplanation,
-          participants: merged.participants,
-          answers_submitted: merged.answersSubmitted,
-          question_started_at: merged.questionStartedAt,
-          updated_at: merged.updatedAt,
-        })
-    ).catch((e) => console.warn('saveQuizLiveStateServer supabase error:', e));
+    try {
+      // 서버리스 프로세스가 중단되기 전에 Supabase DB 쓰기 완료를 반드시 보장 (await)
+      await withTimeout(
+        supabase
+          .from('quiz_live_states')
+          .upsert({
+            pin,
+            status: merged.status,
+            current_question_index: merged.currentQuestionIndex,
+            time_left: merged.timeLeft,
+            show_explanation: merged.showExplanation,
+            participants: merged.participants,
+            answers_submitted: merged.answersSubmitted,
+            question_started_at: merged.questionStartedAt,
+            updated_at: merged.updatedAt,
+          }),
+        800
+      );
+    } catch (e) {
+      console.warn('saveQuizLiveStateServer supabase error:', e);
+    }
   }
 
   return merged;

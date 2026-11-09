@@ -452,8 +452,9 @@ export function applyMonotonicQuizState(prev: LiveQuizState | null, incoming: Li
     };
   }
 
-  // 5. 타임스탬프가 더 오래된 경우 상태 변경 무시하고 명단만 병합
-  if (incoming.updatedAt && prev.updatedAt && incoming.updatedAt < prev.updatedAt) {
+  // 5. 동일 상태/동일 문제 번호에서 타임스탬프가 더 오래된 경우만 상태 덮어쓰기 무시하고 명단만 병합
+  // (대기실->문제시작, 문제->정답공개, 문제번호 증가는 타임스탬프/클록 오차와 무관하게 100% 즉시 반영)
+  if (inIdx === prevIdx && incoming.status === prev.status && incoming.updatedAt && prev.updatedAt && incoming.updatedAt < prev.updatedAt) {
     return {
       ...incoming,
       status: prev.status,
@@ -551,10 +552,12 @@ export function subscribeToQuizUpdates(
 
   // 원격 스마트폰-PC 간 실시간 동기화를 위한 스마트 폴링 (탭 비활성화 시 자동 절약)
   let pollTimer: any = null;
+  let pollCount = 0;
   if (activePin && typeof window !== 'undefined') {
     pollTimer = setInterval(async () => {
-      // 탭이 숨겨져 있거나 화면이 꺼진 경우 폴링 생략 (트래픽 다이어트)
-      if (document.hidden) return;
+      pollCount++;
+      // 탭이 백그라운드에 있을 때는 4회(2초)에 1번씩 폴링, 활성 탭일 때는 매 500ms(0.5초) 즉시 폴링
+      if (document.hidden && pollCount % 4 !== 0) return;
 
       try {
         const res = await fetch(`${getApiBaseUrl()}/api/quiz/live?pin=${activePin}`);

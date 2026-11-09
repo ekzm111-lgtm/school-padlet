@@ -320,75 +320,139 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
   const [timerTick, setTimerTick] = useState<number>(0);
 
   // 퀴즈 시작 (첫 문제)
-  const handleStartQuiz = () => {
+  const handleStartQuiz = async () => {
     const now = Date.now();
     questionStartTimesRef.current[0] = now;
     questionStartedAtRef.current = now;
-    const updated = hostStartQuiz(pin);
-    if (updated) {
-      updated.questionStartedAt = now;
-      updated.updatedAt = now;
-      setLiveState(updated);
-      setLiveQuizState(updated, true);
-    }
+    const baseRoom = room || getQuizRoom(pin);
+    const prevLive = liveState || getLiveQuizState(pin);
+
+    const nextState: LiveQuizState = {
+      pin,
+      status: 'question',
+      currentQuestionIndex: 0,
+      timeLeft: baseRoom?.timePerQuestion && baseRoom.timePerQuestion > 0 ? baseRoom.timePerQuestion : 20,
+      questionStartedAt: now,
+      updatedAt: now,
+      totalQuestions: baseRoom?.questions ? baseRoom.questions.length : 1,
+      showExplanation: false,
+      participants: prevLive?.participants || [],
+      answersSubmitted: [],
+    };
+
+    setLiveState(nextState);
+    setLiveQuizState(nextState, true);
+
+    try {
+      await fetch(`${getApiBaseUrl()}/api/quiz/live`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextState),
+      });
+    } catch {}
   };
 
   // 정답 및 문제풀이 공개
-  const handleRevealAnswer = () => {
-    const updated = hostRevealAnswer(pin);
-    if (updated) {
-      updated.updatedAt = Date.now();
-      setLiveState(updated);
-      setLiveQuizState(updated, true);
-    }
+  const handleRevealAnswer = async () => {
+    const now = Date.now();
+    const prevLive = liveState || getLiveQuizState(pin);
+    if (!prevLive) return;
+
+    const nextState: LiveQuizState = {
+      ...prevLive,
+      status: 'reveal',
+      showExplanation: true,
+      updatedAt: now,
+    };
+
+    setLiveState(nextState);
+    setLiveQuizState(nextState, true);
     playCorrectSound();
+
+    try {
+      await fetch(`${getApiBaseUrl()}/api/quiz/live`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextState),
+      });
+    } catch {}
   };
 
   // 다음 문제로 이동
-  const handleNextQuestion = () => {
-    const nextIdx = (liveState?.currentQuestionIndex ?? 0) + 1;
+  const handleNextQuestion = async () => {
+    const prevLive = liveState || getLiveQuizState(pin);
+    const baseRoom = room || getQuizRoom(pin);
+    if (!prevLive || !baseRoom) return;
+
+    const nextIdx = (prevLive.currentQuestionIndex ?? 0) + 1;
     const now = Date.now();
     questionStartTimesRef.current[nextIdx] = now;
     questionStartedAtRef.current = now;
-    const updated = hostNextQuestion(pin);
-    if (updated) {
-      updated.questionStartedAt = now;
-      updated.updatedAt = now;
-      setLiveState(updated);
-      setLiveQuizState(updated, true);
-      if (updated.status === 'finished') {
-        playVictorySound();
-        confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
 
-        // 사용자 요청: 마지막 문제 끝나고 전체 순위가 확실히 나오도록 참가자 전원 결과 자동 저장
-        if (room && updated.participants && updated.participants.length > 0) {
-          const answersList = updated.answersSubmitted || [];
-          const savedResults = getRoomLeaderboard(room.pin) || [];
-          updated.participants.forEach((p) => {
-            const answersSum = answersList
-              .filter((a: any) => a.participantId === p.id)
-              .reduce((sum: number, a: any) => sum + (Number(a.scoreEarned) || 0), 0);
-            const savedItem = savedResults.find((r) => r.id === p.id);
-            const savedScore = savedItem ? (savedItem.score || 0) : 0;
-            const finalScore = Math.max(p.score || 0, answersSum, savedScore);
-            const correctCount = answersList.filter((a: any) => a.participantId === p.id && a.isCorrect).length;
+    let nextState: LiveQuizState;
+    if (nextIdx >= baseRoom.questions.length) {
+      nextState = {
+        ...prevLive,
+        status: 'finished',
+        currentQuestionIndex: Math.max(0, baseRoom.questions.length - 1),
+        showExplanation: false,
+        updatedAt: now,
+      };
+    } else {
+      nextState = {
+        ...prevLive,
+        status: 'question',
+        currentQuestionIndex: nextIdx,
+        timeLeft: baseRoom.timePerQuestion > 0 ? baseRoom.timePerQuestion : 0,
+        questionStartedAt: now,
+        showExplanation: false,
+        updatedAt: now,
+      };
+    }
 
-            submitQuizResult({
-              id: p.id,
-              pin: room.pin,
-              nickname: p.nickname,
-              avatarId: p.avatarId,
-              isAnonymous: room.allowAnonymous,
-              score: finalScore,
-              correctCount: Math.max(correctCount, savedItem?.correctCount || 0, Math.floor(finalScore / 100)),
-              totalCount: room.questions.length,
-              maxCombo: Math.max(1, savedItem?.maxCombo || 1),
-              totalTimeSpent: 10,
-              submittedAt: new Date().toLocaleString(),
-              answers: [],
-            });
+    setLiveState(nextState);
+    setLiveQuizState(nextState, true);
+
+    try {
+      await fetch(`${getApiBaseUrl()}/api/quiz/live`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextState),
+      });
+    } catch {}
+
+    if (nextState.status === 'finished') {
+      playVictorySound();
+      confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
+
+      // 사용자 요청: 마지막 문제 끝나고 전체 순위가 확실히 나오도록 참가자 전원 결과 자동 저장
+      if (baseRoom && nextState.participants && nextState.participants.length > 0) {
+        const answersList = nextState.answersSubmitted || [];
+        const savedResults = getRoomLeaderboard(baseRoom.pin) || [];
+        nextState.participants.forEach((p) => {
+          const answersSum = answersList
+            .filter((a: any) => a.participantId === p.id)
+            .reduce((sum: number, a: any) => sum + (Number(a.scoreEarned) || 0), 0);
+          const savedItem = savedResults.find((r) => r.id === p.id);
+          const savedScore = savedItem ? (savedItem.score || 0) : 0;
+          const finalScore = Math.max(p.score || 0, answersSum, savedScore);
+          const correctCount = answersList.filter((a: any) => a.participantId === p.id && a.isCorrect).length;
+
+          submitQuizResult({
+            id: p.id,
+            pin: baseRoom.pin,
+            nickname: p.nickname,
+            avatarId: p.avatarId,
+            isAnonymous: baseRoom.allowAnonymous,
+            score: finalScore,
+            correctCount: Math.max(correctCount, savedItem?.correctCount || 0, Math.floor(finalScore / 100)),
+            totalCount: baseRoom.questions.length,
+            maxCombo: Math.max(1, savedItem?.maxCombo || 1),
+            totalTimeSpent: 10,
+            submittedAt: new Date().toLocaleString(),
+            answers: [],
           });
-        }
+        });
       }
     }
   };
