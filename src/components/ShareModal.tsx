@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { X, Copy, Check, QrCode, Share2, Sparkles, Hash, Link2, MessageSquareText } from 'lucide-react';
 import { Board } from '@/lib/types';
-import { createShortUrl } from '@/lib/shortUrl';
+import { saveRemoteBoard } from '@/lib/supabaseStore';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -16,58 +17,40 @@ export default function ShareModal({ isOpen, onClose, board }: ShareModalProps) 
   const [copiedShort, setCopiedShort] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [shortUrl, setShortUrl] = useState<string>('');
-  const [isLoadingShort, setIsLoadingShort] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const minimalBoard = {
-    id: board.id,
-    code: board.code,
-    title: board.title,
-    description: board.description || '',
-    layout: board.layout || 'kanban',
-    theme: board.theme || 'blue',
-    coverImageUrl: board.coverImageUrl || '',
-    customBgUrl: board.customBgUrl || '',
-    authorId: board.authorId,
-    authorName: board.authorName,
-    columns: board.columns || [],
-    allowComments: board.allowComments !== false,
-    allowReactions: board.allowReactions !== false,
-    isLocked: Boolean(board.isLocked),
-  };
-  const bPayload = encodeURIComponent(JSON.stringify(minimalBoard));
-  const targetWithPayload = `${origin}/join/${board.code}?b=${bPayload}`;
   const standardJoinUrl = `${origin}/j/${board.code}`;
 
   useEffect(() => {
     if (!isOpen) return;
 
-    let isMounted = true;
-    setIsLoadingShort(true);
+    // Supabase에 보드 정보 즉시 보장 저장
+    saveRemoteBoard(board).catch(() => {});
 
-    // 글로벌 초단축 링크 자동 생성 (타 기기에서도 열리도록 보드 데이터 페이로드 포함)
-    createShortUrl(targetWithPayload).then((resUrl) => {
-      if (isMounted) {
-        setShortUrl(resUrl);
-        setIsLoadingShort(false);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, targetWithPayload]);
+    // 간결하고 선명한 저밀도 초고화질 QR 코드 생성 (모바일 기본 카메라 0.1초 즉시 인식)
+    QRCode.toDataURL(standardJoinUrl, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch(() => {
+        const fallback = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+          standardJoinUrl
+        )}`;
+        setQrDataUrl(fallback);
+      });
+  }, [isOpen, board, standardJoinUrl]);
 
   if (!isOpen) return null;
 
-  const displayShortLink = shortUrl || standardJoinUrl;
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-    displayShortLink
-  )}`;
-
   const handleCopyShortLink = () => {
-    navigator.clipboard.writeText(displayShortLink);
+    navigator.clipboard.writeText(standardJoinUrl);
     setCopiedShort(true);
     setTimeout(() => setCopiedShort(false), 2000);
   };
@@ -80,7 +63,7 @@ export default function ShareModal({ isOpen, onClose, board }: ShareModalProps) 
 
   // 카톡 / 알림장용 깔끔한 초대 문구 복사
   const handleCopyInviteMessage = () => {
-    const message = `[스쿨패들] '${board.title}' 수업 보드에 초대합니다!\n\n👉 초단축 링크: ${displayShortLink}\n👉 참여 PIN 번호: ${board.code}\n\n스마트폰이나 태블릿에서 링크를 누르면 1초 만에 입장됩니다.`;
+    const message = `[스쿨패들] '${board.title}' 수업 보드에 초대합니다!\n\n👉 초단축 링크: ${standardJoinUrl}\n👉 참여 PIN 번호: ${board.code}\n\n스마트폰이나 태블릿에서 링크를 누르면 1초 만에 입장됩니다.`;
     navigator.clipboard.writeText(message);
     setCopiedMessage(true);
     setTimeout(() => setCopiedMessage(false), 2000);
@@ -121,7 +104,7 @@ export default function ShareModal({ isOpen, onClose, board }: ShareModalProps) 
               <input
                 type="text"
                 readOnly
-                value={isLoadingShort ? '단축 링크 생성 중...' : displayShortLink}
+                value={standardJoinUrl}
                 className="flex-1 px-3 py-2 bg-white rounded-xl text-xs font-mono font-bold text-blue-700 border border-blue-200 select-all outline-none"
               />
               <button
@@ -157,8 +140,12 @@ export default function ShareModal({ isOpen, onClose, board }: ShareModalProps) 
               <QrCode className="w-4 h-4 text-slate-500" />
               <span>교실 전자칠판용 1초 접속 QR 코드</span>
             </div>
-            <div className="p-2 bg-white rounded-xl shadow-xs border border-slate-200">
-              <img src={qrApiUrl} alt="수업 보드 QR 코드" className="w-32 h-32 mx-auto rounded-lg" />
+            <div className="p-2 bg-white rounded-xl shadow-xs border border-slate-200 flex items-center justify-center w-36 h-36">
+              {qrDataUrl ? (
+                <img src={qrDataUrl} alt="수업 보드 QR 코드" className="w-32 h-32 mx-auto rounded-lg" />
+              ) : (
+                <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              )}
             </div>
             <p className="text-[10px] text-slate-400 mt-1.5">스마트폰이나 태블릿 카메라로 비추면 바로 열립니다.</p>
           </div>

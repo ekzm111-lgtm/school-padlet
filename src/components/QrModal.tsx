@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import QRCode from 'qrcode';
 import {
   X,
   QrCode,
@@ -18,7 +19,7 @@ import {
   Hash,
 } from 'lucide-react';
 import { Board } from '@/lib/types';
-import { createShortUrl } from '@/lib/shortUrl';
+import { saveRemoteBoard } from '@/lib/supabaseStore';
 
 interface QrModalProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export default function QrModal({ isOpen, onClose, board }: QrModalProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
-  const [shortUrl, setShortUrl] = useState<string>('');
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -39,48 +40,38 @@ export default function QrModal({ isOpen, onClose, board }: QrModalProps) {
   }, []);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const minimalBoard = {
-    id: board.id,
-    code: board.code,
-    title: board.title,
-    description: board.description || '',
-    layout: board.layout || 'kanban',
-    theme: board.theme || 'blue',
-    coverImageUrl: board.coverImageUrl || '',
-    customBgUrl: board.customBgUrl || '',
-    authorId: board.authorId,
-    authorName: board.authorName,
-    columns: board.columns || [],
-    allowComments: board.allowComments !== false,
-    allowReactions: board.allowReactions !== false,
-    isLocked: Boolean(board.isLocked),
-  };
-  const bPayload = encodeURIComponent(JSON.stringify(minimalBoard));
-  const targetWithPayload = `${origin}/join/${board.code}?b=${bPayload}`;
   const standardJoinUrl = `${origin}/j/${board.code}`;
 
   useEffect(() => {
     if (!isOpen) return;
-    let isMounted = true;
 
-    createShortUrl(targetWithPayload).then((res) => {
-      if (isMounted) setShortUrl(res);
-    });
+    // Supabase에 보드 정보 즉시 보장 저장 (타 기기/스마트폰 100% 접속 보장)
+    saveRemoteBoard(board).catch(() => {});
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, targetWithPayload]);
+    // 간결하고 선명한 저밀도 초고화질 QR 코드 생성 (모바일 기본 카메라 0.1초 즉시 인식)
+    QRCode.toDataURL(standardJoinUrl, {
+      width: 400,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#1e1b4b', // 짙은 인디고/블랙으로 선명도 극대화
+        light: '#ffffff',
+      },
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch(() => {
+        // 네트워크 폴백
+        const fallback = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=10&data=${encodeURIComponent(
+          standardJoinUrl
+        )}`;
+        setQrDataUrl(fallback);
+      });
+  }, [isOpen, board, standardJoinUrl]);
 
   if (!isOpen || !mounted) return null;
 
-  const displayTarget = shortUrl || standardJoinUrl;
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=10&data=${encodeURIComponent(
-    displayTarget
-  )}`;
-
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(displayTarget);
+    navigator.clipboard.writeText(standardJoinUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
@@ -92,26 +83,23 @@ export default function QrModal({ isOpen, onClose, board }: QrModalProps) {
   };
 
   const handleCopyMessage = () => {
-    const message = `[스쿨패들] '${board.title}' 수업 보드에 초대합니다!\n\n👉 스마트폰 카메라로 QR 코드를 비추거나 아래 링크를 눌러주세요:\n${displayTarget}\n\n👉 참여 PIN 번호: ${board.code}`;
+    const message = `[스쿨패들] '${board.title}' 수업 보드에 초대합니다!\n\n👉 스마트폰 카메라로 QR 코드를 비추거나 아래 링크를 눌러주세요:\n${standardJoinUrl}\n\n👉 참여 PIN 번호: ${board.code}`;
     navigator.clipboard.writeText(message);
     setCopiedMessage(true);
     setTimeout(() => setCopiedMessage(false), 2000);
   };
 
-  const handleDownloadQr = async () => {
+  const handleDownloadQr = () => {
+    if (!qrDataUrl) return;
     try {
-      const res = await fetch(qrApiUrl);
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = qrDataUrl;
       a.download = `${board.title.replace(/[\/\?<>\\:\*\|"]/g, '_')}_QR코드.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (e) {
-      window.open(qrApiUrl, '_blank');
+    } catch {
+      window.open(qrDataUrl, '_blank');
     }
   };
 
@@ -190,11 +178,15 @@ export default function QrModal({ isOpen, onClose, board }: QrModalProps) {
               isProjectorMode ? 'w-64 h-64 sm:w-80 sm:h-80' : 'w-56 h-56 sm:w-64 sm:h-64'
             } flex items-center justify-center`}
           >
-            <img
-              src={qrApiUrl}
-              alt="수업 보드 QR 코드"
-              className="w-full h-full object-contain rounded-2xl"
-            />
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt="수업 보드 QR 코드"
+                className="w-full h-full object-contain rounded-2xl"
+              />
+            ) : (
+              <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+            )}
           </div>
 
           <p className="text-xs text-slate-500 font-medium mt-3 flex items-center gap-1.5">
