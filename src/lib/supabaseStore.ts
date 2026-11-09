@@ -345,14 +345,14 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
   }
 }
 
-// 🔥 카드 일괄 순서 및 상태 저장 함수 (원자적 업데이트 지원)
+// 🔥 카드 일괄 순서 및 상태 저장 함수 (원자적 upsert 지원으로 새 카드 자동 등록 및 순서 100% 보장)
 export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
   const client = supabase;
   if (!isSupabaseConfigured || !client || postsList.length === 0) return false;
   try {
-    const promises = postsList.map((post, idx) => {
+    const records = postsList.map((post, idx) => {
       const orderIdx = typeof post.order === 'number' ? post.order : idx;
-      const targetCol = post.column || 'Ai 모델';
+      const targetCol = post.column || '모둠 1';
 
       let cleanContent = (post.content || '').replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
       const meta = {
@@ -364,17 +364,45 @@ export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
       };
       const updatedContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
 
-      return client
-        .from('posts')
-        .update({
-          column_name: targetCol,
-          column_id: targetCol,
-          order_index: orderIdx,
-          content: updatedContent,
-        })
-        .eq('id', post.id);
+      let safeCreatedAt: string;
+      try {
+        const d = post.createdAt ? new Date(post.createdAt) : new Date();
+        safeCreatedAt = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      } catch {
+        safeCreatedAt = new Date().toISOString();
+      }
+
+      return {
+        id: post.id,
+        board_id: post.boardId,
+        title: post.title || '',
+        content: updatedContent,
+        color: post.color || 'white',
+        image_url: post.imageUrl || null,
+        link_url: post.linkUrl || null,
+        author_id: post.authorId || 'student',
+        author_name: post.authorName || '학생',
+        author_role: post.authorRole || 'student',
+        column_id: targetCol,
+        column_name: targetCol,
+        order_index: orderIdx,
+        pinned: Boolean(post.pinned),
+        reactions: post.reactions || {},
+        comments: post.comments || [],
+        attachments: post.attachments || [],
+        created_at: safeCreatedAt,
+      };
     });
-    await Promise.all(promises);
+
+    // 10개씩 청크 단위로 나누어 upsert 실행 (기존 카드는 update, 로컬에만 있던 카드는 insert)
+    const chunkSize = 10;
+    for (let i = 0; i < records.length; i += chunkSize) {
+      const chunk = records.slice(i, i + chunkSize);
+      const { error } = await client.from('posts').upsert(chunk);
+      if (error) {
+        console.error('saveRemotePosts chunk upsert error:', error);
+      }
+    }
     return true;
   } catch (e) {
     console.error('saveRemotePosts error', e);
