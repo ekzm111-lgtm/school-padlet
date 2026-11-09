@@ -83,6 +83,7 @@ export default function BoardDetailPage() {
   // 모둠(열) 드래그 앤 드롭 순서 변경 상태
   const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
   const [dragOverColIdx, setDragOverColIdx] = useState<number | null>(null);
+  const [isSyncingToCloud, setIsSyncingToCloud] = useState(false);
 
   // 그리드 드래그 앤 드롭 순서 변경
   const dragItemIdx = useRef<number | null>(null);
@@ -495,7 +496,7 @@ export default function BoardDetailPage() {
   };
 
   // 학생 초대 단축 링크 복사
-    const [isSyncingToCloud, setIsSyncingToCloud] = useState(false);
+
 
   const handleManualCloudSync = async () => {
     if (!board || !posts || posts.length === 0) return;
