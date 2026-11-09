@@ -3,6 +3,7 @@ import type { QuizRoom, QuizParticipantResult } from '@/types/quiz';
 import { QUIZ_AVATARS } from '@/types/quiz';
 import {
   getAllQuizRooms,
+  fetchAllQuizRoomsAsync,
   getRoomLeaderboard,
   clearRoomResults,
   deleteQuizRoom,
@@ -58,8 +59,8 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
   const [selectedPinsToDelete, setSelectedPinsToDelete] = useState<string[]>([]);
   const [copiedPin, setCopiedPin] = useState<string | null>(null);
 
-  // 룸 데이터 로드
-  const reloadData = () => {
+  // 룸 데이터 로드 (로컬 즉시 반영 + Supabase DB 원격 동기화)
+  const reloadData = async () => {
     const all = getAllQuizRooms();
     setRooms(all);
 
@@ -67,6 +68,17 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
     if (!selectedPin && pinKeys.length > 0) {
       setSelectedPin(pinKeys[pinKeys.length - 1]);
     }
+
+    try {
+      const remote = await fetchAllQuizRoomsAsync();
+      if (remote && Object.keys(remote).length > 0) {
+        setRooms(remote);
+        const remoteKeys = Object.keys(remote);
+        if (!selectedPin && remoteKeys.length > 0) {
+          setSelectedPin(remoteKeys[remoteKeys.length - 1]);
+        }
+      }
+    } catch {}
   };
 
   useEffect(() => {

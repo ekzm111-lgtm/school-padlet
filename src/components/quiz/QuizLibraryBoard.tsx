@@ -3,6 +3,7 @@ import type { SavedQuizPackage } from '@/types/quiz';
 import type { ExamInfo, Question } from '@/types/exam';
 import {
   getAllSavedQuizPackages,
+  fetchQuizPackagesAsync,
   saveQuizPackage,
   deleteSavedQuizPackage,
   subscribeToQuizUpdates,
@@ -55,8 +56,10 @@ export const QuizLibraryBoard: React.FC<QuizLibraryBoardProps> = ({
   const [saveTitle, setSaveTitle] = useState('');
   const [saveDesc, setSaveDesc] = useState('');
 
-  const reload = () => {
+  const reload = async () => {
     setPackages(getAllSavedQuizPackages());
+    const remote = await fetchQuizPackagesAsync();
+    setPackages(remote);
   };
 
   useEffect(() => {

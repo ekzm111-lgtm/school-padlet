@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuizRoomServer, saveQuizRoomServer, getQuizLiveStateServer } from '@/lib/quizServerStore';
+import {
+  getQuizRoomServer,
+  saveQuizRoomServer,
+  getQuizLiveStateServer,
+  getAllQuizRoomsServer,
+  deleteQuizRoomServer,
+} from '@/lib/quizServerStore';
 
 export async function GET(req: NextRequest) {
-  const pin = req.nextUrl.searchParams.get('pin') || '';
+  const pin = req.nextUrl.searchParams.get('pin');
   if (!pin) {
-    return NextResponse.json({ error: 'PIN required' }, { status: 400 });
+    const rooms = await getAllQuizRoomsServer();
+    return NextResponse.json({ ok: true, rooms });
   }
 
   const room = await getQuizRoomServer(pin);
@@ -29,5 +36,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, room: body });
   } catch (err) {
     return NextResponse.json({ error: 'Failed to save room' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const pin = req.nextUrl.searchParams.get('pin');
+    if (!pin) {
+      return NextResponse.json({ error: 'PIN required' }, { status: 400 });
+    }
+    await deleteQuizRoomServer(pin);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: 'Failed to delete room' }, { status: 500 });
   }
 }

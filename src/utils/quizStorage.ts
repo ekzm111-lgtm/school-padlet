@@ -106,7 +106,25 @@ export async function loadQuizRoomAsync(pin: string): Promise<QuizRoom | null> {
   return null;
 }
 
-// 퀴즈 결과 제출 및 저장
+// 원격 서버로부터 모든 방 목록 가져오기 (Supabase DB 동기화)
+export async function fetchAllQuizRoomsAsync(): Promise<Record<string, QuizRoom>> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/quiz/room`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && data.rooms) {
+        const rooms = { ...getAllQuizRooms(), ...data.rooms };
+        localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+        return rooms;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch rooms from server:', e);
+  }
+  return getAllQuizRooms();
+}
+
+// 퀴즈 결과 제출 및 저장 (로컬 + Supabase DB 영구 저장)
 export function submitQuizResult(result: QuizParticipantResult): void {
   const results = getAllQuizResults();
   if (!results[result.pin]) {
@@ -128,6 +146,15 @@ export function submitQuizResult(result: QuizParticipantResult): void {
 
   // 브로드캐스트 알림
   notifyChannel({ type: 'RESULT_SUBMITTED', result });
+
+  // 🔥 Supabase DB 영구 저장
+  try {
+    fetch(`${getApiBaseUrl()}/api/quiz/result`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(result),
+    }).catch(() => {});
+  } catch {}
 }
 
 // 모든 퀴즈 결과 불러오기
@@ -149,12 +176,34 @@ export function getRoomLeaderboard(pin: string): QuizParticipantResult[] {
   });
 }
 
+// 특정 방의 리더보드 원격 서버 동기화 조회 (Supabase DB)
+export async function fetchRoomLeaderboardAsync(pin: string): Promise<QuizParticipantResult[]> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/quiz/result?pin=${pin}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.results)) {
+        const results = getAllQuizResults();
+        results[pin] = data.results;
+        localStorage.setItem(RESULTS_KEY, JSON.stringify(results));
+        return data.results;
+      }
+    }
+  } catch {}
+  return getRoomLeaderboard(pin);
+}
+
 // 특정 방의 결과 기록 초기화
 export function clearRoomResults(pin: string): void {
   const allResults = getAllQuizResults();
   delete allResults[pin];
   localStorage.setItem(RESULTS_KEY, JSON.stringify(allResults));
   notifyChannel({ type: 'RESULTS_CLEARED', pin });
+
+  // 🔥 Supabase DB에서도 삭제
+  try {
+    fetch(`${getApiBaseUrl()}/api/quiz/result?pin=${pin}`, { method: 'DELETE' }).catch(() => {});
+  } catch {}
 }
 
 // 특정 방 삭제
@@ -165,10 +214,15 @@ export function deleteQuizRoom(pin: string): void {
   clearRoomResults(pin);
   localStorage.removeItem(`${LIVE_STATE_KEY_PREFIX}${pin}`);
   notifyChannel({ type: 'ROOM_DELETED', pin });
+
+  // 🔥 Supabase DB에서도 방 및 라이브 삭제
+  try {
+    fetch(`${getApiBaseUrl()}/api/quiz/room?pin=${pin}`, { method: 'DELETE' }).catch(() => {});
+  } catch {}
 }
 
 // ==========================================
-// 퀴즈 문제 세트 보관함 (게시판 라이브러리 저장/불러오기)
+// 퀴즈 문제 세트 보관함 (게시판 라이브러리 저장/불러오기 - Supabase DB 연동)
 // ==========================================
 
 export function getAllSavedQuizPackages(): SavedQuizPackage[] {
@@ -177,7 +231,7 @@ export function getAllSavedQuizPackages(): SavedQuizPackage[] {
     return JSON.parse(data);
   }
 
-  // 기본 기본 세트 2종 (음악 1종, 엔트리 1종) 자동 등록
+  // 기본 세트 2종 (엔트리 1종, 음악 1종) 자동 등록
   const defaultSets: SavedQuizPackage[] = [
     {
       id: 'pkg_default_entry',
@@ -205,6 +259,24 @@ export function getAllSavedQuizPackages(): SavedQuizPackage[] {
   return defaultSets;
 }
 
+// 원격 Supabase DB로부터 퀴즈 보관함 세트 비동기 동기화
+export async function fetchQuizPackagesAsync(): Promise<SavedQuizPackage[]> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/quiz/package`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.packages) && data.packages.length > 0) {
+        localStorage.setItem(PACKAGES_KEY, JSON.stringify(data.packages));
+        notifyChannel({ type: 'PACKAGE_SYNCED', packages: data.packages });
+        return data.packages;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch packages from server:', e);
+  }
+  return getAllSavedQuizPackages();
+}
+
 export function saveQuizPackage(
   title: string,
   subject: 'music' | 'entry' | string,
@@ -230,6 +302,16 @@ export function saveQuizPackage(
   const updated = [newPkg, ...list];
   localStorage.setItem(PACKAGES_KEY, JSON.stringify(updated));
   notifyChannel({ type: 'PACKAGE_SAVED', package: newPkg });
+
+  // 🔥 Supabase DB 영구 저장
+  try {
+    fetch(`${getApiBaseUrl()}/api/quiz/package`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newPkg),
+    }).catch(() => {});
+  } catch {}
+
   return newPkg;
 }
 
@@ -238,6 +320,11 @@ export function deleteSavedQuizPackage(id: string): void {
   const updated = list.filter((p) => p.id !== id);
   localStorage.setItem(PACKAGES_KEY, JSON.stringify(updated));
   notifyChannel({ type: 'PACKAGE_DELETED', id });
+
+  // 🔥 Supabase DB에서도 삭제
+  try {
+    fetch(`${getApiBaseUrl()}/api/quiz/package?id=${id}`, { method: 'DELETE' }).catch(() => {});
+  } catch {}
 }
 
 // ==========================================
