@@ -499,12 +499,27 @@ export default function BoardDetailPage() {
 
 
   const handleManualCloudSync = async () => {
-    if (!board || !posts || posts.length === 0) return;
+    if (!board) return;
     setIsSyncingToCloud(true);
     try {
+      const data = getStoreData();
+      const localForThisBoard = data.posts.filter((p) => p.boardId === board.id);
+
+      // 화면의 posts와 로컬스토리지의 posts를 ID 기준으로 병합 (누락된 카드 완벽 보존)
+      const postMap = new Map();
+      (posts || []).forEach((p) => postMap.set(p.id, p));
+      localForThisBoard.forEach((p) => {
+        if (!postMap.has(p.id)) postMap.set(p.id, p);
+      });
+      const allTargetPosts = Array.from(postMap.values());
+
       await saveRemoteBoard(board);
-      await saveAllRemotePosts(posts);
-      alert('현재 화면의 모든 모둠(' + (columns.length) + '개)과 카드(' + posts.length + '개)가 클라우드 DB에 동기화되었습니다!\n학생 화면에서도 100% 동일하게 보입니다.');
+      const ok = await saveAllRemotePosts(allTargetPosts);
+      if (ok) {
+        alert('현재 화면의 모든 모둠(' + (columns.length) + '개)과 카드(' + allTargetPosts.length + '개)가 클라우드 DB에 동기화되었습니다!\n학생 화면에서도 100% 동일하게 보입니다.');
+      } else {
+        alert('동기화 중 일부 카드 처리에 실패했을 수 있습니다. 잠시 후 다시 시도해 주세요.');
+      }
     } catch (e) {
       alert('동기화 실패: ' + String(e));
     } finally {

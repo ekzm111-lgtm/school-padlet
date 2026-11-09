@@ -24,6 +24,51 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { saveRemotePost } from '@/lib/supabaseStore';
 import confetti from 'canvas-confetti';
 
+// 클라이언트 측 Canvas 기반 이미지 압축 (최대 1280px, JPEG 0.75)
+function compressImageDataUrl(dataUrl: string, maxDim = 1280, quality = 0.75): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !dataUrl || !dataUrl.startsWith('data:image/')) {
+      resolve(dataUrl);
+      return;
+    }
+    // 이미 150KB 이하면 압축 불필요
+    if (dataUrl.length < 150000) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      try {
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 interface PostModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -152,9 +197,11 @@ export default function PostModal({
           if (file) {
             e.preventDefault();
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = async (event) => {
               if (event.target?.result) {
-                setImageUrl(event.target.result as string);
+                const rawUrl = event.target.result as string;
+                const optimizedUrl = await compressImageDataUrl(rawUrl);
+                setImageUrl(optimizedUrl);
                 setShowImageTools(true);
                 setPasteNotice(true);
                 setTimeout(() => setPasteNotice(false), 3000);
@@ -225,13 +272,20 @@ export default function PostModal({
             : `${Math.round(file.size / 1024)} KB`;
 
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
           if (event.target?.result) {
+            let dataUrl = event.target.result as string;
+            // 만약 이미지 파일인 경우 클라우드 및 브라우저 성능을 위해 압축 처리
+            if (file.type.startsWith('image/')) {
+              try {
+                dataUrl = await compressImageDataUrl(dataUrl);
+              } catch (e) {}
+            }
             resolve({
               name: file.name,
               size: formattedSize,
               type: file.type || file.name.split('.').pop() || '',
-              dataUrl: event.target.result as string,
+              dataUrl: dataUrl,
             });
           } else {
             resolve(null);
@@ -305,7 +359,7 @@ export default function PostModal({
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return; // 중복 제출 원천 방지
     if (!content.trim() && !title.trim() && !imageUrl && attachments.length === 0) return;
@@ -320,67 +374,73 @@ export default function PostModal({
       createdColumnName = newColumnInput.trim();
     }
 
-    if (mode === 'edit' && post) {
-      // 수정 모드 저장
-      const updated: Post = {
-        ...post,
-        title: title.trim(),
-        content: content.trim(),
-        color,
-        imageUrl: imageUrl.trim() || undefined,
-        linkUrl: linkUrl.trim() || undefined,
-        column: finalColumn,
-        attachments,
-        fileAttachment: attachments[0] || undefined,
-        authorName: customAuthor.trim() || post.authorName,
-        updatedAt: '방금 수정됨',
-      };
+    try {
+      if (mode === 'edit' && post) {
+        // 수정 모드 저장
+        const updated: Post = {
+          ...post,
+          title: title.trim(),
+          content: content.trim(),
+          color,
+          imageUrl: imageUrl.trim() || undefined,
+          linkUrl: linkUrl.trim() || undefined,
+          column: finalColumn,
+          attachments,
+          fileAttachment: attachments[0] || undefined,
+          authorName: customAuthor.trim() || post.authorName,
+          updatedAt: new Date().toISOString(),
+        };
 
-      const data = getStoreData();
-      saveStoreData.posts(data.posts.map((p) => (p.id === post.id ? updated : p)));
-      if (isSupabaseConfigured) {
-        saveRemotePost(updated);
+        const data = getStoreData();
+        saveStoreData.posts(data.posts.map((p) => (p.id === post.id ? updated : p)));
+        if (isSupabaseConfigured) {
+          await saveRemotePost(updated);
+        }
+        if (onUpdated) onUpdated(updated);
+        onClose();
+      } else {
+        // 생성 모드 저장 (유니크 타임스탬프 + 랜덤 ID)
+        const nowIso = new Date().toISOString();
+        const newPost: Post = {
+          id: `post-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          boardId,
+          title: title.trim(),
+          content: content.trim(),
+          color,
+          imageUrl: imageUrl.trim() || undefined,
+          linkUrl: linkUrl.trim() || undefined,
+          attachments,
+          fileAttachment: attachments[0] || undefined,
+          authorName: customAuthor.trim() || currentUser?.name || '익명 참여자',
+          authorRole: currentUser?.role || 'student',
+          authorId: currentUser?.id || `anon-${Date.now()}`,
+          reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
+          comments: [],
+          column: finalColumn,
+          x: 30 + Math.random() * 200,
+          y: 80 + Math.random() * 200,
+          createdAt: nowIso,
+        };
+
+        const data = getStoreData();
+        saveStoreData.posts([newPost, ...data.posts]);
+        if (isSupabaseConfigured) {
+          await saveRemotePost(newPost);
+        }
+        addMyPostId(newPost.id);
+        if (onCreated) onCreated(newPost, createdColumnName);
+
+        try {
+          confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
+        } catch (err) {}
+
+        onClose();
       }
-      if (onUpdated) onUpdated(updated);
+    } catch (err) {
+      console.error('Error in handleSubmit:', err);
+      setFileError('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
       setIsSubmitting(false);
-      onClose();
-    } else {
-      // 생성 모드 저장 (유니크 타임스탬프 + 랜덤 ID)
-      const newPost: Post = {
-        id: `post-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        boardId,
-        title: title.trim(),
-        content: content.trim(),
-        color,
-        imageUrl: imageUrl.trim() || undefined,
-        linkUrl: linkUrl.trim() || undefined,
-        attachments,
-        fileAttachment: attachments[0] || undefined,
-        authorName: customAuthor.trim() || currentUser?.name || '익명 참여자',
-        authorRole: currentUser?.role || 'student',
-        authorId: currentUser?.id || `anon-${Date.now()}`,
-        reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
-        comments: [],
-        column: finalColumn,
-        x: 30 + Math.random() * 200,
-        y: 80 + Math.random() * 200,
-        createdAt: '방금 전',
-      };
-
-      const data = getStoreData();
-      saveStoreData.posts([newPost, ...data.posts]);
-      if (isSupabaseConfigured) {
-        saveRemotePost(newPost);
-      }
-      addMyPostId(newPost.id);
-      if (onCreated) onCreated(newPost, createdColumnName);
-
-      try {
-        confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
-      } catch (err) {}
-
-      setIsSubmitting(false);
-      onClose();
     }
   };
 

@@ -186,7 +186,7 @@ export default function CreatePostModal({
       column: finalColumn,
       x: 30 + Math.random() * 200,
       y: 80 + Math.random() * 200,
-      createdAt: '방금 전',
+      createdAt: new Date().toISOString(),
     };
 
     const data = getStoreData();

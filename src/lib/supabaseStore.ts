@@ -293,10 +293,21 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       finalContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
     }
 
+    const colName = post.column || '모둠 1';
+
+    let safeCreatedAt: string;
+    try {
+      const d = post.createdAt ? new Date(post.createdAt) : new Date();
+      safeCreatedAt = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+    } catch {
+      safeCreatedAt = new Date().toISOString();
+    }
+
     const rowPayload: any = {
       id: post.id,
       board_id: post.boardId,
-      column_id: post.column || '모둠 1',
+      column_id: colName,
+      column_name: colName,
       title: post.title,
       content: finalContent,
       color: post.color || 'white',
@@ -304,18 +315,28 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       link_url: post.linkUrl || null,
       author_id: post.authorId || 'student',
       author_name: post.authorName || '학생',
+      author_role: post.authorRole || 'student',
+      reactions: post.reactions || {},
+      comments: post.comments || [],
+      attachments: atts,
+      pinned: Boolean(post.pinned),
       order_index: typeof post.order === 'number' ? post.order : 0,
+      created_at: safeCreatedAt,
     };
 
     const { error } = await supabase.from('posts').upsert(rowPayload);
     if (error) {
-      console.warn('saveRemotePost primary upsert failed, retrying with fallback payload:', error);
-      try {
-        await supabase.from('posts').upsert({
+      console.error('saveRemotePost upsert failed:', error);
+      // 만약 이미지나 첨부 용량 초과로 실패했다면 본문과 텍스트 위주로 안전 재시도
+      if (post.imageUrl && (error.message?.includes('payload') || (error as any).code === '413')) {
+        console.warn('Retrying saveRemotePost with light payload...');
+        const { error: errRetry } = await supabase.from('posts').upsert({
           ...rowPayload,
-          column_id: post.column || '모둠 1',
+          image_url: null,
         });
-      } catch (e2) {}
+        if (!errRetry) return true;
+      }
+      return false;
     }
     return true;
   } catch (e) {
@@ -374,7 +395,7 @@ export async function deleteRemotePost(postId: string): Promise<boolean> {
 export async function saveAllRemotePosts(postsList: Post[]): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase || !postsList || postsList.length === 0) return false;
   try {
-    const records = postsList.map((post) => {
+    const records = postsList.map((post, idx) => {
       let cleanContent = post.content || '';
       cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
 
@@ -392,31 +413,57 @@ export async function saveAllRemotePosts(postsList: Post[]): Promise<boolean> {
       if (post.column) meta.column = post.column;
 
       const fullContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
+      const colName = post.column || '모둠 1';
+
+      let safeCreatedAt: string;
+      try {
+        const d = post.createdAt ? new Date(post.createdAt) : new Date();
+        safeCreatedAt = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      } catch {
+        safeCreatedAt = new Date().toISOString();
+      }
 
       return {
         id: post.id,
         board_id: post.boardId,
         title: post.title,
         content: fullContent,
-        color: post.color || 'yellow',
+        color: post.color || 'white',
         image_url: post.imageUrl || null,
         link_url: post.linkUrl || null,
-        author_id: post.authorId || 'anonymous',
+        author_id: post.authorId || 'teacher',
         author_name: post.authorName || '선생님',
         author_role: post.authorRole || 'teacher',
-        column_name: post.column,
+        column_id: colName,
+        column_name: colName,
         reactions: post.reactions || {},
         comments: post.comments || [],
         attachments: atts,
-        pinned: post.pinned || false,
-        x: post.x,
-        y: post.y,
-        created_at: post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
+        pinned: Boolean(post.pinned),
+        order_index: typeof post.order === 'number' ? post.order : idx,
+        created_at: safeCreatedAt,
       };
     });
 
-    const { error } = await supabase.from('posts').upsert(records);
-    return !error;
+    // 대용량 페이로드 방지를 위해 10개씩 청크(Batch) 단위로 순차 upsert
+    const chunkSize = 10;
+    for (let i = 0; i < records.length; i += chunkSize) {
+      const chunk = records.slice(i, i + chunkSize);
+      const { error } = await supabase.from('posts').upsert(chunk);
+      if (error) {
+        console.error(`Chunk ${i} ~ ${i + chunkSize} upsert failed:`, error);
+        // 만약 청크 실패 시 개별 단건 upsert로 세부 시도
+        for (const item of chunk) {
+          try {
+            await supabase.from('posts').upsert(item);
+          } catch (itemErr) {
+            console.error('Individual item upsert failed:', item.id, itemErr);
+          }
+        }
+      }
+    }
+
+    return true;
   } catch (e) {
     console.error('Failed to saveAllRemotePosts:', e);
     return false;
