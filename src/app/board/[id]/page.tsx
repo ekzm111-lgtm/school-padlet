@@ -292,7 +292,7 @@ export default function BoardDetailPage() {
       if (!isSupabaseConfigured || !supabase) return;
       if (isSyncingRef.current) return;
       // 사용자가 최근 8초 내에 카드를 조작했다면 원격 폴링으로 인한 덮어쓰기 방지
-      if (Date.now() - lastUserActionTimeRef.current < 8000) return;
+      if (Date.now() - lastUserActionTimeRef.current < 4000) return;
 
       isSyncingRef.current = true;
       try {
@@ -305,7 +305,7 @@ export default function BoardDetailPage() {
 
         if (remote && Array.isArray(remote)) {
           setPosts((prevPosts) => {
-            if (Date.now() - lastUserActionTimeRef.current < 8000) return prevPosts;
+            if (Date.now() - lastUserActionTimeRef.current < 4000) return prevPosts;
 
             const buildSig = (list: Post[]) =>
               list
@@ -442,7 +442,7 @@ export default function BoardDetailPage() {
       if (!document.hidden) {
         syncRemoteData();
       }
-    }, 8000);
+    }, 3000);
 
     return () => {
       if (channel && supabase) {

@@ -331,11 +331,25 @@ export async function saveRemotePosts(postsList: Post[]): Promise<boolean> {
   try {
     const promises = postsList.map((post, idx) => {
       const orderIdx = typeof post.order === 'number' ? post.order : idx;
+      const targetCol = post.column || 'Ai 모델';
+
+      let cleanContent = (post.content || '').replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
+      const meta = {
+        order: orderIdx,
+        column: targetCol,
+        reactions: post.reactions || {},
+        comments: post.comments || [],
+        attachments: post.attachments || [],
+      };
+      const updatedContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
+
       return client
         .from('posts')
         .update({
+          column_name: targetCol,
+          column_id: targetCol,
           order_index: orderIdx,
-          column_id: post.column || '모둠 1',
+          content: updatedContent,
         })
         .eq('id', post.id);
     });
@@ -353,6 +367,58 @@ export async function deleteRemotePost(postId: string): Promise<boolean> {
     const { error } = await supabase.from('posts').delete().eq('id', postId);
     return !error;
   } catch (e) {
+    return false;
+  }
+}
+
+export async function saveAllRemotePosts(postsList: Post[]): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !postsList || postsList.length === 0) return false;
+  try {
+    const records = postsList.map((post) => {
+      let cleanContent = post.content || '';
+      cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
+
+      const meta: any = {};
+      const atts: any[] = [];
+      if (post.attachments && post.attachments.length > 0) {
+        atts.push(...post.attachments);
+      } else if (post.fileAttachment) {
+        atts.push(post.fileAttachment);
+      }
+      if (atts.length > 0) meta.attachments = atts;
+      if (post.comments && post.comments.length > 0) meta.comments = post.comments;
+      if (post.reactions) meta.reactions = post.reactions;
+      if (typeof post.order === 'number') meta.order = post.order;
+      if (post.column) meta.column = post.column;
+
+      const fullContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
+
+      return {
+        id: post.id,
+        board_id: post.boardId,
+        title: post.title,
+        content: fullContent,
+        color: post.color || 'yellow',
+        image_url: post.imageUrl || null,
+        link_url: post.linkUrl || null,
+        author_id: post.authorId || 'anonymous',
+        author_name: post.authorName || '선생님',
+        author_role: post.authorRole || 'teacher',
+        column_name: post.column,
+        reactions: post.reactions || {},
+        comments: post.comments || [],
+        attachments: atts,
+        pinned: post.pinned || false,
+        x: post.x,
+        y: post.y,
+        created_at: post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
+      };
+    });
+
+    const { error } = await supabase.from('posts').upsert(records);
+    return !error;
+  } catch (e) {
+    console.error('Failed to saveAllRemotePosts:', e);
     return false;
   }
 }
