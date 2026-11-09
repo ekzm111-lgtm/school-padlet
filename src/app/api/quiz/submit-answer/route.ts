@@ -3,7 +3,9 @@ import { submitQuizAnswerServer } from '@/lib/quizServerStore';
 
 export async function POST(req: NextRequest) {
   try {
-    const { pin, answer } = await req.json();
+    const body = await req.json();
+    const pin = body?.pin;
+    const answer = body?.answer || body;
     if (!pin || !answer || !answer.participantId) {
       return NextResponse.json({ error: 'Invalid answer payload' }, { status: 400 });
     }

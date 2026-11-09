@@ -363,19 +363,40 @@ export async function joinQuizParticipantServer(pin: string, participant: any): 
 
 export async function submitQuizAnswerServer(pin: string, answer: any): Promise<any> {
   const current = await getQuizLiveStateServer(pin);
-  let updatedParticipants = current?.participants || [];
-  if (typeof answer.score === 'number') {
-    updatedParticipants = updatedParticipants.map((p: any) => {
-      if (p.id === answer.participantId) {
-        return { ...p, score: Math.max(p.score || 0, answer.score) };
-      }
-      return p;
+  let updatedParticipants = Array.isArray(current?.participants) ? [...current.participants] : [];
+  const scoreEarned = Number(answer.scoreEarned) || 0;
+  const pIdx = updatedParticipants.findIndex((p: any) => p.id === answer.participantId);
+
+  if (pIdx >= 0) {
+    const prevP = updatedParticipants[pIdx];
+    const explicitScore = typeof answer.score === 'number' ? answer.score : undefined;
+    const computedScore = explicitScore !== undefined ? explicitScore : ((prevP.score || 0) + scoreEarned);
+    updatedParticipants[pIdx] = {
+      ...prevP,
+      score: Math.max(prevP.score || 0, computedScore),
+      lastAnswer: answer.selectedAnswer ?? prevP.lastAnswer,
+    };
+  } else if (answer.participantId) {
+    updatedParticipants.push({
+      id: answer.participantId,
+      nickname: answer.nickname || '참가자',
+      score: typeof answer.score === 'number' ? answer.score : scoreEarned,
+      lastAnswer: answer.selectedAnswer,
     });
   }
 
+  const answerEntry = {
+    participantId: answer.participantId,
+    questionIndex: answer.questionIndex,
+    selectedAnswer: answer.selectedAnswer,
+    isCorrect: !!answer.isCorrect,
+    timeSpent: answer.timeSpent || 0,
+    scoreEarned,
+  };
+
   const merged = mergeServerLiveStates(current, {
     participants: updatedParticipants,
-    answersSubmitted: [answer],
+    answersSubmitted: [answerEntry],
     updatedAt: Date.now(),
   });
   return saveQuizLiveStateServer(pin, merged);
@@ -511,16 +532,39 @@ export async function saveQuizResultServer(data: any): Promise<void> {
   if (!supabase || !data || !data.pin) return;
   try {
     const id = data.id || `${data.pin}_${data.participantId || data.nickname || Date.now()}`;
+    const incomingScore = Number(data.score) || 0;
+    const incomingCorrect = Number(data.correctCount) || 0;
+    const incomingCombo = Number(data.maxCombo) || 0;
+
+    let finalScore = incomingScore;
+    let finalCorrect = incomingCorrect;
+    let finalCombo = incomingCombo;
+
+    const existing = await withTimeout(
+      supabase
+        .from('quiz_results')
+        .select('score, correct_count, max_combo')
+        .eq('id', id)
+        .maybeSingle(),
+      400
+    );
+
+    if (existing && !existing.error && existing.data) {
+      finalScore = Math.max(Number(existing.data.score) || 0, incomingScore);
+      finalCorrect = Math.max(Number(existing.data.correct_count) || 0, incomingCorrect);
+      finalCombo = Math.max(Number(existing.data.max_combo) || 0, incomingCombo);
+    }
+
     await supabase.from('quiz_results').upsert({
       id,
       pin: data.pin,
       participant_id: data.participantId || data.id,
       nickname: data.nickname,
       avatar_id: data.avatarId,
-      score: data.score || 0,
-      correct_count: data.correctCount || 0,
+      score: finalScore,
+      correct_count: finalCorrect,
       total_count: data.totalCount || 0,
-      max_combo: data.maxCombo || 0,
+      max_combo: finalCombo,
       answers: data.answers || [],
       submitted_at: new Date().toISOString(),
     });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
-import type { QuizRoom, LiveQuizState } from '@/types/quiz';
+import type { QuizRoom, LiveQuizState, QuizParticipantResult } from '@/types/quiz';
 import { QUIZ_AVATARS } from '@/types/quiz';
 import {
   getQuizRoom,
@@ -12,6 +12,7 @@ import {
   subscribeToQuizUpdates,
   submitQuizResult,
   getRoomLeaderboard,
+  fetchRoomLeaderboardAsync,
   mergeParticipantsList,
   mergeAnswersList,
   applyMonotonicQuizState,
@@ -69,6 +70,7 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
 }) => {
   const [room, setRoom] = useState<QuizRoom | null>(null);
   const [liveState, setLiveState] = useState<LiveQuizState | null>(null);
+  const [serverResults, setServerResults] = useState<QuizParticipantResult[]>([]);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [showQrModal, setShowQrModal] = useState(false);
   const [showStudentPreview, setShowStudentPreview] = useState(false);
@@ -168,7 +170,29 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
         setLiveState(initialLive);
       }
     }
+
+    try {
+      const results = await fetchRoomLeaderboardAsync(pin);
+      if (Array.isArray(results) && results.length > 0) {
+        setServerResults(results);
+      }
+    } catch {}
   };
+
+  // 서버(Supabase DB) 리더보드 주기적 동기화
+  useEffect(() => {
+    const fetchResults = async () => {
+      try {
+        const results = await fetchRoomLeaderboardAsync(pin);
+        if (Array.isArray(results) && results.length > 0) {
+          setServerResults(results);
+        }
+      } catch {}
+    };
+    fetchResults();
+    const timer = setInterval(fetchResults, 1200);
+    return () => clearInterval(timer);
+  }, [pin]);
 
   useEffect(() => {
     reload();
@@ -433,8 +457,9 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
           const answersSum = answersList
             .filter((a: any) => a.participantId === p.id)
             .reduce((sum: number, a: any) => sum + (Number(a.scoreEarned) || 0), 0);
-          const savedItem = savedResults.find((r) => r.id === p.id);
-          const savedScore = savedItem ? (savedItem.score || 0) : 0;
+          const savedItem = savedResults.find((r) => r.id === p.id || (r.nickname && r.nickname === p.nickname));
+          const remoteItem = serverResults.find((r) => r.id === p.id || (r.nickname && r.nickname === p.nickname));
+          const savedScore = Math.max(savedItem?.score || 0, remoteItem?.score || 0);
           const finalScore = Math.max(p.score || 0, answersSum, savedScore);
           const correctCount = answersList.filter((a: any) => a.participantId === p.id && a.isCorrect).length;
 
@@ -442,12 +467,12 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
             id: p.id,
             pin: baseRoom.pin,
             nickname: p.nickname,
-            avatarId: p.avatarId,
+            avatarId: p.avatarId || remoteItem?.avatarId || savedItem?.avatarId || QUIZ_AVATARS[0].id,
             isAnonymous: baseRoom.allowAnonymous,
             score: finalScore,
-            correctCount: Math.max(correctCount, savedItem?.correctCount || 0, Math.floor(finalScore / 100)),
+            correctCount: Math.max(correctCount, savedItem?.correctCount || 0, remoteItem?.correctCount || 0, Math.floor(finalScore / 100)),
             totalCount: baseRoom.questions.length,
-            maxCombo: Math.max(1, savedItem?.maxCombo || 1),
+            maxCombo: Math.max(1, savedItem?.maxCombo || 1, remoteItem?.maxCombo || 1),
             totalTimeSpent: 10,
             submittedAt: new Date().toLocaleString(),
             answers: [],
@@ -467,20 +492,46 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
   const submittedCount = currentQAnswers.length;
 
   // 실시간 점수 순위표 (표준 경쟁 순위: 동점자는 동일 등수, 다음 등수는 동점자 수만큼 건너뜀)
-  // 참가자의 점수가 0으로 유실되지 않도록 answersSubmitted 합계 및 리더보드 저장 점수와 종합 병합
-  const participantsWithComputedScores = (liveState?.participants || []).map((p) => {
+  // 참가자의 점수가 0으로 유실되지 않도록 answersSubmitted 합계, 로컬 저장소 및 원격 서버(Supabase DB) 리더보드 점수와 종합 병합
+  const localSavedResults = getRoomLeaderboard(pin) || [];
+  const participantsMap = new Map<string, any>();
+
+  (liveState?.participants || []).forEach((p) => {
     const answersSum = (liveState?.answersSubmitted || [])
       .filter((a: any) => a.participantId === p.id)
       .reduce((sum: number, a: any) => sum + (Number(a.scoreEarned) || 0), 0);
-    const savedResults = getRoomLeaderboard(pin) || [];
-    const saved = savedResults.find((r) => r.id === p.id);
-    const savedScore = saved ? (saved.score || 0) : 0;
+    const localSaved = localSavedResults.find((r) => r.id === p.id || (r.nickname && r.nickname === p.nickname));
+    const remoteSaved = serverResults.find((r) => r.id === p.id || (r.nickname && r.nickname === p.nickname));
+    const savedScore = Math.max(localSaved?.score || 0, remoteSaved?.score || 0);
     const finalScore = Math.max(p.score || 0, answersSum, savedScore);
-    return {
+    participantsMap.set(p.id, {
       ...p,
       score: finalScore,
-    };
+      avatarId: p.avatarId || remoteSaved?.avatarId || localSaved?.avatarId,
+    });
   });
+
+  // 서버(Supabase DB)에 이미 등록된 참가자 결과가 있다면 누락 없이 병합
+  serverResults.forEach((sr) => {
+    const existing = participantsMap.get(sr.id) || Array.from(participantsMap.values()).find((p) => p.nickname === sr.nickname);
+    if (existing) {
+      existing.score = Math.max(existing.score || 0, sr.score || 0);
+      if (!existing.avatarId && sr.avatarId) existing.avatarId = sr.avatarId;
+      if (sr.correctCount !== undefined) {
+        existing.correctCount = Math.max(existing.correctCount || 0, sr.correctCount);
+      }
+    } else {
+      participantsMap.set(sr.id, {
+        id: sr.id,
+        nickname: sr.nickname,
+        avatarId: sr.avatarId,
+        score: sr.score || 0,
+        correctCount: sr.correctCount || 0,
+      });
+    }
+  });
+
+  const participantsWithComputedScores = Array.from(participantsMap.values());
 
   const sortedParticipants = liveState
     ? calculateCompetitionRanks(participantsWithComputedScores)

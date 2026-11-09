@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { QuizRoom, LiveQuizState, QuizAvatar } from '@/types/quiz';
+import type { QuizRoom, LiveQuizState, QuizAvatar, QuizParticipantResult } from '@/types/quiz';
 import { QUIZ_AVATARS } from '@/types/quiz';
 import {
   getQuizRoom,
@@ -8,6 +8,7 @@ import {
   fetchLiveQuizStateAsync,
   subscribeToQuizUpdates,
   submitQuizResult,
+  fetchRoomLeaderboardAsync,
   applyMonotonicQuizState,
 } from '@/utils/quizStorage';
 import {
@@ -241,7 +242,9 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
     }
   }, [liveState?.status, liveState?.currentQuestionIndex, studentTimeLeft, myAnswer]);
 
-  // 퀴즈 종료 시 학생 본인 최종 점수 및 순위 영구 저장 커밋
+  const [serverResults, setServerResults] = useState<QuizParticipantResult[]>([]);
+
+  // 퀴즈 종료 시 학생 본인 최종 점수 및 순위 영구 저장 커밋 & 서버 최종 순위표 동기화
   useEffect(() => {
     const isFinished = liveState?.status === 'finished' || (room && room.questions && liveState && liveState.currentQuestionIndex >= room.questions.length);
     if (isFinished && room && isJoined && !isResultCommitted) {
@@ -269,7 +272,21 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
         body: JSON.stringify(studentResult),
       }).catch(() => {});
     }
-  }, [liveState?.status, liveState?.currentQuestionIndex, room, isJoined, isResultCommitted, nickname, score, correctCount, combo, selectedAvatar]);
+
+    if (isFinished) {
+      const loadServerRankings = async () => {
+        try {
+          const results = await fetchRoomLeaderboardAsync(pin);
+          if (Array.isArray(results) && results.length > 0) {
+            setServerResults(results);
+          }
+        } catch {}
+      };
+      loadServerRankings();
+      const timer = setInterval(loadServerRankings, 1200);
+      return () => clearInterval(timer);
+    }
+  }, [liveState?.status, liveState?.currentQuestionIndex, room, isJoined, isResultCommitted, nickname, score, correctCount, combo, selectedAvatar, pin]);
 
   const currentQ = (room && liveState && liveState.currentQuestionIndex >= 0)
     ? room.questions[liveState.currentQuestionIndex]
@@ -333,6 +350,7 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
       playWrongSound();
     }
 
+    const newTotalScore = score + pointsEarned;
     await clientSubmitLiveAnswer(
       pin,
       studentIdRef.current,
@@ -340,7 +358,8 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
       isCorrect,
       Math.max(0, Math.min(room.timePerQuestion, room.timePerQuestion - accurateRemaining)),
       pointsEarned,
-      liveState.currentQuestionIndex
+      liveState.currentQuestionIndex,
+      newTotalScore
     );
   };
 
@@ -857,6 +876,28 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
         {(liveState.status === 'finished' || (room && room.questions && liveState.currentQuestionIndex >= room.questions.length)) && (() => {
           // 순위 계산
           const rawList = Array.isArray(liveState.participants) ? [...liveState.participants] : [];
+
+          // 원격 서버(Supabase DB) 결과와 병합하여 다른 기기(모바일/PC)에서 획득한 실제 점수 동기화
+          serverResults.forEach((sr) => {
+            const idx = rawList.findIndex((p) => p.id === sr.id || (p.nickname && p.nickname === sr.nickname));
+            if (idx >= 0) {
+              rawList[idx] = {
+                ...rawList[idx],
+                score: Math.max(rawList[idx].score || 0, sr.score || 0),
+                correctCount: Math.max(rawList[idx].correctCount || 0, sr.correctCount || 0),
+                avatarId: rawList[idx].avatarId || sr.avatarId,
+              };
+            } else {
+              rawList.push({
+                id: sr.id,
+                nickname: sr.nickname,
+                avatarId: sr.avatarId,
+                score: sr.score,
+                correctCount: sr.correctCount,
+              } as any);
+            }
+          });
+
           // 내가 목록에 없으면 추가, 있으면 내 최신 점수 반영
           const myParticipantIndex = rawList.findIndex((p) => p.id === studentIdRef.current);
           if (myParticipantIndex >= 0) {

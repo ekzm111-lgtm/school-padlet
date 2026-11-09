@@ -154,7 +154,8 @@ export async function clientSubmitLiveAnswer(
   isCorrect: boolean,
   timeSpent: number,
   pointsEarned: number,
-  questionIndex?: number
+  questionIndex?: number,
+  totalScore?: number
 ): Promise<LiveQuizState | null> {
   let state = getLiveQuizState(pin);
   const qIdx = questionIndex !== undefined ? questionIndex : (state?.currentQuestionIndex ?? 0);
@@ -166,12 +167,15 @@ export async function clientSubmitLiveAnswer(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         pin,
-        participantId,
-        questionIndex: qIdx,
-        selectedAnswer,
-        isCorrect,
-        timeSpent,
-        scoreEarned: pointsEarned,
+        answer: {
+          participantId,
+          questionIndex: qIdx,
+          selectedAnswer,
+          isCorrect,
+          timeSpent,
+          scoreEarned: pointsEarned,
+          score: totalScore,
+        },
       }),
     });
   } catch {}
@@ -206,6 +210,7 @@ export async function clientSubmitLiveAnswer(
     selectedAnswer,
     isCorrect,
     timeSpent,
+    scoreEarned: pointsEarned,
   };
 
   const updatedAnswers = [...state.answersSubmitted];
