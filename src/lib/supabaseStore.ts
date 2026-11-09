@@ -210,6 +210,16 @@ let postCol = p.column_id || p.column_name || metaColumn || '모둠 1';
       if (postCol === '몸플기 예제' || postCol === '몸풀기') {
         postCol = '몸풀기 예제';
       }
+      const parsedOrderIndex =
+        p.order_index !== null && p.order_index !== undefined
+          ? Number(p.order_index)
+          : undefined;
+
+      const finalOrder =
+        typeof parsedOrderIndex === 'number' && !isNaN(parsedOrderIndex)
+          ? parsedOrderIndex
+          : (typeof metaOrder === 'number' ? metaOrder : 0);
+
       return {
         id: p.id,
         boardId: p.board_id,
@@ -222,7 +232,7 @@ let postCol = p.column_id || p.column_name || metaColumn || '모둠 1';
         authorName: p.author_name || '학생',
         authorRole: (p.author_role || 'student') as UserRole,
         column: postCol,
-        order: metaOrder ?? (typeof p.order_index === 'number' ? p.order_index : 0),
+        order: finalOrder,
         reactions: metaReactions || {
           like: Array.isArray(p.likes) ? p.likes.length : 0,
           clap: 0,

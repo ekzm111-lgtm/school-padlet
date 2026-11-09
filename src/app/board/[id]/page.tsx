@@ -204,24 +204,28 @@ export default function BoardDetailPage() {
           }
 
           // 2-2. 최신 게시글 원격 조회 및 모든 모둠(열) 자동 복원 및 보존
-          const targetId = foundBoard?.id || boardId;
+          const targetId = dbBoard?.id || foundBoard?.id || boardId;
           const fetchPostsPromise = fetchRemotePosts(targetId);
           const remote: any = await Promise.race([fetchPostsPromise, timeoutPromise]);
           if (remote && Array.isArray(remote)) {
-            const isTeacherOrAdmin = currentUser?.role === 'admin' || currentUser?.role === 'teacher';
-            // 만약 관리자/선생님 화면에 로컬 카드가 원격보다 더 많이 존재한다면 (예: 32개 vs 2개)
-            // 원격 데이터로 덮어쓰지 않고, 로컬의 풍부한 카드들을 새 Supabase DB로 즉시 일괄 업로드(동기화)!
-            if (isTeacherOrAdmin && localBoardPosts && localBoardPosts.length > remote.length) {
-              setPosts(localBoardPosts);
-              saveAllRemotePosts(localBoardPosts).catch(() => {});
-              if (foundBoard) {
-                saveRemoteBoard(foundBoard).catch(() => {});
-              }
-            } else if (remote.length > 0 || !localBoardPosts.length) {
-              setPosts(remote);
-              const otherPosts = data.posts.filter((p) => p.boardId !== targetId);
-              saveStoreData.posts([...remote, ...otherPosts]);
+            // 🔥 원격 Supabase DB를 절대적인 단일 진실 원천(Single Source of Truth)으로 사용
+            const remoteMap = new Map(remote.map((p: Post) => [p.id, p]));
+
+            // 로컬에만 있고 원격에 아직 없는 새 미동기화 카드가 있다면 원격에 안전하게 보강 (다른 사람의 글 삭제 원천 방지)
+            const unsyncedLocal = (localBoardPosts || []).filter(
+              (lp) => !remoteMap.has(lp.id) && !remote.some((r: Post) => r.column === lp.column && r.title.trim() && r.title.trim() === lp.title.trim())
+            );
+
+            if (unsyncedLocal.length > 0) {
+              unsyncedLocal.forEach((p) => {
+                saveRemotePost(p).catch(() => {});
+              });
             }
+
+            const finalPosts = unsyncedLocal.length > 0 ? [...remote, ...unsyncedLocal] : remote;
+            setPosts(finalPosts);
+            const otherPosts = data.posts.filter((p) => p.boardId !== targetId);
+            saveStoreData.posts([...finalPosts, ...otherPosts]);
 
             // 🔥 중요: 게시글이 속한 모든 열 이름을 빠짐없이 취합하여 화면에서 숨겨지는 일 100% 방지
             const postCols = remote.map((p: Post) => {
@@ -765,49 +769,53 @@ export default function BoardDetailPage() {
     }
   };
 
+  // 🔥 안전한 카드 순서 및 위치 업데이트 함수:
+  // 변경된 열의 카드만 정확히 0, 1, 2, 3... 순서로 재배열하고, 다른 열의 카드는 단 1개도 누락하지 않음!
+  const updatePostsOrderSafely = async (affectedCards: Post[]) => {
+    lastUserActionTimeRef.current = Date.now();
+    const affectedMap = new Map(affectedCards.map((p) => [p.id, p]));
+    const nextPosts = posts.map((p) => affectedMap.get(p.id) || p);
+
+    for (const card of affectedCards) {
+      if (!nextPosts.some((p) => p.id === card.id)) {
+        nextPosts.push(card);
+      }
+    }
+
+    await persistPostsOrder(nextPosts);
+  };
+
   // 1. 특정 열 내에서 카드를 1칸 위(up) 또는 아래(down)로 이동
   const handleMoveCardStep = async (postId: string, direction: 'up' | 'down') => {
+    lastUserActionTimeRef.current = Date.now();
     const targetPost = posts.find((p) => p.id === postId);
     if (!targetPost) return;
 
     const colName = targetPost.column || columns[0] || '모둠 1';
-    const colCards = posts.filter((p) => (p.column || columns[0]) === colName);
+    const colCards = posts
+      .filter((p) => (p.column || columns[0]) === colName)
+      .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
+
     const idxInCol = colCards.findIndex((p) => p.id === postId);
     if (idxInCol === -1) return;
-
     if (direction === 'up' && idxInCol === 0) return;
     if (direction === 'down' && idxInCol === colCards.length - 1) return;
 
     const swapIdx = direction === 'up' ? idxInCol - 1 : idxInCol + 1;
-    const reorderedColCards = [...colCards];
-    const [moved] = reorderedColCards.splice(idxInCol, 1);
-    reorderedColCards.splice(swapIdx, 0, moved);
+    const [moved] = colCards.splice(idxInCol, 1);
+    colCards.splice(swapIdx, 0, moved);
 
-    let counter = 0;
-    const updatedAllPosts: Post[] = [];
     const nowIso = new Date().toISOString();
-    for (const c of columns) {
-      const cards = (c === colName ? reorderedColCards : posts.filter((p) => (p.column || columns[0]) === c));
-      for (const card of cards) {
-        updatedAllPosts.push({
-          ...card,
-          order: counter++,
-          updatedAt: nowIso,
-        });
-      }
-    }
+    const reorderedInCol = colCards.map((card, i) => ({
+      ...card,
+      order: i,
+      updatedAt: nowIso,
+    }));
 
-    const includedIds = new Set(updatedAllPosts.map((p) => p.id));
-    for (const p of posts) {
-      if (!includedIds.has(p.id)) {
-        updatedAllPosts.push({ ...p, order: counter++ });
-      }
-    }
-
-    await persistPostsOrder(updatedAllPosts);
+    await updatePostsOrderSafely(reorderedInCol);
   };
 
-  // 2. 카드를 해당 열의 맨 위로 이동
+  // 2. 카드를 해당 열의 맨 위로 이동 (최상단 고정!)
   const handleMoveCardToTop = async (postId: string) => {
     lastUserActionTimeRef.current = Date.now();
     const targetPost = posts.find((p) => p.id === postId);
@@ -821,60 +829,44 @@ export default function BoardDetailPage() {
     const idxInCol = colCards.findIndex((p) => p.id === postId);
     if (idxInCol <= 0) return;
 
-    const reorderedColCards = [...colCards];
-    const [moved] = reorderedColCards.splice(idxInCol, 1);
-    reorderedColCards.unshift(moved);
+    const [moved] = colCards.splice(idxInCol, 1);
+    colCards.unshift(moved);
 
-    let counter = 0;
-    const updatedAllPosts: Post[] = [];
     const nowIso = new Date().toISOString();
-    for (const c of columns) {
-      const cards = c === colName
-        ? reorderedColCards
-        : posts.filter((p) => (p.column || columns[0]) === c).sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
-      for (const card of cards) {
-        updatedAllPosts.push({ ...card, order: counter++, updatedAt: nowIso });
-      }
-    }
-    const includedTop = new Set(updatedAllPosts.map((p) => p.id));
-    for (const p of posts) {
-      if (!includedTop.has(p.id)) {
-        updatedAllPosts.push({ ...p, order: counter++ });
-      }
-    }
-    await persistPostsOrder(updatedAllPosts);
+    const reorderedInCol = colCards.map((card, i) => ({
+      ...card,
+      order: i,
+      updatedAt: nowIso,
+    }));
+
+    await updatePostsOrderSafely(reorderedInCol);
   };
 
   // 3. 카드를 해당 열의 맨 아래로 이동
   const handleMoveCardToBottom = async (postId: string) => {
+    lastUserActionTimeRef.current = Date.now();
     const targetPost = posts.find((p) => p.id === postId);
     if (!targetPost) return;
 
     const colName = targetPost.column || columns[0] || '모둠 1';
-    const colCards = posts.filter((p) => (p.column || columns[0]) === colName);
+    const colCards = posts
+      .filter((p) => (p.column || columns[0]) === colName)
+      .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
+
     const idxInCol = colCards.findIndex((p) => p.id === postId);
     if (idxInCol === -1 || idxInCol === colCards.length - 1) return;
 
-    const reorderedColCards = [...colCards];
-    const [moved] = reorderedColCards.splice(idxInCol, 1);
-    reorderedColCards.push(moved);
+    const [moved] = colCards.splice(idxInCol, 1);
+    colCards.push(moved);
 
-    let counter = 0;
-    const updatedAllPosts: Post[] = [];
     const nowIso = new Date().toISOString();
-    for (const c of columns) {
-      const cards = (c === colName ? reorderedColCards : posts.filter((p) => (p.column || columns[0]) === c));
-      for (const card of cards) {
-        updatedAllPosts.push({ ...card, order: counter++, updatedAt: nowIso });
-      }
-    }
-    const includedTop = new Set(updatedAllPosts.map((p) => p.id));
-    for (const p of posts) {
-      if (!includedTop.has(p.id)) {
-        updatedAllPosts.push({ ...p, order: counter++ });
-      }
-    }
-    await persistPostsOrder(updatedAllPosts);
+    const reorderedInCol = colCards.map((card, i) => ({
+      ...card,
+      order: i,
+      updatedAt: nowIso,
+    }));
+
+    await updatePostsOrderSafely(reorderedInCol);
   };
 
   // 4. 카드를 다른 모둠(열)으로 이동
@@ -883,23 +875,30 @@ export default function BoardDetailPage() {
     if (!targetPost || targetPost.column === newColName) return;
 
     const nowIso = new Date().toISOString();
+    const oldCol = targetPost.column || columns[0] || '모둠 1';
     const updatedCard = { ...targetPost, column: newColName, updatedAt: nowIso };
-    const remainingPosts = posts.filter((p) => p.id !== postId);
 
-    // 대상 열의 맨 끝에 추가하고 전체 순서 재부여
-    let counter = 0;
-    const updatedAllPosts: Post[] = [];
-    for (const c of columns) {
-      const colCards = remainingPosts.filter((p) => (p.column || columns[0]) === c);
-      if (c === newColName) {
-        colCards.push(updatedCard);
-      }
-      for (const card of colCards) {
-        updatedAllPosts.push({ ...card, order: counter++, updatedAt: nowIso });
-      }
-    }
+    // 대상 열 맨 끝에 추가
+    const targetColCards = posts
+      .filter((p) => (p.column || columns[0]) === newColName && p.id !== postId)
+      .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
+    targetColCards.push(updatedCard);
 
-    await persistPostsOrder(updatedAllPosts);
+    const affectedCards: Post[] = targetColCards.map((card, i) => ({
+      ...card,
+      order: i,
+      updatedAt: nowIso,
+    }));
+
+    // 출발지 열 재부여
+    const sourceColCards = posts
+      .filter((p) => (p.column || columns[0]) === oldCol && p.id !== postId)
+      .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
+    sourceColCards.forEach((card, i) => {
+      affectedCards.push({ ...card, order: i, updatedAt: nowIso });
+    });
+
+    await updatePostsOrderSafely(affectedCards);
   };
 
   // 5. 같은 열 또는 다른 열의 특정 카드 위에 드롭했을 때 순서 변경 (위/아래 다중 칸 자유 이동)
@@ -907,7 +906,6 @@ export default function BoardDetailPage() {
     e.preventDefault();
     e.stopPropagation();
 
-    // 열 자체를 드롭했을 경우
     if (draggedColIdx !== null) {
       handleColumnDrop(draggedColIdx, targetColIdx);
       return;
@@ -938,9 +936,10 @@ export default function BoardDetailPage() {
     }
 
     const nowIso = new Date().toISOString();
+    const oldCol = sourcePost.column || columns[0] || '모둠 1';
     const updatedMoved = { ...sourcePost, column: colName, updatedAt: nowIso };
 
-    // 대상 열의 카드 목록 가져오기 (드래그 중인 카드 제외 및 현재 order 기준 정렬)
+    // 대상 열 정렬 후 삽입
     const targetColCards = posts
       .filter((p) => (p.column || columns[0]) === colName && p.id !== sourceId)
       .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
@@ -949,23 +948,24 @@ export default function BoardDetailPage() {
     const insertIdx = targetIdx === -1 ? targetColCards.length : (isBelow ? targetIdx + 1 : targetIdx);
     targetColCards.splice(insertIdx, 0, updatedMoved);
 
-    let counter = 0;
-    const reorderedPosts: Post[] = [];
-    for (const c of columns) {
-      const cardsInCol = c === colName
-        ? targetColCards
-        : posts.filter((p) => (p.column || columns[0]) === c && p.id !== sourceId).sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
-      for (const card of cardsInCol) {
-        reorderedPosts.push({
-          ...card,
-          order: counter++,
-        });
-      }
+    const affectedCards: Post[] = targetColCards.map((card, i) => ({
+      ...card,
+      order: i,
+      updatedAt: nowIso,
+    }));
+
+    if (oldCol !== colName) {
+      const sourceColCards = posts
+        .filter((p) => (p.column || columns[0]) === oldCol && p.id !== sourceId)
+        .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
+      sourceColCards.forEach((card, i) => {
+        affectedCards.push({ ...card, order: i, updatedAt: nowIso });
+      });
     }
 
     setDraggedPostId(null);
     setDragOverPostId(null);
-    await persistPostsOrder(reorderedPosts);
+    await updatePostsOrderSafely(affectedCards);
   };
 
   // 열 빈 공간에 드롭했을 때 맨 뒤로 이동
@@ -995,27 +995,32 @@ export default function BoardDetailPage() {
     }
 
     const nowIso = new Date().toISOString();
+    const oldCol = sourcePost.column || columns[0] || '모둠 1';
     const updatedMoved = { ...sourcePost, column: colName, updatedAt: nowIso };
-    const remainingPosts = posts.filter((p) => p.id !== postId);
 
-    let counter = 0;
-    const reorderedPosts: Post[] = [];
-    for (const c of columns) {
-      const cardsInCol = remainingPosts.filter((p) => (p.column || columns[0]) === c);
-      if (c === colName) {
-        cardsInCol.push(updatedMoved);
-      }
-      for (const card of cardsInCol) {
-        reorderedPosts.push({
-          ...card,
-          order: counter++,
-        });
-      }
+    const targetColCards = posts
+      .filter((p) => (p.column || columns[0]) === colName && p.id !== postId)
+      .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
+    targetColCards.push(updatedMoved);
+
+    const affectedCards: Post[] = targetColCards.map((card, i) => ({
+      ...card,
+      order: i,
+      updatedAt: nowIso,
+    }));
+
+    if (oldCol !== colName) {
+      const sourceColCards = posts
+        .filter((p) => (p.column || columns[0]) === oldCol && p.id !== postId)
+        .sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
+      sourceColCards.forEach((card, i) => {
+        affectedCards.push({ ...card, order: i, updatedAt: nowIso });
+      });
     }
 
     setDraggedPostId(null);
     setDragOverPostId(null);
-    await persistPostsOrder(reorderedPosts);
+    await updatePostsOrderSafely(affectedCards);
   };
 
   // 그리드 순서 변경

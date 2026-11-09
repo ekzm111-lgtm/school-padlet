@@ -401,6 +401,12 @@ export default function PostModal({
       } else {
         // 생성 모드 저장 (유니크 타임스탬프 + 랜덤 ID)
         const nowIso = new Date().toISOString();
+        const data = getStoreData();
+        // 해당 열의 기존 카드들 중 가장 작은 order보다 앞서도록 설정하여 항상 최상단 배치
+        const existingInCol = data.posts.filter((p) => (p.column || '모둠 1') === finalColumn);
+        const minOrder = existingInCol.reduce((min, p) => Math.min(min, typeof p.order === 'number' ? p.order : 0), 0);
+        const newOrder = minOrder <= 0 ? minOrder - 1 : 0;
+
         const newPost: Post = {
           id: `post-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           boardId,
@@ -417,12 +423,12 @@ export default function PostModal({
           reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
           comments: [],
           column: finalColumn,
+          order: newOrder,
           x: 30 + Math.random() * 200,
           y: 80 + Math.random() * 200,
           createdAt: nowIso,
         };
 
-        const data = getStoreData();
         saveStoreData.posts([newPost, ...data.posts]);
         if (isSupabaseConfigured) {
           await saveRemotePost(newPost);
