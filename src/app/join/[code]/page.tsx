@@ -61,7 +61,7 @@ function JoinPageContent() {
         // 3. Supabase 클라우드 실시간 데이터베이스 조회 (2.5초 타임아웃 레이스)
         if (!found && isSupabaseConfigured && supabase) {
           try {
-            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
             const queryPromise = supabase
               .from('boards')
               .select('*')
