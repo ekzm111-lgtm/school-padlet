@@ -431,7 +431,13 @@ export default function PostModal({
 
         saveStoreData.posts([newPost, ...data.posts]);
         if (isSupabaseConfigured) {
-          await saveRemotePost(newPost);
+          const ok = await saveRemotePost(newPost);
+          if (!ok) {
+            console.warn('saveRemotePost initial attempt failed, queuing retry...');
+            setTimeout(() => {
+              saveRemotePost(newPost);
+            }, 1000);
+          }
         }
         addMyPostId(newPost.id);
         if (onCreated) onCreated(newPost, createdColumnName);

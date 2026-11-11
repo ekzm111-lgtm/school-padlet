@@ -334,18 +334,40 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       created_at: safeCreatedAt,
     };
 
-    const { error } = await supabase.from('posts').upsert(rowPayload);
-    if (error) {
-      console.error('saveRemotePost upsert failed:', error);
-      // 만약 이미지나 첨부 용량 초과로 실패했다면 본문과 텍스트 위주로 안전 재시도
-      if (post.imageUrl && (error.message?.includes('payload') || (error as any).code === '413')) {
-        console.warn('Retrying saveRemotePost with light payload...');
-        const { error: errRetry } = await supabase.from('posts').upsert({
-          ...rowPayload,
-          image_url: null,
-        });
-        if (!errRetry) return true;
+    let res = await supabase.from('posts').upsert(rowPayload);
+    if (res.error) {
+      console.warn('saveRemotePost 1st try failed:', res.error);
+
+      // 1-1. 일시적 네트워크 지연 또는 동시 요청 충돌 방어 (400ms 후 2차 재시도)
+      await new Promise((r) => setTimeout(r, 400));
+      res = await supabase.from('posts').upsert(rowPayload);
+      if (!res.error) return true;
+
+      // 1-2. 페이로드 용량 초과 방어: 대용량 첨부 dataUrl 경량화 재시도
+      console.warn('saveRemotePost retrying with light payload (omitting large base64 dataUrls)...');
+      const lightAtts = atts.map((a) => ({
+        name: a.name,
+        size: a.size,
+        type: a.type,
+        dataUrl: (a.dataUrl && a.dataUrl.length > 80000) ? '' : a.dataUrl,
+      }));
+
+      const lightMeta = { ...meta, attachments: lightAtts };
+      const lightContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(lightMeta)}-->`;
+
+      const lightPayload = {
+        ...rowPayload,
+        content: lightContent,
+        attachments: lightAtts,
+        image_url: (post.imageUrl && post.imageUrl.length > 200000) ? null : (post.imageUrl || null),
+      };
+
+      const retryRes = await supabase.from('posts').upsert(lightPayload);
+      if (!retryRes.error) {
+        console.log('saveRemotePost successfully saved with light payload!');
+        return true;
       }
+      console.error('saveRemotePost retry also failed:', retryRes.error);
       return false;
     }
     return true;

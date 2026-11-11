@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -94,13 +94,47 @@ export default function BoardDetailPage() {
 
   // 보드 메인 가로 스크롤 Ref & 휠 조작 & 좌우 버튼 핸들러
   const mainScrollRef = useRef<HTMLDivElement>(null);
+  const [selectedColTab, setSelectedColTab] = useState<string>('__ALL__');
+
+  // 모둠별 카드 개수 실시간 집계 (탭 바 배지용)
+  const columnCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    columns.forEach((c) => {
+      counts[c] = posts.filter((p) => (p.column || columns[0]) === c || (!p.column && c === columns[0])).length;
+    });
+    return counts;
+  }, [columns, posts]);
 
   const handleMainWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!mainScrollRef.current) return;
     const target = e.target as HTMLElement;
-    // 모둠 내부 카드 목록 세로 스크롤 중이 아닐 때만 보드 전체 가로 스크롤 작동
-    if (!target.closest('.slim-scrollbar') && mainScrollRef.current) {
+    const scrollContainer = target.closest('.slim-scrollbar') as HTMLElement | null;
+
+    // 1) Shift 키 조합 또는 명시적 가로 휠/트랙패드 제스처
+    if (e.shiftKey) {
+      mainScrollRef.current.scrollLeft += (e.deltaY || e.deltaX) * 1.2;
+      return;
+    }
+
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && e.deltaX !== 0) {
+      // 노트북 트랙패드 / 가로 휠
+      mainScrollRef.current.scrollLeft += e.deltaX * 1.2;
+      return;
+    }
+
+    // 2) 카드 목록 바깥 영역(여백, 모둠 헤더 등)에서는 세로 휠을 보드 전체 가로 스크롤로 매핑
+    if (!scrollContainer) {
       if (e.deltaY !== 0) {
         mainScrollRef.current.scrollLeft += e.deltaY * 1.2;
+      }
+    } else {
+      // 3) 카드 목록 내부라도 끝에 도달했을 때 가로 스크롤 허용
+      const atTop = scrollContainer.scrollTop <= 0 && e.deltaY < 0;
+      const atBottom =
+        scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 2 &&
+        e.deltaY > 0;
+      if (atTop || atBottom) {
+        mainScrollRef.current.scrollLeft += e.deltaY * 0.8;
       }
     }
   };
@@ -109,6 +143,24 @@ export default function BoardDetailPage() {
     if (mainScrollRef.current) {
       const offset = direction === 'left' ? -350 : 350;
       mainScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
+  const scrollToColumn = (colName: string) => {
+    setSelectedColTab(colName);
+    setActiveColumn(colName === '__ALL__' ? columns[0] : colName);
+    if (!mainScrollRef.current) return;
+    if (colName === '__ALL__') {
+      mainScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+      return;
+    }
+    const targetElem = document.getElementById(`board-col-${encodeURIComponent(colName)}`);
+    if (targetElem) {
+      targetElem.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      targetElem.classList.add('ring-4', 'ring-blue-400');
+      setTimeout(() => {
+        targetElem.classList.remove('ring-4', 'ring-blue-400');
+      }, 1200);
     }
   };
 
@@ -1369,7 +1421,7 @@ export default function BoardDetailPage() {
                 onClick={() => {
                   setModalMode('create');
                   setSelectedPostForEdit(undefined);
-                  setActiveColumn(columns[0]);
+                  setActiveColumn(activeColumn || columns[0]);
                   setShowPostModal(true);
                 }}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition active:scale-95 shrink-0 whitespace-nowrap"
@@ -1382,6 +1434,69 @@ export default function BoardDetailPage() {
         </div>
       </div>
     </div>
+
+      {/* 🔥 모둠(열) 퀵 탭 바: 어떤 모둠에 글이 몇 개 있는지 즉시 확인하고 1초 만에 스크롤 이동 */}
+      {currentLayout === 'kanban' && columns.length > 0 && (
+        <div className="no-print w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-3 sm:px-5 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shadow-xs shrink-0 z-10">
+          <span className="text-[11px] font-bold text-slate-500 shrink-0 mr-1 flex items-center gap-1">
+            <Columns className="w-3.5 h-3.5 text-blue-500" />
+            <span className="hidden sm:inline">모둠 바로가기:</span>
+          </span>
+
+          {/* 전체 모둠 보기 */}
+          <button
+            type="button"
+            onClick={() => scrollToColumn('__ALL__')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+              selectedColTab === '__ALL__'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+            title="전체 모둠을 맨 처음부터 봅니다"
+          >
+            <span>전체 모둠</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+              selectedColTab === '__ALL__' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {posts.length}
+            </span>
+          </button>
+
+          {/* 각 모둠별 탭 */}
+          {columns.map((c) => {
+            const count = columnCounts[c] || 0;
+            const isSelected = selectedColTab === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => scrollToColumn(c)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 border ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-300'
+                    : count > 0
+                    ? 'bg-blue-50/80 hover:bg-blue-100/80 text-blue-900 border-blue-200/80'
+                    : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
+                }`}
+                title={`${c} 모둠으로 화면 이동 (등록된 카드: ${count}개)`}
+              >
+                <span className="max-w-[130px] truncate">{c}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                    isSelected
+                      ? 'bg-white/20 text-white'
+                      : count > 0
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* 메인 콘텐츠 영역 (가로 스크롤 & 각 모둠별 독립 세로 스크롤 완벽 지원) */}
       <div className="relative flex-1 w-full min-h-0 flex flex-col overflow-hidden">
@@ -1423,6 +1538,7 @@ export default function BoardDetailPage() {
               return (
                 <div
                   key={colName}
+                  id={`board-col-${encodeURIComponent(colName)}`}
                   onDragOver={(e) => {
                     e.preventDefault();
                     if (draggedColIdx !== null && draggedColIdx !== idx) {
