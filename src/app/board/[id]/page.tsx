@@ -149,6 +149,13 @@ export default function BoardDetailPage() {
   const scrollToColumn = (colName: string) => {
     setSelectedColTab(colName);
     setActiveColumn(colName === '__ALL__' ? columns[0] : colName);
+
+    // 탭 버튼 자체도 가로 탭 바 내에서 중앙으로 스크롤 (모바일 편의성 극대화)
+    const tabElem = document.getElementById(`board-tab-${encodeURIComponent(colName)}`);
+    if (tabElem) {
+      tabElem.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+
     if (!mainScrollRef.current) return;
     if (colName === '__ALL__') {
       mainScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
@@ -1446,6 +1453,7 @@ export default function BoardDetailPage() {
           {/* 전체 모둠 보기 */}
           <button
             type="button"
+            id="board-tab-__ALL__"
             onClick={() => scrollToColumn('__ALL__')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
               selectedColTab === '__ALL__'
@@ -1470,6 +1478,7 @@ export default function BoardDetailPage() {
               <button
                 key={c}
                 type="button"
+                id={`board-tab-${encodeURIComponent(c)}`}
                 onClick={() => scrollToColumn(c)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 border ${
                   isSelected
@@ -1692,6 +1701,32 @@ export default function BoardDetailPage() {
                         />
                       </div>
                     ))}
+
+                    {/* 빈 모둠 친절 안내 및 첫 카드 작성 원클릭 버튼 */}
+                    {colPosts.length === 0 && (
+                      <div className="flex-1 flex flex-col items-center justify-center p-5 text-center border-2 border-dashed border-slate-200/90 rounded-2xl bg-slate-50/60 my-2">
+                        <div className="w-9 h-9 rounded-full bg-slate-200/70 flex items-center justify-center text-slate-400 mb-2">
+                          <Plus className="w-5 h-5 text-slate-500" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-600 mb-0.5">아직 카드가 없습니다</p>
+                        <p className="text-[11px] text-slate-400 mb-3">첫 번째 의견이나 자료를 올려보세요!</p>
+                        {(!board.isLocked || isTeacherOrAdmin) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalMode('create');
+                              setSelectedPostForEdit(undefined);
+                              setActiveColumn(colName);
+                              setShowPostModal(true);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition active:scale-95 flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>첫 카드 작성</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
