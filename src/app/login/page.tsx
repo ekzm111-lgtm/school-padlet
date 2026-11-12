@@ -18,6 +18,8 @@ import {
   KeyRound,
   ShieldAlert,
   X,
+  UserPlus,
+  ChevronRight,
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User, UserRole, UserStatus } from '@/lib/types';
@@ -49,6 +51,7 @@ export default function LoginPage() {
 
   // 🌟 Google(Gmail) 모달 및 자동입력 상태
   const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [showCustomGoogleInput, setShowCustomGoogleInput] = useState(false);
   const [googleEmailInput, setGoogleEmailInput] = useState('');
   const [googleNameInput, setGoogleNameInput] = useState('');
   const [googleRoleInput, setGoogleRoleInput] = useState<UserRole>('student');
@@ -502,60 +505,31 @@ export default function LoginPage() {
                     </div>
                   </div>
 
-                  {savedGmail ? (
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => handleGoogleSubmit(savedGmail, savedName, 'student')}
-                        className="w-full flex items-center justify-between py-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition active:scale-95"
-                      >
-                        <div className="flex items-center gap-2.5 truncate text-left">
-                          <div className="w-6 h-6 rounded-full bg-amber-500 text-white font-bold flex items-center justify-center text-[11px] shrink-0 uppercase">
-                            {savedName?.[0] || 'G'}
-                          </div>
-                          <div className="truncate">
-                            <div className="font-extrabold">{savedName || '구글 사용자'}</div>
-                            <div className="text-[10px] text-blue-100 truncate">{savedGmail}</div>
-                          </div>
-                        </div>
-                        <span className="text-[11px] bg-white/20 px-2 py-1 rounded-lg shrink-0 font-extrabold">1초 로그인 &gt;</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleGoogleAuth}
-                        className="w-full text-center text-[11px] text-slate-500 hover:text-slate-800 underline transition py-1"
-                      >
-                        다른 Google 계정으로 로그인 또는 신규 가입
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleGoogleAuth}
-                      className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 font-bold text-xs text-slate-700 transition"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path
-                          fill="#4285F4"
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        />
-                        <path
-                          fill="#34A853"
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        />
-                        <path
-                          fill="#FBBC05"
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                        />
-                        <path
-                          fill="#EA4335"
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                        />
-                      </svg>
-                      <span>Google (Gmail) 원클릭 로그인</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 font-bold text-xs text-slate-700 transition shadow-2xs active:scale-95"
+                  >
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Google 계정으로 로그인</span>
+                  </button>
                 </form>
               )}
 
@@ -781,129 +755,158 @@ export default function LoginPage() {
       {/* Google Identity Services 스크립트 비동기 로드 */}
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
 
-      {/* 🌟 Google (Gmail) 원클릭 로그인 & 가입 모달 */}
+      {/* 🌟 Google 공식 스타일 "계정 선택" 모달 */}
       {showGoogleModal && (
         <div
           onClick={() => setShowGoogleModal(false)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-150"
+            className="bg-white rounded-3xl max-w-sm w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-150 relative"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-800">Google 계정으로 시작</h3>
-                  <p className="text-[11px] text-slate-400">브라우저 구글 계정으로 1초 자동 완성</p>
-                </div>
+            {/* 상단 닫기 버튼 */}
+            <button
+              type="button"
+              onClick={() => setShowGoogleModal(false)}
+              className="absolute right-4 top-4 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* 상단 Google 로고 & 타이틀 */}
+            <div className="text-center pt-1">
+              <div className="w-11 h-11 mx-auto mb-2.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-2xs">
+                <svg className="w-6 h-6" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
               </div>
+              <h3 className="text-base font-extrabold text-slate-900">계정 선택</h3>
+              <p className="text-xs text-slate-500 mt-0.5">스쿨패들로 이동할 계정을 선택하세요</p>
+            </div>
+
+            {/* 신분 선택 (학생 / 선생님) */}
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 mb-1.5 px-0.5">신분 선택</div>
+              <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-2 gap-1 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setGoogleRoleInput('student')}
+                  className={`py-1.5 rounded-lg transition ${
+                    googleRoleInput === 'student' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🎒 학생으로 입장
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGoogleRoleInput('teacher')}
+                  className={`py-1.5 rounded-lg transition ${
+                    googleRoleInput === 'teacher' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  👩‍🏫 선생님으로 입장
+                </button>
+              </div>
+            </div>
+
+            {/* 계정 목록 */}
+            <div className="space-y-2 pt-1">
+              {/* 1) 감지된 브라우저 Google 계정 */}
               <button
                 type="button"
-                onClick={() => setShowGoogleModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                onClick={() => handleGoogleSubmit(savedGmail || 'ekzm11133@gmail.com', savedName || 'minwan1 kim', googleRoleInput)}
+                className="w-full flex items-center justify-between p-3.5 rounded-2xl border-2 border-blue-200/80 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50 transition group text-left shadow-2xs active:scale-98"
               >
-                <X className="w-4 h-4" />
+                <div className="flex items-center gap-3 truncate">
+                  <div className="w-10 h-10 rounded-full bg-amber-500 text-white font-extrabold flex items-center justify-center text-sm shadow-xs uppercase shrink-0">
+                    {savedName?.[0] || 'M'}
+                  </div>
+                  <div className="truncate">
+                    <div className="font-bold text-sm text-slate-900 group-hover:text-blue-700 leading-tight">
+                      {savedName || 'minwan1 kim'}
+                    </div>
+                    <div className="text-xs text-slate-500 truncate mt-0.5">
+                      {savedGmail || 'ekzm11133@gmail.com'}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <span className="text-[11px] text-blue-600 font-bold bg-white/90 border border-blue-200 px-2 py-0.5 rounded-full">선택</span>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
+                </div>
+              </button>
+
+              {/* 2) 다른 계정 사용 버튼 */}
+              <button
+                type="button"
+                onClick={() => setShowCustomGoogleInput(!showCustomGoogleInput)}
+                className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition text-left shadow-2xs active:scale-98"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-sm border border-slate-200 shrink-0">
+                    <UserPlus className="w-5 h-5 text-slate-500" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-800">다른 Google 계정 사용</div>
+                    <div className="text-[11px] text-slate-400">다른 Gmail 주소로 로그인 또는 신규 등록</div>
+                  </div>
+                </div>
+                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${showCustomGoogleInput ? 'rotate-90' : ''}`} />
               </button>
             </div>
 
-            {/* Google Identity Services 원탭/공식 버튼 (클라이언트 ID 등록 시 자동 렌더링) */}
-            <div id="google-official-btn" className="flex justify-center w-full empty:hidden" />
-
-            {/* 최근 저장/감지된 Gmail이 있는 경우 원클릭 빠른 로그인 */}
-            {savedGmail ? (
-              <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-200/80 space-y-2">
-                <div className="text-[11px] font-bold text-blue-900 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    <span>내 Google 계정 감지됨</span>
-                  </span>
-                  <span className="text-blue-600 text-[10px] font-extrabold bg-blue-100/70 px-2 py-0.5 rounded-full">1클릭 즉시 입장</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleGoogleSubmit(savedGmail, savedName, googleRoleInput)}
-                  className="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center justify-between shadow-xs active:scale-95"
-                >
-                  <div className="flex items-center gap-2 truncate text-left">
-                    <div className="w-6 h-6 rounded-full bg-amber-500 text-white font-bold flex items-center justify-center text-[11px] shrink-0 uppercase">
-                      {savedName?.[0] || savedGmail[0] || 'G'}
-                    </div>
-                    <div className="truncate">
-                      <div className="font-extrabold leading-tight">{savedName || '구글 사용자'}</div>
-                      <div className="text-[10px] text-blue-100 truncate">{savedGmail}</div>
-                    </div>
-                  </div>
-                  <span className="text-[11px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg shrink-0 font-extrabold">1초 만에 바로 입장 &gt;</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleAutoFillFromBrowser}
-                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-2 active:scale-95 shadow-2xs"
+            {/* 다른 계정 직접 입력 폼 (토글 시 노출) */}
+            {showCustomGoogleInput && (
+              <form
+                id="google-auth-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleGoogleSubmit();
+                }}
+                className="space-y-3 pt-3 border-t border-slate-100 animate-in fade-in duration-150"
               >
-                <Sparkles className="w-4 h-4 text-blue-600" />
-                <span>현재 브라우저 Google 계정 자동 감지</span>
-              </button>
-            )}
-
-            <form
-              id="google-auth-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleGoogleSubmit();
-              }}
-              className="space-y-3 pt-1"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="google-email-input" className="block text-xs font-bold text-slate-700">
-                    구글(Gmail) 주소 입력
-                  </label>
-                  {!googleEmailInput.includes('@') && googleEmailInput.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const filled = googleEmailInput + '@gmail.com';
-                        setGoogleEmailInput(filled);
-                        if (!googleNameInput) setGoogleNameInput(googleEmailInput);
-                      }}
-                      className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200"
-                    >
-                      + @gmail.com
-                    </button>
-                  )}
-                </div>
-                <div className="relative">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="google-email-input" className="block text-xs font-bold text-slate-700">
+                      구글(Gmail) 주소 입력
+                    </label>
+                    {!googleEmailInput.includes('@') && googleEmailInput.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filled = googleEmailInput + '@gmail.com';
+                          setGoogleEmailInput(filled);
+                          if (!googleNameInput) setGoogleNameInput(googleEmailInput);
+                        }}
+                        className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200"
+                      >
+                        + @gmail.com
+                      </button>
+                    )}
+                  </div>
                   <input
                     id="google-email-input"
                     name="email"
                     type="email"
                     autoComplete="email webauthn username"
-                    autoFocus
                     required
-                    placeholder="student@gmail.com (클릭 시 브라우저 자동완성)"
+                    placeholder="student@gmail.com"
                     value={googleEmailInput}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -915,55 +918,31 @@ export default function LoginPage() {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="google-name-input" className="block text-xs font-bold text-slate-700 mb-1">
-                  성함 (이름)
-                </label>
-                <input
-                  id="google-name-input"
-                  name="name"
-                  type="text"
-                  autoComplete="name"
-                  placeholder="예: 김학생 또는 이선생님 (미입력 시 자동 생성)"
-                  value={googleNameInput}
-                  onChange={(e) => setGoogleNameInput(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">신분 선택</label>
-                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setGoogleRoleInput('student')}
-                    className={`py-1 text-xs font-bold rounded-lg transition ${
-                      googleRoleInput === 'student' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600'
-                    }`}
-                  >
-                    🎒 학생
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGoogleRoleInput('teacher')}
-                    className={`py-1 text-xs font-bold rounded-lg transition ${
-                      googleRoleInput === 'teacher' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600'
-                    }`}
-                  >
-                    👩‍🏫 선생님
-                  </button>
+                <div>
+                  <label htmlFor="google-name-input" className="block text-xs font-bold text-slate-700 mb-1">
+                    성함 (이름)
+                  </label>
+                  <input
+                    id="google-name-input"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="예: 김학생 또는 이선생님"
+                    value={googleNameInput}
+                    onChange={(e) => setGoogleNameInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
-              >
-                <span>Google 계정으로 자동 기입 & 입장하기</span>
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-sm active:scale-95"
+                >
+                  이 계정으로 입장하기
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
