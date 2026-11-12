@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Heart,
@@ -117,6 +117,39 @@ export default function PostCard({
   const [editCommentText, setEditCommentText] = useState('');
   const [showImageModal, setShowImageModal] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+
+  // 첨부 이미지 또는 링크 기반 대표 썸네일 자동 계산 (유튜브, GitHub 등 링크만 있어도 카드가 썸네일 자동 렌더링!)
+  const cardImage = useMemo(() => {
+    if (currentPost.imageUrl) return currentPost.imageUrl;
+    if (currentPost.linkUrl) {
+      const url = currentPost.linkUrl.trim();
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        try {
+          const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+          let videoId = '';
+          if (u.hostname.includes('youtu.be')) {
+            videoId = u.pathname.replace(/^\//, '').split(/[?#]/)[0];
+          } else if (u.pathname.startsWith('/shorts/')) {
+            videoId = u.pathname.replace('/shorts/', '').split(/[/?#]/)[0];
+          } else {
+            videoId = u.searchParams.get('v') || '';
+          }
+          if (videoId) return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        } catch (e) {}
+      } else if (url.includes('github.com')) {
+        try {
+          const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+          const parts = u.pathname.split('/').filter(Boolean);
+          if (parts.length >= 2) return `https://opengraph.githubassets.com/1/${parts[0]}/${parts[1]}`;
+        } catch (e) {}
+      } else if (url.includes('google.com/search') || url.includes('google.co.kr/search')) {
+        return 'https://images.unsplash.com/photo-1572021335469-31706a17aaef?w=800&auto=format&fit=crop&q=80';
+      } else if (url.includes('coupang.com')) {
+        return 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&auto=format&fit=crop&q=80';
+      }
+    }
+    return null;
+  }, [currentPost.imageUrl, currentPost.linkUrl]);
 
   // 글 내용 클립보드 복사 함수
   const handleCopyContent = (e: React.MouseEvent) => {
@@ -602,8 +635,8 @@ export default function PostCard({
             </div>
           )}
 
-          {/* 첨부 이미지 (클릭 시 링크가 있으면 링크 새 탭 오픈, 없으면 원본 확대) */}
-          {currentPost.imageUrl && (
+          {/* 첨부 이미지 (또는 링크로부터 자동 추출된 썸네일) */}
+          {cardImage && (
             <div
               onClick={(e) => {
                 e.stopPropagation();
@@ -625,8 +658,8 @@ export default function PostCard({
               }
             >
               <img
-                src={currentPost.imageUrl}
-                alt="첨부 이미지"
+                src={cardImage}
+                alt="대표 이미지"
                 className="w-full max-h-56 object-cover group-hover:scale-105 transition duration-300"
               />
             </div>
@@ -843,14 +876,14 @@ export default function PostCard({
       </div>
 
       {/* 이미지 확대 모달 */}
-      {showImageModal && currentPost.imageUrl && typeof document !== 'undefined' && createPortal(
+      {showImageModal && cardImage && typeof document !== 'undefined' && createPortal(
         <div
           onClick={() => setShowImageModal(false)}
           className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
         >
           <div className="max-w-3xl max-h-[90vh] p-2">
             <img
-              src={currentPost.imageUrl}
+              src={cardImage}
               alt="확대 이미지"
               className="max-h-[85vh] w-auto rounded-2xl shadow-2xl mx-auto object-contain"
             />

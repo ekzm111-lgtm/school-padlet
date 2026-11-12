@@ -188,20 +188,69 @@ export default function PostModal({
     setAutoPreviewLoaded(false);
   }, [isOpen, mode, post, defaultColumn, columns, currentUser]);
 
+  // 유튜브, GitHub, 직접 이미지 링크 등 클라이언트 측 즉시 썸네일 판별 함수 (0ms 즉시 동작)
+  const extractInstantThumbnail = (url: string): string | null => {
+    try {
+      let clean = url.trim();
+      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+        clean = 'https://' + clean;
+      }
+      const u = new URL(clean);
+      const host = u.hostname.toLowerCase();
+
+      // 1. YouTube 영상 및 쇼츠
+      if (host.includes('youtu.be') || host.includes('youtube.com')) {
+        let videoId = '';
+        if (host.includes('youtu.be')) {
+          videoId = u.pathname.replace(/^\//, '').split(/[?#]/)[0];
+        } else if (u.pathname.startsWith('/shorts/')) {
+          videoId = u.pathname.replace('/shorts/', '').split(/[/?#]/)[0];
+        } else {
+          videoId = u.searchParams.get('v') || '';
+        }
+        if (videoId) {
+          return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        }
+      }
+
+      // 2. 직접 이미지 URL
+      if (/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(u.pathname)) {
+        return clean;
+      }
+
+      // 3. GitHub 레포지토리
+      if (host === 'github.com') {
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+          return `https://opengraph.githubassets.com/1/${parts[0]}/${parts[1]}`;
+        }
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   // 링크(URL)의 대표 이미지(OpenGraph, 유튜브 썸네일 등) 및 제목 자동 추출 함수
   const fetchLinkPreview = async (
     url: string
   ): Promise<{ imageUrl: string | null; title: string | null }> => {
+    // 1순위: 클라이언트 즉시 추출 (0ms 지연 없음)
+    const instantImg = extractInstantThumbnail(url);
+
     try {
       const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
-      if (!res.ok) return { imageUrl: null, title: null };
-      const data = await res.json();
-      return {
-        imageUrl: data && data.ok && data.imageUrl ? (data.imageUrl as string) : null,
-        title: data && data.ok && data.title ? (data.title as string) : null,
-      };
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          imageUrl: (data && data.ok && data.imageUrl) || instantImg,
+          title: data && data.ok && data.title ? (data.title as string) : null,
+        };
+      }
+      return { imageUrl: instantImg, title: null };
     } catch {
-      return { imageUrl: null, title: null };
+      return { imageUrl: instantImg, title: null };
     }
   };
 
@@ -225,6 +274,14 @@ export default function PostModal({
       return;
     }
 
+    // 유튜브, 이미지 주소 등은 대기 시간 없이 0ms 즉시 화면에 썸네일 노출!
+    const instant = extractInstantThumbnail(trimmed);
+    if (instant && !imageUrl) {
+      setImageUrl(instant);
+      setShowImageTools(true);
+      setAutoPreviewLoaded(true);
+    }
+
     const timer = setTimeout(async () => {
       setIsFetchingPreview(true);
       try {
@@ -243,7 +300,7 @@ export default function PostModal({
       } finally {
         setIsFetchingPreview(false);
       }
-    }, 400);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [linkUrl, imageUrl, title]);
@@ -437,6 +494,11 @@ export default function PostModal({
     // 링크는 입력했으나 대표 이미지가 아직 없는 경우 (붙여넣고 즉시 저장 누른 경우 포함)
     // 저장 직전에 대표 이미지 및 제목을 즉시 추출하여 카드에 함께 저장
     if ((!finalImageUrl || !finalTitle) && linkUrl.trim()) {
+      const instant = extractInstantThumbnail(linkUrl.trim());
+      if (instant && !finalImageUrl) {
+        finalImageUrl = instant;
+        setImageUrl(instant);
+      }
       try {
         const preview = await fetchLinkPreview(linkUrl.trim());
         if (preview.imageUrl && !finalImageUrl) {
