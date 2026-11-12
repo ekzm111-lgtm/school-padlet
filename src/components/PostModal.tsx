@@ -17,6 +17,7 @@ import {
   Save,
   Trash2,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { Post, User, FileAttachment } from '@/lib/types';
 import { getStoreData, saveStoreData, addMyPostId } from '@/lib/store';
@@ -115,6 +116,8 @@ export default function PostModal({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isFetchingPreview, setIsFetchingPreview] = useState(false);
+  const [autoPreviewLoaded, setAutoPreviewLoaded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -181,7 +184,57 @@ export default function PostModal({
     setFileError('');
     setIsCreatingNewColumn(false);
     setNewColumnInput('');
+    setIsFetchingPreview(false);
+    setAutoPreviewLoaded(false);
   }, [isOpen, mode, post, defaultColumn, columns, currentUser]);
+
+  // 링크(URL)의 대표 이미지(OpenGraph, 유튜브 썸네일 등) 자동 추출 함수
+  const fetchLinkPreviewImage = async (url: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && data.ok && data.imageUrl) {
+        return data.imageUrl as string;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  // 사용자가 링크를 입력하거나 붙여넣었을 때 대표 이미지를 자동으로 감지하여 설정 (디바운스 500ms)
+  useEffect(() => {
+    if (!linkUrl.trim()) {
+      setAutoPreviewLoaded(false);
+      return;
+    }
+    // 이미 사용자가 직접 이미지를 설정했거나 캡처 첨부한 경우 덮어쓰지 않음
+    if (imageUrl) return;
+
+    const trimmed = linkUrl.trim();
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.includes('.')) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsFetchingPreview(true);
+      try {
+        const previewImg = await fetchLinkPreviewImage(trimmed);
+        if (previewImg && !imageUrl) {
+          setImageUrl(previewImg);
+          setShowImageTools(true);
+          setAutoPreviewLoaded(true);
+        }
+      } catch (err) {
+        console.warn('Auto link preview error:', err);
+      } finally {
+        setIsFetchingPreview(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [linkUrl, imageUrl]);
 
   // 전역 어디서든 Ctrl+V 캡처 이미지 감지
   useEffect(() => {
@@ -362,9 +415,25 @@ export default function PostModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return; // 중복 제출 원천 방지
-    if (!content.trim() && !title.trim() && !imageUrl && attachments.length === 0) return;
+    if (!content.trim() && !title.trim() && !imageUrl && attachments.length === 0 && !linkUrl.trim()) return;
 
     setIsSubmitting(true);
+
+    let finalImageUrl = imageUrl.trim();
+
+    // 링크는 입력했으나 대표 이미지가 아직 없는 경우 (붙여넣고 즉시 저장 누른 경우 포함)
+    // 저장 직전에 대표 이미지를 즉시 추출하여 카드에 함께 저장
+    if (!finalImageUrl && linkUrl.trim()) {
+      try {
+        const previewImg = await fetchLinkPreviewImage(linkUrl.trim());
+        if (previewImg) {
+          finalImageUrl = previewImg;
+          setImageUrl(previewImg);
+        }
+      } catch (err) {
+        console.warn('저장 전 대표 이미지 추출 실패:', err);
+      }
+    }
 
     let finalColumn = selectedColumn;
     let createdColumnName: string | undefined = undefined;
@@ -382,7 +451,7 @@ export default function PostModal({
           title: title.trim(),
           content: content.trim(),
           color,
-          imageUrl: imageUrl.trim() || undefined,
+          imageUrl: finalImageUrl || undefined,
           linkUrl: linkUrl.trim() || undefined,
           column: finalColumn,
           attachments,
@@ -413,7 +482,7 @@ export default function PostModal({
           title: title.trim(),
           content: content.trim(),
           color,
-          imageUrl: imageUrl.trim() || undefined,
+          imageUrl: finalImageUrl || undefined,
           linkUrl: linkUrl.trim() || undefined,
           attachments,
           fileAttachment: attachments[0] || undefined,
@@ -645,6 +714,33 @@ export default function PostModal({
                 </button>
               )}
             </div>
+
+            {/* 링크 대표 이미지 자동 추출 상태 안내 */}
+            {isFetchingPreview && (
+              <div className="flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-100/70 px-3 py-2 rounded-xl border border-blue-200 animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                <span>링크의 대표 이미지(미리보기)를 자동으로 가져오는 중입니다...</span>
+              </div>
+            )}
+
+            {!isFetchingPreview && autoPreviewLoaded && imageUrl && (
+              <div className="flex items-center justify-between text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>링크의 대표 이미지가 자동으로 적용되었습니다!</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageUrl('');
+                    setAutoPreviewLoaded(false);
+                  }}
+                  className="text-slate-500 hover:text-red-600 underline text-[11px] font-semibold"
+                >
+                  이미지 취소
+                </button>
+              </div>
+            )}
 
             {/* 📁 구글 드라이브 자료 안내 & 원클릭 버튼 배너 */}
             <div className="mt-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 flex-wrap">
