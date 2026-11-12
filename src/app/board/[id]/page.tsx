@@ -1536,7 +1536,7 @@ export default function BoardDetailPage() {
         >
           {currentLayout === 'kanban' ? (
             /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤) */
-            <div className="flex gap-3 sm:gap-3.5 items-stretch h-full w-max min-w-full min-h-0 pb-1">
+            <div className="flex gap-3 sm:gap-3.5 items-stretch h-full w-max min-w-full min-h-0 pb-1 snap-x snap-mandatory">
               {columns.map((colName, idx) => {
               const colPosts = posts
                 .filter((p) => (p.column || columns[0]) === colName || (!p.column && idx === 0))
@@ -1560,7 +1560,7 @@ export default function BoardDetailPage() {
                     }
                   }}
                   onDrop={(e) => handleDropOnColumn(e, colName, idx)}
-                  className={`w-[82vw] max-w-[285px] sm:w-[280px] shrink-0 snap-start bg-white/90 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border shadow-xs flex flex-col h-full max-h-full transition-all duration-200 min-h-0 ${
+                  className={`w-[86vw] max-w-[320px] sm:w-[280px] shrink-0 snap-center bg-white/90 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border shadow-xs flex flex-col h-full max-h-full transition-all duration-200 min-h-0 ${
                     isColDragged ? 'opacity-40 scale-95 border-dashed border-blue-400' : ''
                   } ${
                     isColDragOver
@@ -1867,7 +1867,7 @@ export default function BoardDetailPage() {
             setActiveColumn(columns[0]);
             setShowPostModal(true);
           }}
-          className="no-print fixed bottom-8 right-8 z-40 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-blue-500/40"
+          className="no-print fixed bottom-6 right-5 sm:bottom-8 sm:right-8 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-blue-500/40 border-2 border-white"
           title="새 카드 작성"
         >
           <Plus className="w-7 h-7 stroke-[2.5]" />

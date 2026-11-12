@@ -34,13 +34,31 @@ export default function QrModal({ isOpen, onClose, board }: QrModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [useLanIp, setUseLanIp] = useState(false);
+  const [lanIp, setLanIp] = useState('');
 
   useEffect(() => {
     setMounted(true);
+    fetch('/api/network-ip')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.ok && d.localIp && d.localIp !== 'localhost') {
+          setLanIp(d.localIp);
+          if (
+            typeof window !== 'undefined' &&
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+          ) {
+            setUseLanIp(true);
+          }
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const standardJoinUrl = `${origin}/j/${board.code}`;
+  const port = typeof window !== 'undefined' && window.location.port ? `:${window.location.port}` : '';
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const effectiveOrigin = useLanIp && lanIp ? `http://${lanIp}${port}` : currentOrigin;
+  const standardJoinUrl = `${effectiveOrigin}/j/${board.code}`;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -193,6 +211,39 @@ export default function QrModal({ isOpen, onClose, board }: QrModalProps) {
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>별도 앱 설치 없이 스마트폰 기본 카메라로 비추면 자동 연결됩니다.</span>
           </p>
+
+          {/* PC 로컬 환경일 때 스마트폰 Wi-Fi 접속용 IP 전환 탭 */}
+          {lanIp && (
+            <div className="mt-3 p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2 max-w-sm w-full">
+              <span className="text-[11px] font-bold text-slate-600">QR 대상 주소:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setUseLanIp(true)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
+                    useLanIp
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                  title="같은 Wi-Fi에 연결된 스마트폰/태블릿 스캔용"
+                >
+                  📱 모바일 Wi-Fi ({lanIp})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseLanIp(false)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold transition ${
+                    !useLanIp
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                  title="PC 브라우저 기본 주소"
+                >
+                  💻 기본 주소
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 액션 버튼 바 */}

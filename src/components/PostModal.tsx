@@ -188,30 +188,38 @@ export default function PostModal({
     setAutoPreviewLoaded(false);
   }, [isOpen, mode, post, defaultColumn, columns, currentUser]);
 
-  // 링크(URL)의 대표 이미지(OpenGraph, 유튜브 썸네일 등) 자동 추출 함수
-  const fetchLinkPreviewImage = async (url: string): Promise<string | null> => {
+  // 링크(URL)의 대표 이미지(OpenGraph, 유튜브 썸네일 등) 및 제목 자동 추출 함수
+  const fetchLinkPreview = async (
+    url: string
+  ): Promise<{ imageUrl: string | null; title: string | null }> => {
     try {
       const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
-      if (!res.ok) return null;
+      if (!res.ok) return { imageUrl: null, title: null };
       const data = await res.json();
-      if (data && data.ok && data.imageUrl) {
-        return data.imageUrl as string;
-      }
-      return null;
+      return {
+        imageUrl: data && data.ok && data.imageUrl ? (data.imageUrl as string) : null,
+        title: data && data.ok && data.title ? (data.title as string) : null,
+      };
     } catch {
-      return null;
+      return { imageUrl: null, title: null };
     }
   };
 
-  // 사용자가 링크를 입력하거나 붙여넣었을 때 대표 이미지를 자동으로 감지하여 설정 (디바운스 500ms)
+  // 본문(content)에 링크 주소를 붙여넣었을 때도 자동으로 참고 링크(URL)로 연결
+  useEffect(() => {
+    if (linkUrl.trim() || !content.trim()) return;
+    const urlMatch = content.match(/https?:\/\/[^\s]+/i);
+    if (urlMatch && urlMatch[0]) {
+      setLinkUrl(urlMatch[0].trim());
+    }
+  }, [content, linkUrl]);
+
+  // 사용자가 링크를 입력하거나 붙여넣었을 때 대표 이미지와 제목을 패들렛처럼 자동으로 감지
   useEffect(() => {
     if (!linkUrl.trim()) {
       setAutoPreviewLoaded(false);
       return;
     }
-    // 이미 사용자가 직접 이미지를 설정했거나 캡처 첨부한 경우 덮어쓰지 않음
-    if (imageUrl) return;
-
     const trimmed = linkUrl.trim();
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.includes('.')) {
       return;
@@ -220,21 +228,25 @@ export default function PostModal({
     const timer = setTimeout(async () => {
       setIsFetchingPreview(true);
       try {
-        const previewImg = await fetchLinkPreviewImage(trimmed);
-        if (previewImg && !imageUrl) {
-          setImageUrl(previewImg);
+        const preview = await fetchLinkPreview(trimmed);
+        if (preview.imageUrl && !imageUrl) {
+          setImageUrl(preview.imageUrl);
           setShowImageTools(true);
           setAutoPreviewLoaded(true);
+        }
+        // 제목이 비어있다면 패들렛처럼 영상/웹페이지 제목을 자동 채우기
+        if (preview.title && !title.trim()) {
+          setTitle(preview.title);
         }
       } catch (err) {
         console.warn('Auto link preview error:', err);
       } finally {
         setIsFetchingPreview(false);
       }
-    }, 500);
+    }, 400);
 
     return () => clearTimeout(timer);
-  }, [linkUrl, imageUrl]);
+  }, [linkUrl, imageUrl, title]);
 
   // 전역 어디서든 Ctrl+V 캡처 이미지 감지
   useEffect(() => {
@@ -420,15 +432,20 @@ export default function PostModal({
     setIsSubmitting(true);
 
     let finalImageUrl = imageUrl.trim();
+    let finalTitle = title.trim();
 
     // 링크는 입력했으나 대표 이미지가 아직 없는 경우 (붙여넣고 즉시 저장 누른 경우 포함)
-    // 저장 직전에 대표 이미지를 즉시 추출하여 카드에 함께 저장
-    if (!finalImageUrl && linkUrl.trim()) {
+    // 저장 직전에 대표 이미지 및 제목을 즉시 추출하여 카드에 함께 저장
+    if ((!finalImageUrl || !finalTitle) && linkUrl.trim()) {
       try {
-        const previewImg = await fetchLinkPreviewImage(linkUrl.trim());
-        if (previewImg) {
-          finalImageUrl = previewImg;
-          setImageUrl(previewImg);
+        const preview = await fetchLinkPreview(linkUrl.trim());
+        if (preview.imageUrl && !finalImageUrl) {
+          finalImageUrl = preview.imageUrl;
+          setImageUrl(preview.imageUrl);
+        }
+        if (preview.title && !finalTitle) {
+          finalTitle = preview.title;
+          setTitle(preview.title);
         }
       } catch (err) {
         console.warn('저장 전 대표 이미지 추출 실패:', err);
@@ -448,7 +465,7 @@ export default function PostModal({
         // 수정 모드 저장
         const updated: Post = {
           ...post,
-          title: title.trim(),
+          title: finalTitle,
           content: content.trim(),
           color,
           imageUrl: finalImageUrl || undefined,
@@ -479,7 +496,7 @@ export default function PostModal({
         const newPost: Post = {
           id: `post-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           boardId,
-          title: title.trim(),
+          title: finalTitle,
           content: content.trim(),
           color,
           imageUrl: finalImageUrl || undefined,

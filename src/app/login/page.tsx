@@ -15,6 +15,7 @@ import {
   UserCheck,
   KeyRound,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User, UserRole, UserStatus } from '@/lib/types';
@@ -44,8 +45,30 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [settings, setSettings] = useState(getStoreData().settings);
 
+  // 🌟 Google(Gmail) 모달 및 자동입력 상태
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleEmailInput, setGoogleEmailInput] = useState('');
+  const [googleNameInput, setGoogleNameInput] = useState('');
+  const [googleRoleInput, setGoogleRoleInput] = useState<UserRole>('student');
+  const [savedGmail, setSavedGmail] = useState('');
+  const [savedName, setSavedName] = useState('');
+
   useEffect(() => {
     setSettings(getStoreData().settings);
+    if (typeof window !== 'undefined') {
+      const g = localStorage.getItem('schoolpad_last_gmail') || '';
+      const n = localStorage.getItem('schoolpad_last_name') || '';
+      if (g) {
+        setSavedGmail(g);
+        setGoogleEmailInput(g);
+        setEmail((prev) => prev || g);
+      }
+      if (n) {
+        setSavedName(n);
+        setGoogleNameInput(n);
+        setName((prev) => prev || n);
+      }
+    }
   }, []);
 
   // 1) 아이디/비밀번호 로그인 처리
@@ -84,35 +107,58 @@ export default function LoginPage() {
     setLoginPw('admin');
   };
 
-  // 2) 구글 계정으로 원클릭 가입 및 로그인
+  // 2) Google(Gmail) 원클릭 가입 및 로그인 모달 열기
   const handleGoogleAuth = () => {
+    setShowGoogleModal(true);
+  };
+
+  // Google 모달에서 실제 로그인/가입 실행
+  const handleGoogleSubmit = (emailToUse?: string, nameToUse?: string, roleToUse?: UserRole) => {
+    const finalEmail = (emailToUse || googleEmailInput).trim();
+    const finalName = (nameToUse || googleNameInput).trim() || '학생';
+    const finalRole = roleToUse || googleRoleInput;
+
+    if (!finalEmail) {
+      alert('Google(Gmail) 주소를 입력해 주세요.');
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('schoolpad_last_gmail', finalEmail);
+      localStorage.setItem('schoolpad_last_name', finalName);
+      setSavedGmail(finalEmail);
+      setSavedName(finalName);
+    }
+
     const data = getStoreData();
     const isAutoApprove = data.settings.autoApproveUsers;
 
-    const googleEmail = prompt('사용할 구글(Gmail) 주소를 입력하세요:', 'student2026@gmail.com');
-    if (!googleEmail) return;
+    const existing = data.users.find(
+      (u) => u.email.toLowerCase() === finalEmail.toLowerCase()
+    );
 
-    const userName = prompt('학생 또는 선생님 성함을 입력하세요:', '김학생') || '학생';
-
-    const existing = data.users.find((u) => u.email === googleEmail);
     if (existing) {
       if (existing.status === 'pending') {
         alert('현재 관리자 승인 대기 중인 계정입니다. 관리자 승인 후 이용 가능합니다.');
         return;
       }
+      if (existing.status === 'rejected') {
+        alert('관리자에 의해 가입이 반려된 계정입니다. 관리자에게 재승인을 요청해주세요.');
+        return;
+      }
       saveStoreData.currentUser(existing);
-      router.push('/');
+      router.push(existing.role === 'admin' ? '/admin' : '/');
       return;
     }
 
     // 신규 가입 처리
     const newUser: User = {
       id: `user-google-${Date.now()}`,
-      username: googleEmail.split('@')[0],
-      password: '1234',
-      name: userName,
-      email: googleEmail,
-      role: 'student',
+      username: finalEmail.split('@')[0],
+      password: 'google-auth-auto',
+      name: finalName,
+      email: finalEmail,
+      role: finalRole,
       status: isAutoApprove ? 'approved' : 'pending',
       schoolName: data.settings.schoolName,
       createdAt: new Date().toISOString().split('T')[0],
@@ -122,9 +168,10 @@ export default function LoginPage() {
 
     if (isAutoApprove) {
       saveStoreData.currentUser(newUser);
-      alert(`🎉 [자동 가입 승인] ${userName}님 환영합니다!`);
-      router.push('/');
+      alert(`🎉 [Gmail 자동 가입 완료] ${finalName}님 환영합니다!`);
+      router.push(finalRole === 'admin' ? '/admin' : '/');
     } else {
+      setShowGoogleModal(false);
       setPendingMessage(true);
     }
   };
@@ -371,6 +418,42 @@ export default function LoginPage() {
               {/* [탭 2] 회원가입 */}
               {activeTab === 'signup' && (
                 <form onSubmit={handleSignupSubmit} className="space-y-4">
+                  {/* Google (Gmail) 1초 자동 가입 및 로그인 버튼 */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 text-slate-800 font-bold text-xs transition shadow-xs"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Google (Gmail) 계정으로 1초 자동 가입</span>
+                  </button>
+
+                  <div className="relative pt-1">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200" />
+                    </div>
+                    <div className="relative flex justify-center text-[11px]">
+                      <span className="px-3 bg-white text-slate-400 font-medium">또는 직접 입력하여 가입</span>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
                     <button
                       type="button"
@@ -405,13 +488,45 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">이메일(G메일 권장)</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">이메일 (G메일 자동 완성)</label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const base = email.split('@')[0] || 'student';
+                            setEmail(base + '@gmail.com');
+                            if (!newUsername) setNewUsername(base);
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 transition"
+                        >
+                          + @gmail.com
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const base = email.split('@')[0] || 'teacher';
+                            setEmail(base + '@school.ac.kr');
+                            if (!newUsername) setNewUsername(base);
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium border border-slate-200 transition"
+                        >
+                          + @school.ac.kr
+                        </button>
+                      </div>
+                    </div>
                     <input
                       type="email"
                       required
                       placeholder="student@gmail.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEmail(val);
+                        if (!newUsername && val.includes('@')) {
+                          setNewUsername(val.split('@')[0]);
+                        }
+                      }}
                       className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
@@ -518,6 +633,144 @@ export default function LoginPage() {
           )}
         </div>
       </div>
+
+      {/* 🌟 Google (Gmail) 원클릭 로그인 & 가입 모달 */}
+      {showGoogleModal && (
+        <div
+          onClick={() => setShowGoogleModal(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Google 계정으로 시작</h3>
+                  <p className="text-[11px] text-slate-400">Gmail 주소로 간편하게 로그인/가입</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGoogleModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 최근 저장된 Gmail이 있는 경우 원클릭 빠른 로그인 */}
+            {savedGmail && (
+              <div className="p-3 bg-blue-50/80 rounded-2xl border border-blue-200/80 space-y-2">
+                <div className="text-[11px] font-bold text-blue-900 flex items-center justify-between">
+                  <span>최근 사용한 구글 계정</span>
+                  <span className="text-blue-600 text-[10px]">자동 기억됨</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleGoogleSubmit(savedGmail, savedName, googleRoleInput)}
+                  className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center justify-between shadow-xs"
+                >
+                  <span className="truncate">{savedGmail}</span>
+                  <span className="text-[11px] opacity-90 shrink-0">바로 로그인 &gt;</span>
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  구글(Gmail) 주소 입력
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    placeholder="student@gmail.com"
+                    value={googleEmailInput}
+                    onChange={(e) => setGoogleEmailInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  {!googleEmailInput.includes('@') && googleEmailInput.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setGoogleEmailInput(googleEmailInput + '@gmail.com')}
+                      className="absolute right-2 top-1.5 px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold"
+                    >
+                      + @gmail.com
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  성함 (이름)
+                </label>
+                <input
+                  type="text"
+                  placeholder="예: 김학생 또는 이선생님"
+                  value={googleNameInput}
+                  onChange={(e) => setGoogleNameInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">신분 선택</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setGoogleRoleInput('student')}
+                    className={`py-1 text-xs font-bold rounded-lg transition ${
+                      googleRoleInput === 'student' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600'
+                    }`}
+                  >
+                    🎒 학생
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGoogleRoleInput('teacher')}
+                    className={`py-1 text-xs font-bold rounded-lg transition ${
+                      googleRoleInput === 'teacher' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600'
+                    }`}
+                  >
+                    👩‍🏫 선생님
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleGoogleSubmit()}
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-sm active:scale-95"
+              >
+                Google 계정으로 입장하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

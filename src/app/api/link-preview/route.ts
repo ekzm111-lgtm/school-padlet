@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     const parsed = new URL(targetUrl);
     const hostname = parsed.hostname.toLowerCase();
 
-    // 1. YouTube 전용 고속 썸네일 추출
+    // 1. YouTube 전용 고속 oEmbed 및 고화질 썸네일 추출 (제목 & 썸네일 100% 자동 추출)
     if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
       let videoId = '';
       if (hostname.includes('youtu.be')) {
@@ -52,6 +52,27 @@ export async function GET(req: NextRequest) {
       } else {
         videoId = parsed.searchParams.get('v') || '';
       }
+
+      // YouTube oEmbed API로 정확한 영상 제목 및 썸네일 조회
+      try {
+        const oembedRes = await fetch(
+          `https://www.youtube.com/oembed?url=${encodeURIComponent(targetUrl)}&format=json`,
+          { signal: AbortSignal.timeout(2500) }
+        );
+        if (oembedRes.ok) {
+          const oembed = await oembedRes.json();
+          return NextResponse.json({
+            ok: true,
+            imageUrl:
+              oembed.thumbnail_url ||
+              (videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null),
+            title: oembed.title || 'YouTube 영상',
+            author: oembed.author_name || 'YouTube',
+            domain: hostname,
+          });
+        }
+      } catch (e) {}
+
       if (videoId) {
         return NextResponse.json({
           ok: true,

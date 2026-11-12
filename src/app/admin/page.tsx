@@ -85,6 +85,15 @@ export default function AdminPage() {
     showToast('회원 가입 요청을 반려했습니다.');
   };
 
+  // 가입 상태 자유 변경 (승인완료 / 대기 / 반려)
+  const handleStatusChange = (userId: string, newStatus: 'approved' | 'pending' | 'rejected') => {
+    const updated = users.map((u) => (u.id === userId ? { ...u, status: newStatus } : u));
+    saveStoreData.users(updated);
+    setUsers(updated);
+    const label = newStatus === 'approved' ? '승인완료' : newStatus === 'pending' ? '승인대기' : '반려';
+    showToast(`회원 상태를 '${label}'(으)로 변경했습니다.`);
+  };
+
   // 모든 대기자 일괄 승인
   const handleApproveAll = () => {
     const updated = users.map((u) => (u.status === 'pending' ? { ...u, status: 'approved' as const } : u));
@@ -203,6 +212,7 @@ export default function AdminPage() {
   };
 
   const pendingUsers = users.filter((u) => u.status === 'pending');
+  const rejectedUsers = users.filter((u) => u.status === 'rejected');
   const filteredUsers = users.filter(
     (u) =>
       u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
@@ -417,6 +427,61 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+
+            {/* 🌟 반려된 가입 신청 명단 (언제든지 다시 승인 가능) */}
+            {rejectedUsers.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-red-700 flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 text-red-500" />
+                      <span>반려된 가입 신청 명단 ({rejectedUsers.length}명)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      이전에 반려 처리되었으나, 언제든지 [다시 승인하기] 버튼을 눌러 바로 정상 회원으로 승인할 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {rejectedUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-red-50/50 border border-red-200/60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-red-100 text-red-700 font-bold flex items-center justify-center text-xs">
+                          {user.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-800">{user.name}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">
+                              반려됨
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              ID: {user.username || '없음'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 font-mono">{user.email}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleApproveUser(user.id)}
+                          className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>다시 승인하기</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -497,17 +562,48 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            user.status === 'approved'
-                              ? 'bg-emerald-50 text-emerald-600'
-                              : user.status === 'pending'
-                              ? 'bg-amber-50 text-amber-600'
-                              : 'bg-red-50 text-red-600'
-                          }`}
-                        >
-                          {user.status === 'approved' ? '승인완료' : user.status === 'pending' ? '승인대기' : '반려'}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <select
+                            value={user.status}
+                            onChange={(e) =>
+                              handleStatusChange(
+                                user.id,
+                                e.target.value as 'approved' | 'pending' | 'rejected'
+                              )
+                            }
+                            className={`rounded-lg text-[11px] font-bold py-1 px-2 border cursor-pointer transition ${
+                              user.status === 'approved'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : user.status === 'pending'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-red-50 text-red-700 border-red-200'
+                            }`}
+                          >
+                            <option value="approved">✓ 승인완료</option>
+                            <option value="pending">⏳ 승인대기</option>
+                            <option value="rejected">✕ 반려</option>
+                          </select>
+                          {user.status === 'rejected' && (
+                            <button
+                              type="button"
+                              onClick={() => handleApproveUser(user.id)}
+                              className="px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition shadow-xs whitespace-nowrap"
+                              title="즉시 다시 승인하기"
+                            >
+                              다시 승인
+                            </button>
+                          )}
+                          {user.status === 'pending' && (
+                            <button
+                              type="button"
+                              onClick={() => handleApproveUser(user.id)}
+                              className="px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] transition shadow-xs whitespace-nowrap"
+                              title="즉시 승인하기"
+                            >
+                              승인
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-3 text-center">
                         <button
