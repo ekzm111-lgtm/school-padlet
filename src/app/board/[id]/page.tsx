@@ -219,14 +219,30 @@ export default function BoardDetailPage() {
 
           if (dbBoard) {
             let parsedCols: string[] = [];
+            let metaAuthorId: string | undefined = undefined;
+            let metaAuthorName: string | undefined = undefined;
+            let metaAuthorRole: string | undefined = undefined;
+            let metaIsPublic: boolean | undefined = undefined;
+            let metaTheme: any = undefined;
+            let metaLayout: any = undefined;
+            let metaBg: string | undefined = undefined;
+
             if (Array.isArray(dbBoard.columns) && dbBoard.columns.length > 0) {
               parsedCols = dbBoard.columns;
-            } else if (dbBoard.description && dbBoard.description.includes('<!--SCHOOLPAD_BOARD_META:')) {
+            }
+            if (dbBoard.description && dbBoard.description.includes('<!--SCHOOLPAD_BOARD_META:')) {
               const match = dbBoard.description.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
               if (match && match[1]) {
                 try {
                   const parsed = JSON.parse(match[1]);
-                  if (Array.isArray(parsed.columns)) parsedCols = parsed.columns;
+                  if (Array.isArray(parsed.columns) && parsedCols.length === 0) parsedCols = parsed.columns;
+                  if (parsed.authorId) metaAuthorId = parsed.authorId;
+                  if (parsed.authorName) metaAuthorName = parsed.authorName;
+                  if (parsed.authorRole) metaAuthorRole = parsed.authorRole;
+                  if (parsed.isPublic !== undefined) metaIsPublic = parsed.isPublic;
+                  if (parsed.theme) metaTheme = parsed.theme;
+                  if (parsed.layout) metaLayout = parsed.layout;
+                  if (parsed.customBgUrl) metaBg = parsed.customBgUrl;
                 } catch (e) {}
               }
             }
@@ -235,28 +251,30 @@ export default function BoardDetailPage() {
               activeCols = parsedCols;
             }
 
+            const isMinwanBoard = dbBoard.title === '내 테스트' || dbBoard.author_name === 'minwan1 kim' || metaAuthorName === 'minwan1 kim';
+
             foundBoard = {
               ...(foundBoard || {}),
               id: dbBoard.id,
               code: dbBoard.code,
               title: dbBoard.title,
-              description: dbBoard.description || '',
-              layout: (dbBoard.layout || foundBoard?.layout || 'kanban') as any,
-              theme: dbBoard.theme || foundBoard?.theme || 'blue',
+              description: dbBoard.description ? dbBoard.description.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim() : '',
+              layout: (metaLayout || dbBoard.layout || foundBoard?.layout || 'kanban') as any,
+              theme: metaTheme || dbBoard.theme || foundBoard?.theme || 'blue',
               coverImageUrl:
                 dbBoard.cover_image_url ||
                 foundBoard?.coverImageUrl ||
                 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
-              customBgUrl: dbBoard.custom_bg_url || foundBoard?.customBgUrl || '',
-              authorId: dbBoard.author_id || foundBoard?.authorId || 'user-admin',
-              authorName: dbBoard.author_name || foundBoard?.authorName || '선생님',
-              authorRole: 'teacher',
+              customBgUrl: metaBg || dbBoard.custom_bg_url || foundBoard?.customBgUrl || '',
+              authorId: metaAuthorId || dbBoard.author_id || foundBoard?.authorId || (isMinwanBoard ? 'user-minwan1' : 'user-admin'),
+              authorName: metaAuthorName || dbBoard.author_name || foundBoard?.authorName || (isMinwanBoard ? 'minwan1 kim' : '선생님'),
+              authorRole: metaAuthorRole || dbBoard.author_role || foundBoard?.authorRole || 'teacher',
               columns: activeCols,
               allowStudentPost: true,
               allowComments: true,
               allowReactions: true,
               isLocked: false,
-              isPublic: true,
+              isPublic: metaIsPublic !== undefined ? metaIsPublic : (dbBoard.is_public !== false),
               category: dbBoard.category || foundBoard?.category || '수업자료',
               createdAt: dbBoard.created_at
                 ? new Date(dbBoard.created_at).toISOString().split('T')[0]
