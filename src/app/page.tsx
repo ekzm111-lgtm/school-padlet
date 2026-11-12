@@ -28,6 +28,7 @@ import Header from '@/components/Header';
 import CreateBoardModal from '@/components/CreateBoardModal';
 import EditBoardModal from '@/components/EditBoardModal';
 import QrModal from '@/components/QrModal';
+import Footer from '@/components/Footer';
 import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchRemoteBoards, saveRemoteBoard } from '@/lib/supabaseStore';
@@ -624,6 +625,9 @@ export default function HomePage() {
           </div>
         )}
       </main>
+
+      {/* 🌟 페이지 최하단 푸터 */}
+      <Footer />
 
       {/* 새 보드 만들기 모달 */}
       {currentUser && (

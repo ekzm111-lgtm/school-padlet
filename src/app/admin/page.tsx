@@ -24,6 +24,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User, SystemSettings, Board } from '@/lib/types';
 
@@ -730,6 +731,9 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+
+      {/* 🌟 관리자 페이지 최하단 푸터 */}
+      <Footer />
 
       {/* 🌟 관리자: 회원 이름 수정 모달 */}
       {editingUserForName && (
