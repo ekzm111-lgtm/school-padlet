@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Board, Post, User, FileAttachment, UserRole } from './types';
+import { Board, Post, User, FileAttachment, UserRole, SystemSettings } from './types';
 
 // Supabase 테이블 데이터 <-> SchoolPad 로컬 타입 상호 변환기
 
@@ -12,7 +12,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
       .order('created_at', { ascending: false });
     if (error || !data) return null;
     return data
-      .filter((b) => !b.id?.startsWith('quiz_') && !b.title?.startsWith('__QUIZ_'))
+      .filter((b) => !b.id?.startsWith('quiz_') && !b.title?.startsWith('__QUIZ_') && !b.id?.startsWith('__SYSTEM_') && !b.title?.startsWith('__SYSTEM_'))
       .map((b) => {
       let rawDesc = b.description || '';
       let metaCols: string[] | undefined = undefined;
@@ -567,5 +567,127 @@ export async function saveAllRemotePosts(postsList: Post[]): Promise<boolean> {
   } catch (e) {
     console.error('Failed to saveAllRemotePosts:', e);
     return false;
+  }
+}
+
+// ==========================================
+// 🌟 전 학교 실시간 회원(사용자) & 시스템 설정 클라우드 동기화
+// ==========================================
+
+export async function fetchRemoteUsers(): Promise<User[] | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('board_id', '__SYSTEM_USERS__')
+      .eq('column_name', '__user__');
+
+    if (error || !data || data.length === 0) return null;
+
+    const users: User[] = [];
+    for (const row of data) {
+      try {
+        const u = JSON.parse(row.content);
+        if (u && u.id && u.name) {
+          users.push(u);
+        }
+      } catch (e) {}
+    }
+    return users.length > 0 ? users : null;
+  } catch (e) {
+    console.error('fetchRemoteUsers error:', e);
+    return null;
+  }
+}
+
+export async function saveRemoteUser(user: User): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !user) return false;
+  try {
+    // 부모 보드(__SYSTEM_USERS__) 존재 보장
+    await supabase.from('boards').upsert({
+      id: '__SYSTEM_USERS__',
+      code: 'SYSUSER',
+      title: '__SYSTEM_USERS__',
+      description: 'System User Registry for Cross-Device Sync',
+      is_public: false,
+      author_id: 'system',
+      author_name: '시스템',
+    });
+
+    const { error } = await supabase.from('posts').upsert({
+      id: user.id,
+      board_id: '__SYSTEM_USERS__',
+      title: user.name,
+      content: JSON.stringify(user),
+      author_id: user.id,
+      author_name: user.name,
+      author_role: user.role || 'student',
+      column_name: '__user__',
+    });
+
+    return !error;
+  } catch (e) {
+    console.error('saveRemoteUser error:', e);
+    return false;
+  }
+}
+
+export async function deleteRemoteUser(userId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !userId) return false;
+  try {
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', userId)
+      .eq('board_id', '__SYSTEM_USERS__');
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function saveRemoteSettings(settings: SystemSettings): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !settings) return false;
+  try {
+    await supabase.from('boards').upsert({
+      id: '__SYSTEM_USERS__',
+      code: 'SYSUSER',
+      title: '__SYSTEM_USERS__',
+      description: 'System User Registry for Cross-Device Sync',
+      is_public: false,
+      author_id: 'system',
+      author_name: '시스템',
+    });
+
+    const { error } = await supabase.from('posts').upsert({
+      id: 'sys_settings',
+      board_id: '__SYSTEM_USERS__',
+      title: '__SYSTEM_SETTINGS__',
+      content: JSON.stringify(settings),
+      author_id: 'system',
+      author_name: '시스템',
+      column_name: '__settings__',
+    });
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function fetchRemoteSettings(): Promise<SystemSettings | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('content')
+      .eq('id', 'sys_settings')
+      .eq('board_id', '__SYSTEM_USERS__')
+      .maybeSingle();
+
+    if (error || !data?.content) return null;
+    return JSON.parse(data.content) as SystemSettings;
+  } catch (e) {
+    return null;
   }
 }

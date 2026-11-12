@@ -9,6 +9,8 @@ import {
   saveAllRemotePosts,
   deleteRemoteBoard,
   deleteRemotePost,
+  saveRemoteUser,
+  saveRemoteSettings,
 } from './supabaseStore';
 
 const INITIAL_SETTINGS: SystemSettings = {
@@ -539,12 +541,18 @@ export const saveStoreData = {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data));
       window.dispatchEvent(new Event('store_updated'));
+      if (isSupabaseConfigured) {
+        saveRemoteSettings(data).catch(() => {});
+      }
     }
   },
   users: (data: User[]) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data));
       window.dispatchEvent(new Event('store_updated'));
+      if (isSupabaseConfigured && data.length > 0) {
+        data.forEach((u) => saveRemoteUser(u).catch(() => {}));
+      }
     }
   },
   boards: (data: Board[]) => {

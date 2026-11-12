@@ -27,6 +27,13 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User, SystemSettings, Board } from '@/lib/types';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import {
+  fetchRemoteUsers,
+  saveRemoteUser,
+  fetchRemoteSettings,
+  saveRemoteSettings,
+} from '@/lib/supabaseStore';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -55,19 +62,101 @@ export default function AdminPage() {
     setTimeout(() => setToastMessage(''), 2500);
   };
 
-  const loadData = () => {
+  const loadData = async () => {
     const data = getStoreData();
     setCurrentUser(data.currentUser);
     setUsers(data.users);
     setBoards(data.boards);
     setSettings(data.settings);
+
+    // 🌟 원격 Supabase 클라우드에서 최신 사용자 및 시스템 설정 불러오기
+    if (isSupabaseConfigured) {
+      try {
+        const [remoteUsers, remoteSettings] = await Promise.all([
+          fetchRemoteUsers(),
+          fetchRemoteSettings(),
+        ]);
+
+        if (remoteUsers && remoteUsers.length > 0) {
+          const userMap = new Map<string, User>();
+          data.users.forEach((u) => userMap.set(u.id, u));
+          remoteUsers.forEach((u) => userMap.set(u.id, u));
+          const merged = Array.from(userMap.values());
+          setUsers(merged);
+          // 로컬에도 동기화 저장
+          saveStoreData.users(merged);
+        }
+
+        if (remoteSettings) {
+          setSettings(remoteSettings);
+          saveStoreData.settings(remoteSettings);
+        }
+      } catch (err) {
+        console.error('Admin cloud load error:', err);
+      }
+    }
   };
 
   useEffect(() => {
     loadData();
     const handleUpdate = () => loadData();
     window.addEventListener('store_updated', handleUpdate);
-    return () => window.removeEventListener('store_updated', handleUpdate);
+
+    // ⚡ 다른 PC나 스마트폰에서 가입한 사용자를 즉각 감지하기 위한 Supabase 실시간 리스너 및 폴링
+    let channel: any = null;
+    let pollTimer: any = null;
+
+    if (isSupabaseConfigured && supabase) {
+      channel = supabase
+        .channel('admin-users-cloud-sync')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'posts',
+            filter: 'board_id=eq.__SYSTEM_USERS__',
+          },
+          () => {
+            fetchRemoteUsers().then((ru) => {
+              if (ru && ru.length > 0) {
+                const data = getStoreData();
+                const userMap = new Map<string, User>();
+                data.users.forEach((u) => userMap.set(u.id, u));
+                ru.forEach((u) => userMap.set(u.id, u));
+                const merged = Array.from(userMap.values());
+                setUsers(merged);
+                saveStoreData.users(merged);
+              }
+            });
+          }
+        )
+        .subscribe();
+
+      pollTimer = setInterval(() => {
+        fetchRemoteUsers().then((ru) => {
+          if (ru && ru.length > 0) {
+            setUsers((prev) => {
+              if (ru.length !== prev.length || ru.some((r) => !prev.some((p) => p.id === r.id && p.status === r.status && p.role === r.role))) {
+                const userMap = new Map<string, User>();
+                prev.forEach((u) => userMap.set(u.id, u));
+                ru.forEach((u) => userMap.set(u.id, u));
+                const merged = Array.from(userMap.values());
+                saveStoreData.users(merged);
+                return merged;
+              }
+              return prev;
+            });
+          }
+        });
+      }, 4000);
+    }
+
+    return () => {
+      window.removeEventListener('store_updated', handleUpdate);
+      if (channel && supabase) supabase.removeChannel(channel);
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }, []);
 
   // 가입 승인 처리

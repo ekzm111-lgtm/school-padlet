@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User, UserRole, UserStatus } from '@/lib/types';
+import { fetchRemoteUsers, saveRemoteUser } from '@/lib/supabaseStore';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -74,6 +75,18 @@ export default function LoginPage() {
         setName((prev) => prev || n);
       }
     }
+
+    // 🌟 원격 클라우드 사용자 목록 동기화
+    fetchRemoteUsers().then((remoteUsers) => {
+      if (remoteUsers && remoteUsers.length > 0) {
+        const data = getStoreData();
+        const userMap = new Map<string, User>();
+        data.users.forEach((u) => userMap.set(u.id, u));
+        remoteUsers.forEach((u) => userMap.set(u.id, u));
+        const merged = Array.from(userMap.values());
+        saveStoreData.users(merged);
+      }
+    }).catch(() => {});
 
     // 1) Supabase Google OAuth 리디렉션 로그인 감지
     if (supabase) {
@@ -183,16 +196,36 @@ export default function LoginPage() {
   };
 
   // 1) 아이디/비밀번호 로그인 처리
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     const data = getStoreData();
 
-    const user = data.users.find(
+    let user = data.users.find(
       (u) =>
         (u.username === loginId.trim() || u.email === loginId.trim()) &&
         (u.password === loginPw.trim() || (!u.password && loginPw.trim() === 'admin'))
     );
+
+    if (!user) {
+      // 다른 PC나 스마트폰에서 가입한 사용자인지 원격 클라우드 실시간 확인
+      try {
+        const remoteUsers = await fetchRemoteUsers();
+        if (remoteUsers) {
+          user = remoteUsers.find(
+            (u) =>
+              (u.username === loginId.trim() || u.email === loginId.trim()) &&
+              (u.password === loginPw.trim() || (!u.password && loginPw.trim() === 'admin'))
+          );
+          if (user) {
+            const userMap = new Map<string, User>();
+            data.users.forEach((u) => userMap.set(u.id, u));
+            remoteUsers.forEach((u) => userMap.set(u.id, u));
+            saveStoreData.users(Array.from(userMap.values()));
+          }
+        }
+      } catch (err) {}
+    }
 
     if (!user) {
       setErrorMsg('아이디 또는 비밀번호가 일치하지 않습니다. (초기 관리자: admin / admin)');
@@ -227,7 +260,7 @@ export default function LoginPage() {
   };
 
   // Google 모달에서 실제 로그인/가입 실행
-  const handleGoogleSubmit = (emailToUse?: string, nameToUse?: string, roleToUse?: UserRole) => {
+  const handleGoogleSubmit = async (emailToUse?: string, nameToUse?: string, roleToUse?: UserRole) => {
     const finalEmail = (emailToUse || googleEmailInput).trim();
     const finalRole = roleToUse || googleRoleInput;
     let finalName = (nameToUse || googleNameInput).trim();
@@ -283,6 +316,8 @@ export default function LoginPage() {
     };
 
     saveStoreData.users([...data.users, newUser]);
+    // 🌟 원격 클라우드에 신규 가입 즉시 영구 저장
+    await saveRemoteUser(newUser).catch(() => {});
 
     if (isAutoApprove) {
       saveStoreData.currentUser(newUser);
@@ -295,7 +330,7 @@ export default function LoginPage() {
   };
 
   // 3) 직접 회원가입 폼 제출
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     const data = getStoreData();
@@ -321,6 +356,8 @@ export default function LoginPage() {
     };
 
     saveStoreData.users([...data.users, newUser]);
+    // 🌟 원격 클라우드에 신규 가입 즉시 영구 저장
+    await saveRemoteUser(newUser).catch(() => {});
 
     if (isAutoApprove) {
       saveStoreData.currentUser(newUser);
