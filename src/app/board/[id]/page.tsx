@@ -1336,23 +1336,26 @@ export default function BoardDetailPage() {
               <span className="sm:hidden">복제</span>
             </button>
 
-            {/* 공개/비공개 공유 설정 토글 (내 보드인 경우) */}
-            {currentUser && board.authorId === currentUser.id && (
+            {/* 공개/비공개 공유 설정 토글 (본인 보드이거나 교사/관리자인 경우) */}
+            {currentUser && (board.authorId === currentUser.id || isTeacherOrAdmin) && (
               <button
-                onClick={() => {
-                  const updated = { ...board, isPublic: !board.isPublic };
+                onClick={async () => {
+                  const updated = { ...board, isPublic: !board.isPublic, updatedAt: Date.now() };
                   setBoard(updated);
                   const data = getStoreData();
                   saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updated : b)));
+                  if (isSupabaseConfigured) {
+                    await saveRemoteBoard(updated);
+                  }
                 }}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition shrink-0 whitespace-nowrap ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition shrink-0 whitespace-nowrap shadow-xs active:scale-95 ${
                   board.isPublic !== false
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-slate-100 text-slate-600 border-slate-300'
+                    : 'bg-slate-100 text-slate-700 border-slate-300'
                 }`}
-                title="학교 전체 공개/비공개 전환"
+                title="학교 전체 공개 / 나만 보기 전환"
               >
-                {board.isPublic !== false ? <Globe className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                {board.isPublic !== false ? <Globe className="w-3.5 h-3.5 text-emerald-600" /> : <Lock className="w-3.5 h-3.5 text-slate-600" />}
                 <span>{board.isPublic !== false ? '공개' : '나만보기'}</span>
               </button>
             )}

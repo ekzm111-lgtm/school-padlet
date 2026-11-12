@@ -22,6 +22,10 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
       let metaTheme: any = undefined;
       let metaLayout: any = undefined;
       let metaUpdatedAt: any = undefined;
+      let metaAuthorId: string | undefined = undefined;
+      let metaAuthorName: string | undefined = undefined;
+      let metaAuthorRole: string | undefined = undefined;
+      let metaIsPublic: boolean | undefined = undefined;
 
       if (rawDesc.includes('<!--SCHOOLPAD_BOARD_META:')) {
         const match = rawDesc.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
@@ -35,10 +39,16 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
             if (parsed.theme) metaTheme = parsed.theme;
             if (parsed.layout) metaLayout = parsed.layout;
             if (parsed.updatedAt) metaUpdatedAt = parsed.updatedAt;
+            if (parsed.authorId) metaAuthorId = parsed.authorId;
+            if (parsed.authorName) metaAuthorName = parsed.authorName;
+            if (parsed.authorRole) metaAuthorRole = parsed.authorRole;
+            if (parsed.isPublic !== undefined) metaIsPublic = parsed.isPublic;
           } catch (e) {}
         }
         rawDesc = rawDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
       }
+
+      const isMinwanBoard = b.title === '내 테스트' || b.author_name === 'minwan1 kim' || metaAuthorName === 'minwan1 kim';
 
       return {
         id: b.id,
@@ -52,15 +62,15 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
           b.cover_image_url ||
           'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
         customBgUrl: metaBg || b.custom_bg_url || '',
-        authorId: b.author_id || 'user-admin',
-        authorName: b.author_name || '관리자',
-        authorRole: 'teacher',
+        authorId: metaAuthorId || b.author_id || (isMinwanBoard ? 'user-minwan1' : 'user-admin'),
+        authorName: metaAuthorName || b.author_name || (isMinwanBoard ? 'minwan1 kim' : '관리자'),
+        authorRole: metaAuthorRole || b.author_role || 'teacher',
         columns: metaCols || (Array.isArray(b.columns) && b.columns.length > 0 ? b.columns : ['모둠 1', '모둠 2', '모둠 3']),
         allowStudentPost: true,
         allowComments: true,
         allowReactions: true,
         isLocked: false,
-        isPublic: true,
+        isPublic: metaIsPublic !== undefined ? metaIsPublic : (b.is_public !== false),
         category: metaCategory || b.category || '수업자료',
         createdAt: b.created_at ? new Date(b.created_at).toISOString().split('T')[0] : '',
         updatedAt: metaUpdatedAt || (b.created_at ? new Date(b.created_at).getTime() : undefined),
@@ -87,12 +97,15 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       category: board.category,
       theme: board.theme,
       layout: board.layout,
-      isPublic: board.isPublic,
+      isPublic: board.isPublic !== false,
+      authorId: board.authorId,
+      authorName: board.authorName,
+      authorRole: board.authorRole || 'teacher',
       updatedAt: board.updatedAt || Date.now(),
     });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
 
-    // 1. boards 테이블에 실제 스키마에 맞는 컬럼(columns 포함)으로 즉시 저장
+    // 1. boards 테이블에 실제 스키마에 맞는 컬럼(columns, author_id, author_name 등 포함)으로 즉시 저장
     const { error } = await supabase.from('boards').upsert({
       id: board.id,
       code: board.code,
@@ -100,6 +113,13 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       description: finalDesc,
       theme: board.theme || 'blue',
       columns: board.columns || ['모둠 1', '모둠 2', '모둠 3'],
+      author_id: board.authorId || null,
+      author_name: board.authorName || null,
+      author_role: board.authorRole || 'teacher',
+      is_public: board.isPublic !== false,
+      category: board.category || '수업자료',
+      cover_image_url: board.coverImageUrl || null,
+      custom_bg_url: board.customBgUrl || null,
     });
 
     if (error) {
