@@ -179,6 +179,8 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
       let metaReactions: any = undefined;
       let metaOrder: number | undefined = undefined;
       let metaColumn: string | undefined = undefined;
+      let metaX: number | undefined = undefined;
+      let metaY: number | undefined = undefined;
 
       // content 내에 인코딩된 첨부파일 및 댓글, 순서 메타데이터 복원
       if (rawContent.includes('<!--SCHOOLPAD_META:')) {
@@ -200,6 +202,12 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
             }
             if (typeof parsed.column === 'string' && parsed.column) {
               metaColumn = parsed.column;
+            }
+            if (typeof parsed.x === 'number') {
+              metaX = parsed.x;
+            }
+            if (typeof parsed.y === 'number') {
+              metaY = parsed.y;
             }
           } catch (e) {}
         }
@@ -233,6 +241,8 @@ let postCol = p.column_id || p.column_name || metaColumn || '모둠 1';
         authorRole: (p.author_role || 'student') as UserRole,
         column: postCol,
         order: finalOrder,
+        x: metaX,
+        y: metaY,
         reactions: metaReactions || {
           like: Array.isArray(p.likes) ? p.likes.length : 0,
           clap: 0,
@@ -267,13 +277,15 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     let cleanContent = post.content || '';
     cleanContent = cleanContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
 
-    // 첨부파일과 댓글, 순서, 컬럼을 메타데이터로 함께 인코딩하여 저장
+    // 첨부파일과 댓글, 순서, 컬럼, 위치(x, y)를 메타데이터로 함께 인코딩하여 저장
     const meta: {
       attachments?: FileAttachment[];
       comments?: any[];
       reactions?: any;
       order?: number;
       column?: string;
+      x?: number;
+      y?: number;
     } = {};
 
     const atts: FileAttachment[] = [];
@@ -296,6 +308,12 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
     }
     if (post.column) {
       meta.column = post.column;
+    }
+    if (typeof post.x === 'number') {
+      meta.x = Math.round(post.x);
+    }
+    if (typeof post.y === 'number') {
+      meta.y = Math.round(post.y);
     }
 
     let finalContent = cleanContent;
@@ -471,6 +489,8 @@ export async function saveAllRemotePosts(postsList: Post[]): Promise<boolean> {
       if (post.reactions) meta.reactions = post.reactions;
       if (typeof post.order === 'number') meta.order = post.order;
       if (post.column) meta.column = post.column;
+      if (typeof post.x === 'number') meta.x = Math.round(post.x);
+      if (typeof post.y === 'number') meta.y = Math.round(post.y);
 
       const fullContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(meta)}-->`;
       const colName = post.column || '모둠 1';

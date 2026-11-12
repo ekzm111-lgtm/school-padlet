@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Script from 'next/script';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import {
   GraduationCap,
   Sparkles,
@@ -69,7 +71,113 @@ export default function LoginPage() {
         setName((prev) => prev || n);
       }
     }
+
+    // 1) Supabase Google OAuth 리디렉션 로그인 감지
+    if (supabase) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user && user.email) {
+          const gName =
+            user.user_metadata?.full_name ||
+            user.user_metadata?.name ||
+            user.email.split('@')[0];
+          handleGoogleSubmit(user.email, gName, 'student');
+        }
+      }).catch(() => {});
+    }
   }, []);
+
+  // 2) Google Identity Services (GSI) One Tap 및 버튼 초기화
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const initGsi = () => {
+      const g = (window as any).google;
+      if (!g?.accounts?.id || !clientId) return;
+
+      try {
+        g.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response: any) => {
+            if (response?.credential) {
+              try {
+                const base64Url = response.credential.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(
+                  atob(base64)
+                    .split('')
+                    .map((c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                    .join('')
+                );
+                const profile = JSON.parse(jsonPayload);
+                if (profile?.email) {
+                  const googleName = profile.name || profile.given_name || profile.email.split('@')[0];
+                  setGoogleEmailInput(profile.email);
+                  setGoogleNameInput(googleName);
+                  handleGoogleSubmit(profile.email, googleName, googleRoleInput);
+                }
+              } catch (err) {
+                console.error('Failed to parse Google credential', err);
+              }
+            }
+          },
+          auto_select: true,
+          cancel_on_tap_outside: true,
+        });
+
+        g.accounts.id.prompt();
+
+        const btnEl = document.getElementById('google-official-btn');
+        if (btnEl) {
+          g.accounts.id.renderButton(btnEl, {
+            theme: 'outline',
+            size: 'large',
+            width: 320,
+            text: 'continue_with',
+            locale: 'ko',
+          });
+        }
+      } catch (err) {
+        console.warn('GSI init error:', err);
+      }
+    };
+
+    if ((window as any).google?.accounts?.id) {
+      initGsi();
+    } else {
+      const timer = setInterval(() => {
+        if ((window as any).google?.accounts?.id) {
+          clearInterval(timer);
+          initGsi();
+        }
+      }, 500);
+      return () => clearInterval(timer);
+    }
+  }, [googleRoleInput]);
+
+  // 브라우저 자격 증명(Web Credential API) 자동 감지
+  const handleAutoFillFromBrowser = async () => {
+    try {
+      if (typeof window !== 'undefined' && 'credentials' in navigator && (navigator as any).credentials?.get) {
+        const cred = await (navigator as any).credentials.get({
+          password: true,
+          mediation: 'optional',
+        });
+        if (cred && (cred as any).id) {
+          const userEmail = (cred as any).id;
+          setGoogleEmailInput(userEmail);
+          const prefix = userEmail.split('@')[0];
+          setGoogleNameInput((cred as any).name || prefix);
+          return;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    const inputEl = document.getElementById('google-email-input') as HTMLInputElement;
+    if (inputEl) {
+      inputEl.focus();
+    }
+  };
 
   // 1) 아이디/비밀번호 로그인 처리
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -108,19 +216,42 @@ export default function LoginPage() {
   };
 
   // 2) Google(Gmail) 원클릭 가입 및 로그인 모달 열기
-  const handleGoogleAuth = () => {
+  const handleGoogleAuth = async () => {
+    // 1) Supabase에 Google OAuth Provider가 활성화되어 있을 경우 원클릭 이동
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined,
+          },
+        });
+        if (!error && data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+      } catch (e) {}
+    }
+    // 2) 브라우저 계정 자동 감지 & 완성 모달 열기
     setShowGoogleModal(true);
+    setTimeout(() => {
+      handleAutoFillFromBrowser();
+    }, 150);
   };
 
   // Google 모달에서 실제 로그인/가입 실행
   const handleGoogleSubmit = (emailToUse?: string, nameToUse?: string, roleToUse?: UserRole) => {
     const finalEmail = (emailToUse || googleEmailInput).trim();
-    const finalName = (nameToUse || googleNameInput).trim() || '학생';
     const finalRole = roleToUse || googleRoleInput;
+    let finalName = (nameToUse || googleNameInput).trim();
 
     if (!finalEmail) {
       alert('Google(Gmail) 주소를 입력해 주세요.');
       return;
+    }
+
+    if (!finalName) {
+      finalName = finalEmail.split('@')[0];
     }
 
     if (typeof window !== 'undefined') {
@@ -634,6 +765,9 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* Google Identity Services 스크립트 비동기 로드 */}
+      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
+
       {/* 🌟 Google (Gmail) 원클릭 로그인 & 가입 모달 */}
       {showGoogleModal && (
         <div
@@ -646,7 +780,7 @@ export default function LoginPage() {
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
@@ -667,8 +801,8 @@ export default function LoginPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">Google 계정으로 시작</h3>
-                  <p className="text-[11px] text-slate-400">Gmail 주소로 간편하게 로그인/가입</p>
+                  <h3 className="text-sm font-extrabold text-slate-800">Google 계정으로 시작</h3>
+                  <p className="text-[11px] text-slate-400">브라우저 구글 계정으로 1초 자동 완성</p>
                 </div>
               </div>
               <button
@@ -680,56 +814,95 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {/* Google Identity Services 원탭/공식 버튼 (클라이언트 ID 등록 시 자동 렌더링) */}
+            <div id="google-official-btn" className="flex justify-center w-full empty:hidden" />
+
             {/* 최근 저장된 Gmail이 있는 경우 원클릭 빠른 로그인 */}
-            {savedGmail && (
-              <div className="p-3 bg-blue-50/80 rounded-2xl border border-blue-200/80 space-y-2">
+            {savedGmail ? (
+              <div className="p-3 bg-blue-50/90 rounded-2xl border border-blue-200/80 space-y-2">
                 <div className="text-[11px] font-bold text-blue-900 flex items-center justify-between">
-                  <span>최근 사용한 구글 계정</span>
-                  <span className="text-blue-600 text-[10px]">자동 기억됨</span>
+                  <span>내 구글 계정 감지됨</span>
+                  <span className="text-blue-600 text-[10px] font-extrabold">자동 기억됨</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleGoogleSubmit(savedGmail, savedName, googleRoleInput)}
-                  className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center justify-between shadow-xs"
+                  className="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center justify-between shadow-xs active:scale-95"
                 >
-                  <span className="truncate">{savedGmail}</span>
-                  <span className="text-[11px] opacity-90 shrink-0">바로 로그인 &gt;</span>
+                  <span className="truncate">{savedGmail} {savedName ? `(${savedName})` : ''}</span>
+                  <span className="text-[11px] opacity-90 shrink-0 font-extrabold">1초 만에 바로 입장 &gt;</span>
                 </button>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAutoFillFromBrowser}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-2 active:scale-95 shadow-2xs"
+              >
+                <Sparkles className="w-4 h-4 text-blue-600" />
+                <span>현재 브라우저 Google 계정 자동 감지</span>
+              </button>
             )}
 
-            <div className="space-y-3 pt-1">
+            <form
+              id="google-auth-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleGoogleSubmit();
+              }}
+              className="space-y-3 pt-1"
+            >
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  구글(Gmail) 주소 입력
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    placeholder="student@gmail.com"
-                    value={googleEmailInput}
-                    onChange={(e) => setGoogleEmailInput(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                <div className="flex items-center justify-between mb-1">
+                  <label htmlFor="google-email-input" className="block text-xs font-bold text-slate-700">
+                    구글(Gmail) 주소 입력
+                  </label>
                   {!googleEmailInput.includes('@') && googleEmailInput.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setGoogleEmailInput(googleEmailInput + '@gmail.com')}
-                      className="absolute right-2 top-1.5 px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold"
+                      onClick={() => {
+                        const filled = googleEmailInput + '@gmail.com';
+                        setGoogleEmailInput(filled);
+                        if (!googleNameInput) setGoogleNameInput(googleEmailInput);
+                      }}
+                      className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200"
                     >
                       + @gmail.com
                     </button>
                   )}
                 </div>
+                <div className="relative">
+                  <input
+                    id="google-email-input"
+                    name="email"
+                    type="email"
+                    autoComplete="email webauthn username"
+                    autoFocus
+                    required
+                    placeholder="student@gmail.com (클릭 시 브라우저 자동완성)"
+                    value={googleEmailInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGoogleEmailInput(val);
+                      if (!googleNameInput && val.length > 2) {
+                        setGoogleNameInput(val.split('@')[0]);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label htmlFor="google-name-input" className="block text-xs font-bold text-slate-700 mb-1">
                   성함 (이름)
                 </label>
                 <input
+                  id="google-name-input"
+                  name="name"
                   type="text"
-                  placeholder="예: 김학생 또는 이선생님"
+                  autoComplete="name"
+                  placeholder="예: 김학생 또는 이선생님 (미입력 시 자동 생성)"
                   value={googleNameInput}
                   onChange={(e) => setGoogleNameInput(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
@@ -761,13 +934,12 @@ export default function LoginPage() {
               </div>
 
               <button
-                type="button"
-                onClick={() => handleGoogleSubmit()}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-sm active:scale-95"
+                type="submit"
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
               >
-                Google 계정으로 입장하기
+                <span>Google 계정으로 자동 기입 & 입장하기</span>
               </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

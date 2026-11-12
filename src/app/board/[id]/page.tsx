@@ -106,6 +106,8 @@ export default function BoardDetailPage() {
   }, [columns, posts]);
 
   const handleMainWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    // 그리드나 캔버스 모드에서는 기본 세로/자유 스크롤이 정상 동작해야 하므로 휠 가로 매핑을 하지 않음
+    if (currentLayout !== 'kanban') return;
     if (!mainScrollRef.current) return;
     const target = e.target as HTMLElement;
     const scrollContainer = target.closest('.slim-scrollbar') as HTMLElement | null;
@@ -1128,7 +1130,7 @@ export default function BoardDetailPage() {
     if (!draggingId || currentLayout !== 'canvas') return;
     const canvasEl = e.currentTarget.getBoundingClientRect();
     const newX = Math.max(10, Math.min(canvasEl.width - 280, e.clientX - canvasEl.left - dragOffset.current.x));
-    const newY = Math.max(10, Math.min(1800, e.clientY - canvasEl.top - dragOffset.current.y));
+    const newY = Math.max(10, Math.min(2100, e.clientY - canvasEl.top - dragOffset.current.y));
 
     setPosts((prev) => prev.map((p) => (p.id === draggingId ? { ...p, x: newX, y: newY } : p)));
   };
@@ -1141,6 +1143,10 @@ export default function BoardDetailPage() {
       return match ? match : p;
     });
     saveStoreData.posts(updatedAllPosts);
+    const draggedPost = posts.find((p) => p.id === draggingId);
+    if (draggedPost && isSupabaseConfigured) {
+      saveRemotePost(draggedPost).catch(() => {});
+    }
     setDraggingId(null);
   };
 
@@ -1532,7 +1538,11 @@ export default function BoardDetailPage() {
         <main
           ref={mainScrollRef}
           onWheel={handleMainWheel}
-          className="flex-1 w-full px-3 sm:px-5 pt-3 pb-4 overflow-x-auto overflow-y-hidden board-h-scroll flex flex-col min-h-0"
+          className={`flex-1 w-full px-3 sm:px-5 pt-3 pb-4 min-h-0 ${
+            currentLayout === 'kanban'
+              ? 'overflow-x-auto overflow-y-hidden board-h-scroll flex flex-col'
+              : 'overflow-x-auto overflow-y-auto block'
+          }`}
         >
           {currentLayout === 'kanban' ? (
             /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤) */
@@ -1784,7 +1794,7 @@ export default function BoardDetailPage() {
               <Move className="w-3.5 h-3.5 text-blue-500" />
               <span>카드를 마우스로 끌어서 다른 카드 위치로 놓으면 순서가 바로 바뀝니다.</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 items-start">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-3.5 items-start pb-28 max-w-full">
               {posts.map((post, idx) => (
                 <div
                   key={post.id}
@@ -1814,7 +1824,7 @@ export default function BoardDetailPage() {
             onMouseMove={handleMouseMoveCanvas}
             onMouseUp={handleMouseUpCanvas}
             onMouseLeave={handleMouseUpCanvas}
-            className="relative min-h-[800px] w-full rounded-3xl border-2 border-dashed border-slate-300/60 p-4 transition overflow-hidden"
+            className="relative min-h-[2200px] min-w-[2000px] rounded-3xl border-2 border-dashed border-slate-300/60 p-4 transition pb-32"
           >
             <div className="absolute top-3 left-4 text-xs font-bold text-slate-500/80 pointer-events-none flex items-center gap-1.5">
               <MousePointer2 className="w-3.5 h-3.5" />
