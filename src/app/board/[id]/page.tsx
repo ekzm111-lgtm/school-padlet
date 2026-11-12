@@ -461,7 +461,7 @@ export default function BoardDetailPage() {
             const postCols = posts.map((p) => p.column).filter(Boolean) as string[];
             // 🔥 원격 열 목록 + 현재 로컬 열 목록(방금 추가한 빈 모둠 등) + 게시글 열 목록을 통합 및 정규화
             const cleanCols = Array.from(
-              new Set([...latestCols, ...columns, ...postCols].map((c: any) => {
+              new Set([...latestCols, ...postCols].map((c: any) => {
                 let name = String(c || '').trim();
                 if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
                 return name;

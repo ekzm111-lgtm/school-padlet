@@ -77,9 +77,9 @@ const INITIAL_BOARDS: Board[] = [
     description: '바이브코딩 실습 및 AI 도구 활용 보드입니다.',
     layout: 'kanban',
     theme: 'blue',
-    coverImageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
+    coverImageUrl: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80',
     authorId: 'user-admin',
-    authorName: '김관리 (정보부장)',
+    authorName: '관리자',
     authorRole: 'admin',
     allowStudentPost: true,
     allowComments: true,
@@ -87,7 +87,7 @@ const INITIAL_BOARDS: Board[] = [
     isLocked: false,
     isPublic: true,
     category: '수업자료',
-    columns: ['Ai 모델', '몸풀기 예제', '실습', 'util', '바이브코딩 편집기', '무료 AI (api)'],
+    columns: ['Ai 모델', '몸풀기 예제', '실습', 'util', '바이브코딩 편집기', '무료 AI (api)', '샘플1 공유', '샘플2 공유'],
     createdAt: '2026-10-26',
   },
   {
@@ -110,32 +110,7 @@ const INITIAL_BOARDS: Board[] = [
     columns: ['모둠 1', '모둠 2', '모둠 3'],
     createdAt: '2026-10-25',
   },
-  {
-    id: 'board-digital-tutor-2025',
-    code: '202501',
-    title: '2025. 디지털튜터 강의의 복제물',
-    description: '디지털튜터 양성 및 역량 강화 실습 강의를 위한 수업 협업 및 실습 보드입니다.',
-    layout: 'kanban',
-    theme: 'blue',
-    coverImageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80',
-    authorId: 'user-admin',
-    authorName: 'minwan kim (디지털튜터 강사)',
-    authorRole: 'teacher',
-    allowStudentPost: true,
-    allowComments: true,
-    allowReactions: true,
-    isLocked: false,
-    isPublic: true,
-    category: '수업자료',
-    columns: [
-      '[1강] 디지털 기초 & 기기 활용',
-      '[2강] 에듀테크 도구 탐구',
-      '[3강] 수업 실습 & 교안 제작',
-      '[4강] 디지털튜터 코칭 사례',
-      '자료 나눔 & Q&A',
-    ],
-    createdAt: '2025-11-08',
-  },
+
   {
     id: 'board-1',
     code: '782914',
@@ -524,10 +499,8 @@ export const getStoreData = (): StoreData => {
     }
   }
 
-  // '바이브코딩 교육자료' (999190) 및 '2025. 디지털튜터' 보드 자동 동기화
+  // '바이브코딩 교육자료' (999190) 보드 자동 동기화
   const vibeBoard = INITIAL_BOARDS.find((b) => b.code === '999190');
-  const dtBoard = INITIAL_BOARDS.find((b) => b.code === '202501');
-
   if (vibeBoard && !boardsList.some((b) => b.code === '999190')) {
     boardsList = [vibeBoard, ...boardsList];
     try {
@@ -535,12 +508,8 @@ export const getStoreData = (): StoreData => {
     } catch (e) {}
   }
 
-  if (dtBoard && !boardsList.some((b) => b.code === '202501')) {
-    boardsList = [dtBoard, ...boardsList];
-    try {
-      localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
-    } catch (e) {}
-  }
+  // 삭제된 디지털튜터 보드(202501)가 로컬에 남아있다면 영구 제거 필터링
+  boardsList = boardsList.filter((b) => b.id !== 'board-digital-tutor-2025' && b.code !== '202501');
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
 

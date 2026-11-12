@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import { X, Image as ImageIcon, Upload, Sparkles, Check, Palette } from 'lucide-react';
 import { Board, BoardTheme } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
+import { saveRemoteBoard } from '@/lib/supabaseStore';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface BackgroundModalProps {
   isOpen: boolean;
@@ -100,6 +102,9 @@ export default function BackgroundModal({
 
     const data = getStoreData();
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updated : b)));
+    if (isSupabaseConfigured) {
+      saveRemoteBoard(updated).catch(() => {});
+    }
     onUpdated(updated);
     onClose();
   };
