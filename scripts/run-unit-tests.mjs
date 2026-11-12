@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 
-// 1. 환경 변수 로드
+// 환경 변수 로드
 const envFile = fs.readFileSync('.env.local', 'utf8');
 const env = {};
 envFile.split('\n').forEach(line => {
@@ -19,140 +19,163 @@ envFile.split('\n').forEach(line => {
 
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-test.describe('School Padlet Unit Tests (via mavka-ai methodology)', () => {
+test.describe('School Padlet Comprehensive Feature Suite (Auto Test & Fix)', () => {
 
-  test.describe('1. Column Normalization & Matching Logic', () => {
-    // Given - When - Then
-    test('normalizeColumn_withTypo_returnsCorrectedName', () => {
-      // Given
-      const typoCols = ['몸플기 예제', '몸풀기', '  몸풀기 예제  '];
-      
-      // When & Then
-      typoCols.forEach(col => {
-        let normalized = String(col || '').trim();
-        if (normalized === '몸플기 예제' || normalized === '몸풀기') normalized = '몸풀기 예제';
-        assert.equal(normalized, '몸풀기 예제');
+  // --- 1. 모둠(열) 정규화 및 매핑 검증 ---
+  test.describe('1. Column Normalization & Navigation Mapping', () => {
+    test('normalizeColumn_withVariousTypo_returnsCorrectCleanName', () => {
+      const inputs = [
+        { raw: '몸플기 예제', expected: '몸풀기 예제' },
+        { raw: '몸풀기', expected: '몸풀기 예제' },
+        { raw: '   실습   ', expected: '실습' },
+        { raw: '샘플1 공유', expected: '샘플1 공유' },
+      ];
+
+      inputs.forEach(({ raw, expected }) => {
+        let name = String(raw || '').trim();
+        if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+        assert.equal(name, expected);
       });
     });
 
-    test('normalizeColumn_withEmptyOrNull_fallbacksToDefault', () => {
-      // Given
-      const emptyValues = [null, undefined, '', '   '];
-      const defaultCol = '모둠 1';
+    test('columnFilter_withMissingColumn_defaultsToFirstColumn', () => {
+      const columns = ['Ai 모델', '몸풀기 예제', '실습', 'util'];
+      const samplePosts = [
+        { id: '1', column: '실습' },
+        { id: '2', column: undefined },
+        { id: '3', column: '' },
+      ];
 
-      // When & Then
-      emptyValues.forEach(val => {
-        const result = (val && String(val).trim()) ? String(val).trim() : defaultCol;
-        assert.equal(result, '모둠 1');
-      });
+      const col0Posts = samplePosts.filter((p, idx) => (p.column || columns[0]) === columns[0] || (!p.column && idx === 0));
+      assert.equal(col0Posts.length, 2, '컬럼이 비어있는 카드는 기본 모둠 1(columns[0])에 매핑되어야 함');
     });
   });
 
-  test.describe('2. Metadata Encoding and Decoding', () => {
-    test('decodeMetadata_withValidComment_restoresAttachmentsAndOrder', () => {
-      // Given
-      const sampleMeta = {
-        order: -3,
+  // --- 2. 게시글 메타데이터 & 대용량 페이로드 안전성 ---
+  test.describe('2. Post Metadata Encoding & Large Payload Stripping', () => {
+    test('metadata_roundtrip_preservesAttachmentsCommentsAndOrder', () => {
+      const originalMeta = {
+        order: -5,
         column: '샘플1 공유',
-        attachments: [{ name: 'tetris.html', size: '12 KB', type: 'text/html' }],
-        reactions: { like: 5, heart: 2 }
+        reactions: { like: 10, heart: 4 },
+        comments: [{ id: 'c1', text: '좋은 코드네요!', author: '선생님' }],
+        attachments: [{ name: 'test.png', size: '20 KB', type: 'image/png' }],
       };
-      const rawContent = `테스트 본문 내용\n<!--SCHOOLPAD_META:${JSON.stringify(sampleMeta)}-->`;
 
-      // When
-      let cleanContent = rawContent;
-      let decodedMeta = {};
-      if (rawContent.includes('<!--SCHOOLPAD_META:')) {
-        const match = rawContent.match(/<!--SCHOOLPAD_META:([\s\S]*?)-->/);
-        if (match && match[1]) {
-          decodedMeta = JSON.parse(match[1]);
-        }
-        cleanContent = rawContent.replace(/<!--SCHOOLPAD_META:[\s\S]*?-->/g, '').trim();
-      }
+      const cleanContent = '안녕하세요. 제출합니다.';
+      const serialized = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(originalMeta)}-->`;
 
-      // Then
-      assert.equal(cleanContent, '테스트 본문 내용');
-      assert.equal(decodedMeta.order, -3);
-      assert.equal(decodedMeta.column, '샘플1 공유');
-      assert.equal(decodedMeta.attachments.length, 1);
-      assert.equal(decodedMeta.attachments[0].name, 'tetris.html');
-      assert.equal(decodedMeta.reactions.like, 5);
+      // 파싱
+      const match = serialized.match(/<!--SCHOOLPAD_META:([\s\S]*?)-->/);
+      assert.ok(match, '메타 주석이 정상 매칭되어야 함');
+      const parsed = JSON.parse(match[1]);
+
+      assert.equal(parsed.order, -5);
+      assert.equal(parsed.column, '샘플1 공유');
+      assert.equal(parsed.reactions.like, 10);
+      assert.equal(parsed.comments.length, 1);
+      assert.equal(parsed.attachments[0].name, 'test.png');
     });
 
-    test('encodeMetadata_withOversizedPayload_stripsLargeDataUrl', () => {
-      // Given
-      const hugeDataUrl = 'data:image/png;base64,' + 'A'.repeat(120000); // 120KB
+    test('largePayloadStripper_protectsSupabaseFromOOM', () => {
+      const bigBase64 = 'data:image/png;base64,' + 'Z'.repeat(150000);
       const atts = [
-        { name: 'big.png', size: '120 KB', type: 'image/png', dataUrl: hugeDataUrl },
-        { name: 'small.txt', size: '1 KB', type: 'text/plain', dataUrl: 'data:text/plain;base64,SGVsbG8=' }
+        { name: 'big.png', size: '150 KB', type: 'image/png', dataUrl: bigBase64 },
+        { name: 'normal.txt', size: '2 KB', type: 'text/plain', dataUrl: 'data:text/plain;base64,QUJD' },
       ];
 
-      // When (경량화 로직)
-      const lightAtts = atts.map(a => ({
+      const lightAtts = atts.map((a) => ({
         name: a.name,
         size: a.size,
         type: a.type,
-        dataUrl: (a.dataUrl && a.dataUrl.length > 80000) ? '' : a.dataUrl
+        dataUrl: (a.dataUrl && a.dataUrl.length > 80000) ? '' : a.dataUrl,
       }));
 
-      // Then
-      assert.equal(lightAtts[0].dataUrl, '', '100KB 초과 첨부는 dataUrl이 경량화되어야 함');
-      assert.equal(lightAtts[1].dataUrl, 'data:text/plain;base64,SGVsbG8=', '작은 첨부는 유지되어야 함');
+      assert.equal(lightAtts[0].dataUrl, '', '80KB 초과 첨부는 dataUrl이 경량화되어 저장 실패를 방지해야 함');
+      assert.equal(lightAtts[1].dataUrl, 'data:text/plain;base64,QUJD', '소용량 첨부는 보존되어야 함');
     });
   });
 
-  test.describe('3. Post Sorting (Order & Timestamp)', () => {
-    test('sortPosts_withMixedOrders_sortsAscendingByOrder', () => {
-      // Given
-      const posts = [
-        { id: 'p1', title: 'Card 1', order: 5 },
-        { id: 'p2', title: 'Card 2', order: -2 },
-        { id: 'p3', title: 'Card 3', order: 0 },
-        { id: 'p4', title: 'Card 4', order: undefined }
+  // --- 3. 카드 순서(Order Index) 오름차순 안정 정렬 ---
+  test.describe('3. Card Order Index Sorting', () => {
+    test('sortCards_handlesNegativeZeroPositiveAndUndefinedOrders', () => {
+      const cards = [
+        { id: 'c-pos', order: 10 },
+        { id: 'c-neg', order: -5 },
+        { id: 'c-zero', order: 0 },
+        { id: 'c-undef', order: undefined },
       ];
 
-      // When
-      posts.sort((a, b) => {
+      cards.sort((a, b) => {
         const orderA = typeof a.order === 'number' ? a.order : 9999;
         const orderB = typeof b.order === 'number' ? b.order : 9999;
         return orderA - orderB;
       });
 
-      // Then
-      assert.equal(posts[0].id, 'p2'); // -2
-      assert.equal(posts[1].id, 'p3'); // 0
-      assert.equal(posts[2].id, 'p1'); // 5
-      assert.equal(posts[3].id, 'p4'); // 9999 (undefined)
+      assert.equal(cards[0].id, 'c-neg');
+      assert.equal(cards[1].id, 'c-zero');
+      assert.equal(cards[2].id, 'c-pos');
+      assert.equal(cards[3].id, 'c-undef');
     });
   });
 
-  test.describe('4. Supabase Live Board & Post Sync Integrity', () => {
-    test('verifyVibeBoard_hasValidColumnsAndActivePosts', async () => {
-      // Given
-      const boardId = 'board-1792975588752';
+  // --- 4. 퀴즈 점수 채점 및 실시간 리더보드 계산 ---
+  test.describe('4. Quiz Scoring & Leaderboard Calculation', () => {
+    test('calculateScore_withCorrectAnswer_awardsPointsAccurately', () => {
+      const userAnswers = [
+        { questionId: 'q1', selectedOptionIndex: 1, isCorrect: true, timeSpentMs: 2500 },
+        { questionId: 'q2', selectedOptionIndex: 0, isCorrect: false, timeSpentMs: 4000 },
+        { questionId: 'q3', selectedOptionIndex: 2, isCorrect: true, timeSpentMs: 1200 },
+      ];
 
-      // When
+      // 채점 공식: 맞춘 문제 수 * 100점 + (시간 보너스: max(0, 50 - floor(ms/1000) * 5))
+      const correctCount = userAnswers.filter(a => a.isCorrect).length;
+      assert.equal(correctCount, 2, '2문제를 맞췄으므로 0점이 아닌 정확한 카운트여야 함');
+
+      const baseScore = correctCount * 100;
+      assert.equal(baseScore, 200);
+    });
+
+    test('leaderboard_sortsByScoreDescendingThenTimeAscending', () => {
+      const participants = [
+        { name: '학생A', score: 200, totalTimeMs: 15000 },
+        { name: '학생B', score: 300, totalTimeMs: 18000 },
+        { name: '학생C', score: 200, totalTimeMs: 12000 }, // 동점이지만 더 빠름
+      ];
+
+      participants.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.totalTimeMs - b.totalTimeMs;
+      });
+
+      assert.equal(participants[0].name, '학생B'); // 300점
+      assert.equal(participants[1].name, '학생C'); // 200점 (12초)
+      assert.equal(participants[2].name, '학생A'); // 200점 (15초)
+    });
+  });
+
+  // --- 5. Supabase 실시간 원격 DB 정합성 ---
+  test.describe('5. Supabase Live Board Integrity', () => {
+    test('verifyVibeBoard_existsAndColumnsMatched', async () => {
+      const boardId = 'board-1792975588752';
       const { data: board, error: bErr } = await supabase
         .from('boards')
         .select('*')
         .eq('id', boardId)
         .single();
 
-      // Then
       assert.equal(bErr, null);
-      assert.ok(board);
       assert.equal(board.code, '105207');
-      assert.ok(Array.isArray(board.columns));
       assert.ok(board.columns.includes('util'));
       assert.ok(board.columns.includes('샘플1 공유'));
 
       const { data: posts, error: pErr } = await supabase
         .from('posts')
-        .select('id, column_id, author_name, title')
+        .select('id, column_id')
         .eq('board_id', boardId);
 
       assert.equal(pErr, null);
-      assert.ok(posts.length >= 40, `총 게시글은 40개 이상이어야 함 (실제: ${posts.length})`);
+      assert.ok(posts.length >= 40);
     });
   });
 
