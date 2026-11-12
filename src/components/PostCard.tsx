@@ -336,12 +336,16 @@ export default function PostCard({
     (currentUser && currentUser.name === currentPost.authorName) ||
     myPostIds.includes(currentPost.id);
 
+  // 게시물 수정 권한: 최고 관리자(admin) 또는 작성자 본인(isAuthor)만 가능!
+  // 다른 사람이 작성한 게시물은 교사라도 임의로 수정 불가
   const canEdit =
     currentUser?.role === 'admin' ||
-    currentUser?.role === 'teacher' ||
     isAuthor;
 
-  const canDelete = canEdit;
+  // 게시물 삭제 권한: 최고 관리자(admin) 또는 작성자 본인(isAuthor)만 가능!
+  const canDelete =
+    currentUser?.role === 'admin' ||
+    isAuthor;
 
   const cardColorClass = {
     white: 'card-color-white',
@@ -771,8 +775,6 @@ export default function PostCard({
 
                 const canDeleteThisComment =
                   currentUser?.role === 'admin' ||
-                  currentUser?.role === 'teacher' ||
-                  isAuthor ||
                   isMyComment;
 
                 const isEditing = editingCommentId === c.id;

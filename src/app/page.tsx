@@ -412,9 +412,10 @@ export default function HomePage() {
                   (currentUser.name === 'minwan1 kim' && (board.authorName === 'minwan1 kim' || board.title === '내 테스트'))
                 )
               );
-              // 교사(teacher) 또는 관리자(admin)는 학교 보드를 자유롭게 수정 및 관리 가능
+              // 보드 수정 권한: 본인이 만든 보드(isMyBoard)이거나, 전체 시스템 최고 관리자(admin)만 수정 가능!
+              // 다른 교사가 만든 보드는 교사라도 임의 수정 불가 (복제해서 사용)
               const canEditBoard = Boolean(
-                currentUser && (isMyBoard || currentUser.role === 'teacher' || currentUser.role === 'admin')
+                currentUser && (isMyBoard || currentUser.role === 'admin')
               );
 
               return (
