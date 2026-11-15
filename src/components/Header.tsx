@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   Pencil,
   X,
-  Gamepad2,
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User } from '@/lib/types';
@@ -122,20 +121,8 @@ export default function Header() {
             </Link>
           </div>
 
-          {/* 중앙: 6자리 학생 핀코드 빠른 참여 버튼 & 퀴즈앤 바로가기 */}
+          {/* 중앙: 6자리 학생 핀코드 빠른 참여 버튼 */}
           <div className="hidden md:flex items-center gap-2">
-            <Link
-              href="/quiz"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200 text-xs font-bold text-purple-700 transition shadow-xs hover:scale-105"
-              title="실시간 퀴즈앤(QuizN) 문제 출제 및 대결"
-            >
-              <Gamepad2 className="w-3.5 h-3.5 text-purple-600" />
-              <span>실시간 퀴즈앤</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
-                NEW
-              </span>
-            </Link>
-
             <button
               onClick={() => setShowPinModal(true)}
               className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-xs font-semibold text-slate-700 hover:text-blue-600 transition-all shadow-inner"
@@ -150,15 +137,6 @@ export default function Header() {
 
           {/* 우측 유저 및 관리 버튼 */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* 모바일 퀴즈앤 버튼 */}
-            <Link
-              href="/quiz"
-              className="md:hidden p-2 rounded-lg bg-purple-50 text-purple-700 border border-purple-200"
-              title="퀴즈앤 라이브"
-            >
-              <Gamepad2 className="w-4 h-4" />
-            </Link>
-
             {/* 모바일 핀 입장 버튼 */}
             <button
               onClick={() => setShowPinModal(true)}

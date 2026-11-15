@@ -376,6 +376,109 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     } catch {}
   };
 
+  // 🌟 100명 부하 및 대규모 동시 입장 시뮬레이터 (컴퓨터 100대 없이도 즉각 테스트)
+  const handleSimulateBots = async (count: number) => {
+    const KOREAN_NAMES = [
+      '김민준', '이서연', '박도윤', '최지우', '정예준', '강하은', '조시우', '윤서아', '장준서', '임수아',
+      '한하윤', '오도현', '서지유', '신은우', '권민서', '황준혁', '안서현', '송건우', '전예나', '홍시윤',
+      '유재원', '고은채', '문태양', '배수현', '백승우', '노아린', '하진우', '곽민지', '성유찬', '차소율',
+      '구본혁', '우가은', '민태희', '엄지호', '변서진', '채현우', '원지안', '방도경', '진하람', '남궁윤'
+    ];
+
+    const currentList = liveState?.participants || [];
+    const currentCount = currentList.length;
+    const newBots: any[] = [];
+
+    for (let i = 1; i <= count; i++) {
+      const idx = currentCount + i;
+      const classNum = Math.floor((idx - 1) / 25) + 1;
+      const name = `${classNum}반 ${KOREAN_NAMES[(idx - 1) % KOREAN_NAMES.length]} (${idx}번)`;
+      const avatar = QUIZ_AVATARS[(idx - 1) % QUIZ_AVATARS.length];
+      newBots.push({
+        id: `bot_${pin}_${Date.now()}_${idx}`,
+        nickname: name,
+        avatarId: avatar.id,
+        avatarUrl: avatar.imageUrl,
+        avatarEmoji: avatar.emoji,
+        isBot: true,
+        score: 0,
+      });
+    }
+
+    if (liveState) {
+      const updated = [...currentList, ...newBots];
+      const nextState: LiveQuizState = { ...liveState, participants: updated };
+      setLiveState(nextState);
+      setLiveQuizState(nextState, true);
+      try {
+        await fetch(`${getApiBaseUrl()}/api/quiz/live`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nextState),
+        });
+      } catch {}
+    }
+  };
+
+  const handleClearBots = async () => {
+    if (!liveState) return;
+    const filtered = (liveState.participants || []).filter((p) => !p.id.startsWith('bot_'));
+    const nextState: LiveQuizState = { ...liveState, participants: filtered };
+    setLiveState(nextState);
+    setLiveQuizState(nextState, true);
+    try {
+      await fetch(`${getApiBaseUrl()}/api/quiz/live`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextState),
+      });
+    } catch {}
+  };
+
+  // 🤖 퀴즈 문제 진행 중 가상 학생들의 실시간 자동 응시 시뮬레이션
+  useEffect(() => {
+    if (!liveState || liveState.status !== 'question' || !room) return;
+    const qIdx = liveState.currentQuestionIndex;
+    const currentQ = room.questions[qIdx];
+    if (!currentQ) return;
+
+    const bots = (liveState.participants || []).filter((p) => p.id.startsWith('bot_'));
+    if (bots.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const existingAnswers = liveState.answersSubmitted || [];
+      const botAnswers = bots
+        .filter((b) => !existingAnswers.some((a: any) => a.participantId === b.id && a.questionIndex === qIdx))
+        .map((b) => {
+          const isCorrect = Math.random() < 0.75;
+          const optCount = currentQ.options?.length || 4;
+          const selected = isCorrect ? currentQ.correctAnswer : String(Math.floor(Math.random() * optCount) + 1);
+          const timeSpent = Math.floor(Math.random() * 6) + 1;
+          const points = isCorrect ? (currentQ.points || 5) * 100 : 0;
+          return {
+            participantId: b.id,
+            questionIndex: qIdx,
+            selectedAnswer: selected,
+            isCorrect,
+            timeSpent,
+            scoreEarned: points,
+          };
+        });
+
+      if (botAnswers.length > 0) {
+        const updatedAnswers = [...existingAnswers, ...botAnswers];
+        setLiveState((prev) => {
+          if (!prev || prev.status !== 'question') return prev;
+          const next = { ...prev, answersSubmitted: updatedAnswers };
+          setLiveQuizState(next, false);
+          return next;
+        });
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [liveState?.status, liveState?.currentQuestionIndex]);
+
   // 정답 및 문제풀이 공개
   const handleRevealAnswer = async () => {
     const now = Date.now();
@@ -916,31 +1019,56 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
               </div>
 
               {/* 실시간 대기자 참여 명단 (사용자 요청: 참여명단 나오고 참여자가 전부 들어오면 시작) */}
-              <div className="bg-slate-900/80 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between">
+              <div className="bg-slate-900/80 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
                   <div className="text-xs text-slate-300 font-extrabold flex items-center gap-2">
                     <Users size={15} className="text-amber-400" />
                     <span>실시간 입장 명단</span>
-                    <span className="text-xs bg-indigo-600/30 text-indigo-300 px-2.5 py-0.5 rounded-full">
+                    <span className="text-xs bg-indigo-600/30 text-indigo-300 px-2.5 py-0.5 rounded-full font-bold">
                       {participantCount}명 대기 중
                     </span>
                   </div>
-                  {participantCount > 0 && (
-                    <span className="text-[11px] text-emerald-400 font-medium">
-                      ✓ 모든 참여자가 들어오면 아래 시작 버튼을 누르세요.
-                    </span>
-                  )}
+
+                  {/* 100명 가상 학생 시뮬레이터 테스트 버튼 */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSimulateBots(10)}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600/40 hover:bg-indigo-600 text-indigo-200 hover:text-white border border-indigo-500/40 text-[11px] font-bold transition shadow-xs"
+                      title="10명의 가상 학생을 즉시 입장시킵니다."
+                    >
+                      +10명 입장
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSimulateBots(100)}
+                      className="px-3 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[11px] font-black transition shadow-xs flex items-center gap-1"
+                      title="컴퓨터 100대 없이도 100명이 꽉 찬 화면을 즉각 테스트합니다."
+                    >
+                      <span>🚀 100명 일괄 입장 테스트</span>
+                    </button>
+                    {(liveState.participants || []).some((p) => p.id.startsWith('bot_')) && (
+                      <button
+                        type="button"
+                        onClick={handleClearBots}
+                        className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/40 text-[11px] font-bold transition"
+                        title="가상 테스트 학생 퇴장"
+                      >
+                        🧹 비우기
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {participantCount === 0 ? (
                   <div className="py-6 sm:py-8 text-center text-slate-500 text-xs space-y-1">
                     <p className="font-semibold">아직 입장한 학생이 없습니다.</p>
                     <p className="text-[11px] text-slate-600">
-                      스마트폰 카메라로 위 QR 코드를 비추면 참가자 카드가 여기에 실시간으로 나타납니다.
+                      스마트폰 카메라로 위 QR 코드를 비추거나, 우측 상단의 [🚀 100명 일괄 입장 테스트] 버튼을 눌러보세요.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-48 overflow-y-auto p-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 max-h-[360px] overflow-y-auto p-1 no-scrollbar">
                     {liveState.participants.map((p) => {
                       const allAvatars = [...getSavedCollectedAvatars(), ...QUIZ_AVATARS];
                       const avatarInfo = allAvatars.find((a) => a.id === p.avatarId) || QUIZ_AVATARS[0];

@@ -28,6 +28,9 @@ import {
   Cloud,
   ChevronLeft,
   ChevronRight,
+  Users,
+  Gamepad2,
+  Play,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import PostCard from '@/components/PostCard';
@@ -35,6 +38,10 @@ import PostModal from '@/components/PostModal';
 import ShareModal from '@/components/ShareModal';
 import BackgroundModal from '@/components/BackgroundModal';
 import QrModal from '@/components/QrModal';
+import BoardParticipantsModal, { BoardParticipant } from '@/components/BoardParticipantsModal';
+import BoardQuizModal from '@/components/quiz/BoardQuizModal';
+import { QuizHostScreen } from '@/components/quiz/QuizHostScreen';
+import { QuizStudentScreen } from '@/components/quiz/QuizStudentScreen';
 import { getStoreData, saveStoreData, duplicateBoard, deletePost, getMyPostIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, saveAllRemotePosts, deleteRemotePost } from '@/lib/supabaseStore';
@@ -63,6 +70,17 @@ export default function BoardDetailPage() {
   const [activeColumn, setActiveColumn] = useState<string | undefined>(undefined);
   const [currentLayout, setCurrentLayout] = useState<BoardLayout>('kanban');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // 🌟 참여자 명단 및 실시간 접속자 모달 상태
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [botParticipants, setBotParticipants] = useState<BoardParticipant[]>([]);
+  const [onlinePresenceUsers, setOnlinePresenceUsers] = useState<any[]>([]);
+
+  // 🎯 이 보드 전용 실시간 퀴즈 모달 및 플레이어 상태
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [activeQuizPin, setActiveQuizPin] = useState<string | null>(null);
+  const [activeHostPin, setActiveHostPin] = useState<string | null>(null);
+  const [activeStudentPin, setActiveStudentPin] = useState<string | null>(null);
 
   // 모둠(열) 이름 수정 상태
   const [editingColIdx, setEditingColIdx] = useState<number | null>(null);
@@ -104,6 +122,161 @@ export default function BoardDetailPage() {
     });
     return counts;
   }, [columns, posts]);
+
+  // 🌟 전체 참여자(실시간 접속자 + 게시글 작성자 + 모의 봇) 실시간 종합 집계
+  const allParticipants: BoardParticipant[] = useMemo(() => {
+    const list: BoardParticipant[] = [];
+    const seen = new Set<string>();
+
+    // 1. 현재 presence 접속 중인 유저
+    onlinePresenceUsers.forEach((u) => {
+      if (u && u.id && !seen.has(u.id)) {
+        seen.add(u.id);
+        const postCount = posts.filter((p) => p.authorId === u.id || p.authorName === u.name).length;
+        list.push({
+          id: u.id,
+          name: u.name,
+          role: u.role || 'student',
+          isOnline: true,
+          joinedAt: u.joinedAt || '방금 전',
+          postCount,
+        });
+      }
+    });
+
+    // 2. 현재 로그인한 사용자 본인(presence 미반영 시 보완)
+    if (currentUser && !seen.has(currentUser.id)) {
+      seen.add(currentUser.id);
+      const postCount = posts.filter((p) => p.authorId === currentUser.id || p.authorName === currentUser.name).length;
+      list.push({
+        id: currentUser.id,
+        name: currentUser.name,
+        role: currentUser.role,
+        isOnline: true,
+        joinedAt: '방금 전',
+        postCount,
+      });
+    }
+
+    // 3. 이 보드에 글을 남겼던 다른 참여자들 (오프라인 표시)
+    posts.forEach((p) => {
+      const authorId = p.authorId || `author_${p.authorName}`;
+      if (!seen.has(authorId)) {
+        seen.add(authorId);
+        const count = posts.filter((item) => item.authorId === p.authorId || item.authorName === p.authorName).length;
+        list.push({
+          id: authorId,
+          name: p.authorName || '학생',
+          role: p.authorRole || 'student',
+          isOnline: false,
+          joinedAt: p.createdAt ? String(p.createdAt).slice(0, 10) : '이전 참여',
+          postCount: count,
+        });
+      }
+    });
+
+    // 4. 모의 학생 봇들
+    botParticipants.forEach((b) => {
+      list.push(b);
+    });
+
+    return list;
+  }, [onlinePresenceUsers, currentUser, posts, botParticipants]);
+
+  // 100명 모의 학생 입장 시뮬레이터 핸들러
+  const handleAddBots = (count: number) => {
+    const KOREAN_NAMES = [
+      '김민준', '이서연', '박도윤', '최지우', '정예준', '강하은', '조시우', '윤서아', '장준서', '임수아',
+      '한하윤', '오도현', '서지유', '신은우', '권민서', '황준혁', '안서현', '송건우', '전예나', '홍시윤',
+      '유재원', '고은채', '문태양', '배수현', '백승우', '노아린', '하진우', '곽민지', '성유찬', '차소율',
+      '구본혁', '우가은', '민태희', '엄지호', '변서진', '채현우', '원지안', '방도경', '진하람', '남궁윤'
+    ];
+    const newBots: BoardParticipant[] = [];
+    const now = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+    for (let i = 1; i <= count; i++) {
+      const idx = botParticipants.length + i;
+      const classNum = Math.floor((idx - 1) / 25) + 1;
+      const name = `${classNum}반 ${KOREAN_NAMES[(idx - 1) % KOREAN_NAMES.length]} (${idx}번)`;
+      newBots.push({
+        id: `bot_presence_${Date.now()}_${idx}`,
+        name,
+        role: 'student',
+        isOnline: true,
+        joinedAt: now,
+        postCount: Math.random() > 0.6 ? Math.floor(Math.random() * 3) + 1 : 0,
+        isBot: true,
+      });
+    }
+    setBotParticipants((prev) => [...prev, ...newBots]);
+  };
+
+  const handleClearBots = () => {
+    setBotParticipants([]);
+  };
+
+  // 실시간 Presence 접속자 추적 채널
+  useEffect(() => {
+    if (!boardId) return;
+    let presenceChannel: any = null;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const myId = currentUser ? currentUser.id : `guest_${Math.random().toString(36).substring(2, 7)}`;
+        const myName = currentUser ? currentUser.name : `학생_${Math.floor(1000 + Math.random() * 9000)}`;
+        const myRole = currentUser ? currentUser.role : 'student';
+
+        presenceChannel = supabase.channel(`board_presence_${boardId}`, {
+          config: { presence: { key: myId } },
+        });
+
+        presenceChannel
+          .on('presence', { event: 'sync' }, () => {
+            const state = presenceChannel.presenceState();
+            const list: any[] = [];
+            Object.values(state).forEach((presences: any) => {
+              if (Array.isArray(presences)) {
+                presences.forEach((p) => {
+                  if (p.user) list.push(p.user);
+                });
+              }
+            });
+            setOnlinePresenceUsers(list);
+          })
+          .subscribe(async (status: string) => {
+            if (status === 'SUBSCRIBED') {
+              await presenceChannel.track({
+                user: {
+                  id: myId,
+                  name: myName,
+                  role: myRole,
+                  joinedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+                },
+              });
+            }
+          });
+      } catch (err) {
+        console.warn('Presence channel error:', err);
+      }
+    }
+
+    // 이 보드의 활성화된 퀴즈 확인
+    const checkActiveQuiz = () => {
+      if (typeof window !== 'undefined') {
+        const pin = localStorage.getItem(`board_active_quiz_${boardId}`);
+        setActiveQuizPin(pin || null);
+      }
+    };
+    checkActiveQuiz();
+    const timer = setInterval(checkActiveQuiz, 2500);
+
+    return () => {
+      if (presenceChannel && supabase) {
+        supabase.removeChannel(presenceChannel);
+      }
+      clearInterval(timer);
+    };
+  }, [boardId, currentUser]);
 
   const handleMainWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     // 그리드나 캔버스 모드에서는 기본 세로/자유 스크롤이 정상 동작해야 하므로 휠 가로 매핑을 하지 않음
@@ -575,6 +748,39 @@ export default function BoardDetailPage() {
         <Link href="/" className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl">
           메인으로 이동
         </Link>
+      </div>
+    );
+  }
+
+  // 1. 교사용 퀴즈 대형 호스트 화면이 활성화된 경우
+  if (activeHostPin) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950">
+        <QuizHostScreen
+          pin={activeHostPin}
+          onExit={() => {
+            setActiveHostPin(null);
+            if (typeof window !== 'undefined' && board) {
+              localStorage.removeItem(`board_active_quiz_${board.id}`);
+            }
+            setActiveQuizPin(null);
+          }}
+          onViewLeaderboard={() => {
+            setActiveHostPin(null);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // 2. 학생용 퀴즈 실시간 응시 화면이 활성화된 경우
+  if (activeStudentPin) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950">
+        <QuizStudentScreen
+          pin={activeStudentPin}
+          onExit={() => setActiveStudentPin(null)}
+        />
       </div>
     );
   }
@@ -1254,6 +1460,24 @@ export default function BoardDetailPage() {
       <div className="shrink-0 z-30 no-print shadow-xs">
         <Header />
 
+        {/* 🔔 학생 실시간 퀴즈 시작 알림 배너 */}
+        {activeQuizPin && !isTeacherOrAdmin && (
+          <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white px-4 py-2.5 flex items-center justify-between gap-3 shadow-md z-20 shrink-0 animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+              <span className="text-xs sm:text-sm font-black">
+                🔔 선생님이 이 보드에서 실시간 퀴즈를 시작했습니다!
+              </span>
+            </div>
+            <button
+              onClick={() => setActiveStudentPin(activeQuizPin)}
+              className="px-3.5 py-1.5 rounded-xl bg-white text-purple-700 hover:bg-purple-50 text-xs font-black transition shadow-sm active:scale-95 shrink-0 flex items-center gap-1"
+            >
+              <span>🎮 지금 참여하기</span>
+            </button>
+          </div>
+        )}
+
         {/* 보드 서브 컨트롤 바 */}
         <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-3 sm:px-6 py-2 sm:py-2.5">
           <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-3">
@@ -1331,6 +1555,33 @@ export default function BoardDetailPage() {
             >
               <Hash className="w-3.5 h-3.5" />
               <span>{board.code}</span>
+            </button>
+
+            {/* 👥 실시간 참여 인원 수 배지 & 클릭 시 명단 모달 */}
+            <button
+              onClick={() => setShowParticipantsModal(true)}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition shadow-xs active:scale-95 shrink-0 whitespace-nowrap"
+              title="현재 보드에 접속 중인 학생 및 참여자 명단 확인"
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                <span>참여자 {allParticipants.filter((u) => u.isOnline).length}명</span>
+              </span>
+            </button>
+
+            {/* 🎯 이 보드 전용 실시간 퀴즈 버튼 */}
+            <button
+              onClick={() => setShowQuizModal(true)}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm active:scale-95 shrink-0 whitespace-nowrap ${
+                activeQuizPin
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white animate-pulse ring-2 ring-purple-300'
+                  : 'bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200 text-purple-700'
+              }`}
+              title="이 보드 전용 실시간 퀴즈앤(QuizN) 대결 진행"
+            >
+              <Gamepad2 className="w-3.5 h-3.5 text-purple-600" />
+              <span>{activeQuizPin ? '🎯 퀴즈 진행 중!' : '🎯 실시간 퀴즈'}</span>
             </button>
 
             {/* 이 보드 복제하기 버튼 */}
@@ -1943,6 +2194,37 @@ export default function BoardDetailPage() {
         onClose={() => setShowBgModal(false)}
         board={board}
         onUpdated={(up) => setBoard(up)}
+      />
+
+      {/* 👥 실시간 보드 참여자 명단 모달 (100명 모의 봇 테스트 지원) */}
+      <BoardParticipantsModal
+        isOpen={showParticipantsModal}
+        onClose={() => setShowParticipantsModal(false)}
+        boardTitle={board.title}
+        onlineUsers={allParticipants}
+        onAddBots={handleAddBots}
+        onClearBots={handleClearBots}
+        isTeacherOrAdmin={isTeacherOrAdmin}
+      />
+
+      {/* 🎯 이 보드 전용 실시간 퀴즈 모달 */}
+      <BoardQuizModal
+        isOpen={showQuizModal}
+        onClose={() => setShowQuizModal(false)}
+        board={board}
+        currentUser={currentUser}
+        isTeacherOrAdmin={isTeacherOrAdmin}
+        activeQuizPin={activeQuizPin}
+        onStartLive={(pin) => {
+          setActiveQuizPin(pin);
+          setActiveHostPin(pin);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`board_active_quiz_${board.id}`, pin);
+          }
+        }}
+        onJoinAsStudent={(pin) => {
+          setActiveStudentPin(pin);
+        }}
       />
     </div>
   );

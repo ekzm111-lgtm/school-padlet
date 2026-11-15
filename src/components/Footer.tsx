@@ -94,9 +94,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/quiz" className="hover:text-purple-400 transition flex items-center gap-1.5">
-                  <Gamepad2 className="w-3.5 h-3.5 text-purple-400" /> 퀴즈앤(QuizN) 라이브 대결
-                </Link>
+                <span className="text-purple-300 font-medium flex items-center gap-1.5">
+                  <Gamepad2 className="w-3.5 h-3.5 text-purple-400" /> 보드별 실시간 퀴즈 (수업 보드 내 구동)
+                </span>
               </li>
               <li>
                 <Link href="/login" className="hover:text-blue-400 transition flex items-center gap-1.5">

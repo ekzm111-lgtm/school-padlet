@@ -1,0 +1,65 @@
+import type { ExamInfo, Question } from '@/types/exam';
+
+export const defaultFormativeExamInfo: ExamInfo = {
+  schoolName: '미래한국초·중·고등학교',
+  grade: '전 학년 공통',
+  term: '수업 마무리',
+  subject: '수업 1분 핵심 형성평가',
+  date: '2026. 11. 16',
+  totalTime: '5분',
+  instructions: [
+    '오늘 배운 핵심 개념을 확인하는 1분 형성평가입니다.',
+    '선생님이 수업 중에 강조한 핵심 내용을 떠올리며 정답을 골라보세요.',
+  ],
+};
+
+export const defaultFormativeQuestions: Question[] = [
+  {
+    id: 'formative_1',
+    category: '형성평가',
+    type: 'multiple-choice',
+    points: 5,
+    title: '(OX 퀴즈) 오늘 배운 핵심 개념에 대한 설명으로 옳은 것은 O, 옳지 않은 것은 X를 고르세요.',
+    hasScore: false,
+    scoreAbc: '',
+    hasAudio: false,
+    options: ['O (참, 맞습니다)', 'X (거짓, 틀립니다)'],
+    correctAnswer: '1',
+    explanation: '오늘 수업에서 배운 핵심 원리에 부합하는 올바른 설명입니다.',
+    difficulty: '하',
+  },
+  {
+    id: 'formative_2',
+    category: '형성평가',
+    type: 'multiple-choice',
+    points: 5,
+    title: '다음 중 오늘 수업 시간에 다룬 주요 특징으로 알맞지 않은(틀린) 것은?',
+    hasScore: false,
+    scoreAbc: '',
+    hasAudio: false,
+    options: [
+      '첫 번째 핵심 원리에 부합한다.',
+      '서로 상호작용하며 균형을 유지한다.',
+      '시간이 지나도 절대 변하지 않고 고정되어 있다.',
+      '다양한 조건에 따라 유기적으로 변화한다.',
+      '우리 실생활에 밀접하게 활용된다.',
+    ],
+    correctAnswer: '3',
+    explanation: '수업에서 다룬 현상은 고정되어 있지 않고 환경과 상호작용하며 유연하게 변화합니다.',
+    difficulty: '중',
+  },
+  {
+    id: 'formative_3',
+    category: '형성평가',
+    type: 'multiple-choice',
+    points: 5,
+    title: '다음 빈칸에 들어갈 알맞은 핵심 용어는 무엇일까요?\n"모든 생태계의 기초 에너지는 (      )로부터 공급된다."',
+    hasScore: false,
+    scoreAbc: '',
+    hasAudio: false,
+    options: ['태양광(태양 에너지)', '지열 에너지', '풍력 에너지', '원자력 에너지', '화석 연료'],
+    correctAnswer: '1',
+    explanation: '지구 생태계의 거의 모든 1차 생산자는 태양의 빛에너지를 화학에너지로 전환하여 양분을 만듭니다.',
+    difficulty: '하',
+  },
+];
