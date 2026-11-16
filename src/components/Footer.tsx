@@ -24,8 +24,8 @@ export default function Footer() {
   return (
     <footer className="w-full bg-slate-900 text-slate-300 border-t border-slate-800 transition-colors mt-auto">
       {/* 상단 퀵 상태 바 */}
-      <div className="border-b border-slate-800/80 bg-slate-950/60 py-3 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="border-b border-slate-800/80 bg-slate-950/60 py-3 px-4 sm:px-8 lg:px-12">
+        <div className="w-full flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-slate-400">
             <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -48,7 +48,7 @@ export default function Footer() {
       </div>
 
       {/* 메인 푸터 콘텐츠 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+      <div className="w-full px-4 sm:px-8 lg:px-12 py-10 sm:py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10">
           {/* 1열: 서비스 로고 및 소개 */}
           <div className="space-y-4">

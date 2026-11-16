@@ -197,7 +197,7 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-slate-50 selection:bg-blue-600 selection:text-white">
       <Header />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 w-full px-4 sm:px-8 lg:px-12 py-6 sm:py-8">
         {/* 🔥 학교/교실 실사진 배경을 적용한 프리미엄 히어로 배너 */}
         <div className="relative overflow-hidden rounded-[2.5rem] text-white p-8 sm:p-12 shadow-2xl mb-10 border border-white/20 group">
           {/* 한국 선생님과 교복 입은 학생들 실사진 배경 */}

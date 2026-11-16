@@ -19,7 +19,11 @@ import {
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User } from '@/lib/types';
 
-export default function Header() {
+interface HeaderProps {
+  extraRight?: React.ReactNode;
+}
+
+export default function Header({ extraRight }: HeaderProps = {}) {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -99,8 +103,8 @@ export default function Header() {
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
-          {/* 로고 & 학교 정보 */}
+        <div className="w-full px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+          {/* 로고 & 학교 정보 (맨 왼쪽 배치) */}
           <div className="flex items-center gap-2 shrink-0">
             <Link href="/" className="flex items-center gap-2 group shrink-0">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform shrink-0">
@@ -135,8 +139,11 @@ export default function Header() {
             </button>
           </div>
 
-          {/* 우측 유저 및 관리 버튼 */}
+          {/* 우측 유저 및 관리 버튼 (맨 오른쪽 배치) */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* 🔥 참여자 & 실시간 퀴즈 버튼 (관리자 버튼 바로 앞쪽 배치) */}
+            {extraRight}
+
             {/* 모바일 핀 입장 버튼 */}
             <button
               onClick={() => setShowPinModal(true)}

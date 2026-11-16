@@ -1467,7 +1467,38 @@ export default function BoardDetailPage() {
     >
       {/* 상단 완벽 고정 영역 (전체 헤더 + 보드 서브 컨트롤 바) */}
       <div className="shrink-0 z-30 no-print shadow-xs">
-        <Header />
+        <Header
+          extraRight={
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* 👥 실시간 참여 인원 수 배지 & 클릭 시 명단 모달 (관리자 버튼 앞쪽) */}
+              <button
+                onClick={() => setShowParticipantsModal(true)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition shadow-xs active:scale-95 shrink-0 whitespace-nowrap"
+                title="현재 보드에 접속 중인 학생 및 참여자 명단 확인"
+              >
+                <Users className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span>참여자 {allParticipants.filter((u) => u.isOnline).length}명</span>
+                </span>
+              </button>
+
+              {/* 🎯 이 보드 전용 실시간 퀴즈 버튼 (관리자 버튼 앞쪽) */}
+              <button
+                onClick={() => setShowQuizModal(true)}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm active:scale-95 shrink-0 whitespace-nowrap ${
+                  activeQuizPin
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white animate-pulse ring-2 ring-purple-300'
+                    : 'bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200 text-purple-700'
+                }`}
+                title="이 보드 전용 실시간 퀴즈(QuizN) 대결 시작"
+              >
+                <Gamepad2 className="w-3.5 h-3.5" />
+                <span>실시간 퀴즈</span>
+              </button>
+            </div>
+          }
+        />
 
         {/* 🔔 학생 실시간 퀴즈 시작 알림 배너 */}
         {activeQuizPin && !isTeacherOrAdmin && (
@@ -1564,33 +1595,6 @@ export default function BoardDetailPage() {
             >
               <Hash className="w-3.5 h-3.5" />
               <span>{board.code}</span>
-            </button>
-
-            {/* 👥 실시간 참여 인원 수 배지 & 클릭 시 명단 모달 */}
-            <button
-              onClick={() => setShowParticipantsModal(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition shadow-xs active:scale-95 shrink-0 whitespace-nowrap"
-              title="현재 보드에 접속 중인 학생 및 참여자 명단 확인"
-            >
-              <Users className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                <span>참여자 {allParticipants.filter((u) => u.isOnline).length}명</span>
-              </span>
-            </button>
-
-            {/* 🎯 이 보드 전용 실시간 퀴즈 버튼 */}
-            <button
-              onClick={() => setShowQuizModal(true)}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm active:scale-95 shrink-0 whitespace-nowrap ${
-                activeQuizPin
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white animate-pulse ring-2 ring-purple-300'
-                  : 'bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200 text-purple-700'
-              }`}
-              title="이 보드 전용 실시간 퀴즈앤(QuizN) 대결 진행"
-            >
-              <Gamepad2 className="w-3.5 h-3.5 text-purple-600" />
-              <span>{activeQuizPin ? '🎯 퀴즈 진행 중!' : '🎯 실시간 퀴즈'}</span>
             </button>
 
             {/* 이 보드 복제하기 버튼 */}
