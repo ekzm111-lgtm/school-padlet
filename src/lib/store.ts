@@ -905,6 +905,7 @@ export const duplicateBoard = (sourceBoardId: string, currentUser: User): Board 
     authorRole: currentUser.role,
     copiedFromTitle: source.title,
     createdAt: new Date().toISOString().split('T')[0],
+    updatedAt: Date.now(),
   };
 
   // 원본 보드의 게시글들도 복사하여 새 보드로 연결

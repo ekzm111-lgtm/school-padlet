@@ -54,8 +54,23 @@ import confetti from 'canvas-confetti';
 
 export default function HomePage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [boards, setBoards] = useState<Board[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return getStoreData().currentUser;
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [boards, setBoards] = useState<Board[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return getStoreData().boards;
+      } catch (e) {}
+    }
+    return [];
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingBoard, setEditingBoard] = useState<Board | null>(null);
@@ -265,11 +280,17 @@ export default function HomePage() {
               const localTime = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
               const remTime = typeof rem.updatedAt === 'number' ? rem.updatedAt : 0;
               // 원격 데이터가 더 최신이거나 같으면 원격의 최신 커버 이미지 및 내용 반영
-              if (remTime >= localTime) {
-                merged.push({ ...local, ...rem, order: local.order ?? rem.order, pinned: local.pinned ?? rem.pinned });
-              } else {
-                merged.push({ ...rem, ...local });
-              }
+              const useRemote = remTime >= localTime;
+              const base = useRemote ? { ...local, ...rem } : { ...rem, ...local };
+              // 중요한 공유 설정(isPublic, title, description, coverImageUrl, category 등)은 원격 클라우드 최신 상태 우선 반영
+              merged.push({
+                ...base,
+                isPublic: rem.isPublic !== undefined ? rem.isPublic : base.isPublic,
+                title: rem.title || base.title,
+                category: rem.category || base.category,
+                order: local.order ?? rem.order,
+                pinned: local.pinned ?? rem.pinned,
+              });
             } else if (local) {
               merged.push(local);
             } else if (rem) {
@@ -287,6 +308,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    setIsMounted(true);
     loadData();
     const handleUpdate = () => {
       // 로컬 스토어 변경 시 로컬 순서 유지하며 반영
@@ -295,7 +317,28 @@ export default function HomePage() {
       setBoards(applySavedOrders(data.boards));
     };
     window.addEventListener('store_updated', handleUpdate);
-    return () => window.removeEventListener('store_updated', handleUpdate);
+
+    // ⚡ 다른 사용자의 보드 개설 및 공개/비공개 토글 실시간 감지
+    let boardChannel: any = null;
+    let pollTimer: any = null;
+    if (isSupabaseConfigured && supabase) {
+      boardChannel = supabase
+        .channel('main-boards-cloud-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, () => {
+          loadData();
+        })
+        .subscribe();
+
+      pollTimer = setInterval(() => {
+        loadData();
+      }, 5000);
+    }
+
+    return () => {
+      window.removeEventListener('store_updated', handleUpdate);
+      if (boardChannel && supabase) supabase.removeChannel(boardChannel);
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }, []);
 
   // 로그인되지 않은 경우 로그인 페이지로 자동 안내
@@ -345,9 +388,12 @@ export default function HomePage() {
   const handleTogglePublic = async (e: React.MouseEvent, targetBoard: Board) => {
     e.stopPropagation();
     const isPublicNow = targetBoard.isPublic !== false;
-    const updated = { ...targetBoard, isPublic: !isPublicNow, updatedAt: Date.now() };
+    const newStatus = !isPublicNow;
+    const updated = { ...targetBoard, isPublic: newStatus, updatedAt: Date.now() };
     const data = getStoreData();
-    saveStoreData.boards(data.boards.map((b) => (b.id === targetBoard.id ? updated : b)));
+    const updatedBoards = data.boards.map((b) => (b.id === targetBoard.id ? updated : b));
+    saveStoreData.boards(updatedBoards);
+    setBoards(applySavedOrders(updatedBoards));
     if (isSupabaseConfigured) {
       await saveRemoteBoard(updated);
     }
@@ -547,9 +593,19 @@ export default function HomePage() {
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
   const totalPostsCount = getStoreData().posts.length;
 
-  // 🌟 학생 전용 뷰: 패들렛·카훗 공식 스타일 (대형 6자리 PIN 입력 + 추천 수업 자료 열람)
-  // 학생은 보드 개설/수정 등의 관리 기능 없이 오직 6자리 코드로 수업 참여에 집중할 수 있도록 심플한 화면 제공!
-  if (!isTeacherOrAdmin) {
+  // 🌟 세션 로딩 중이거나 아직 마운트되기 전에는 성급하게 학생 뷰를 노출하지 않고 부드러운 로딩 상태 유지
+  if (!isMounted || !currentUser) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+        <span className="text-xs text-slate-500 font-bold">화면을 불러오는 중입니다...</span>
+      </div>
+    );
+  }
+
+  // 🌟 학생 전용 뷰: 오직 currentUser.role === 'student'인 경우에만 렌더링!
+  // 교사/관리자는 0.1초도 학생 화면이 깜빡이지 않고 본인 대시보드가 즉시 노출됩니다.
+  if (currentUser.role === 'student') {
     return (
       <StudentHomeView
         currentUser={currentUser}

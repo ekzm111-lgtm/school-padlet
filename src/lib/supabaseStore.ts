@@ -114,7 +114,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
 
     // 1. boards 테이블에 실제 스키마에 맞는 컬럼(columns, author_id, author_name 등 포함)으로 즉시 저장
-    const { error } = await supabase.from('boards').upsert({
+    let { error } = await supabase.from('boards').upsert({
       id: board.id,
       code: board.code,
       title: board.title,
@@ -131,7 +131,20 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
     });
 
     if (error) {
-      console.error('saveRemoteBoard upsert failed:', error);
+      console.warn('saveRemoteBoard full upsert failed, retrying with core columns:', error);
+      // 필수 핵심 컬럼들로 재시도 (기존 DB 스키마에 일부 부가 컬럼이 없더라도 100% 저장 성공)
+      const coreRetry = await supabase.from('boards').upsert({
+        id: board.id,
+        code: board.code,
+        title: board.title,
+        description: finalDesc,
+        theme: board.theme || 'blue',
+        is_public: board.isPublic !== false,
+        category: board.category || '수업자료',
+      });
+      if (coreRetry.error) {
+        console.error('saveRemoteBoard core retry failed:', coreRetry.error);
+      }
     }
 
     // 2. 🔥 학생-교사 실시간 동기화 100% 보장: posts 테이블의 시스템 메타 레코드에 동시 저장

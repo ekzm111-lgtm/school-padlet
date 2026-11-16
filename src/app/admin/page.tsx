@@ -35,6 +35,7 @@ import {
   deleteRemoteUser,
   fetchRemoteSettings,
   saveRemoteSettings,
+  fetchRemoteBoards,
   saveRemoteBoard,
   deleteRemoteBoard,
   deleteRemotePost,
@@ -46,7 +47,24 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(getStoreData().settings);
-  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'boards' | 'adminPw'>('pending');
+  const [activeTab, setActiveTabState] = useState<'pending' | 'users' | 'boards' | 'adminPw'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('schoolpad_admin_active_tab');
+        if (saved && ['pending', 'users', 'boards', 'adminPw'].includes(saved)) {
+          return saved as any;
+        }
+      } catch (e) {}
+    }
+    return 'pending';
+  });
+
+  const setActiveTab = (tab: 'pending' | 'users' | 'boards' | 'adminPw') => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('schoolpad_admin_active_tab', tab);
+    } catch (e) {}
+  };
   const [searchUser, setSearchUser] = useState('');
   const [toastMessage, setToastMessage] = useState('');
 
@@ -74,12 +92,13 @@ export default function AdminPage() {
     setBoards(data.boards);
     setSettings(data.settings);
 
-    // 🌟 원격 Supabase 클라우드에서 최신 사용자 및 시스템 설정 불러오기
+    // 🌟 원격 Supabase 클라우드에서 최신 사용자, 보드 및 시스템 설정 불러오기
     if (isSupabaseConfigured) {
       try {
-        const [remoteUsers, remoteSettings] = await Promise.all([
+        const [remoteUsers, remoteSettings, remoteBoards] = await Promise.all([
           fetchRemoteUsers(),
           fetchRemoteSettings(),
+          fetchRemoteBoards(),
         ]);
 
         if (remoteUsers && remoteUsers.length > 0) {
@@ -96,6 +115,28 @@ export default function AdminPage() {
           setSettings(remoteSettings);
           saveStoreData.settings(remoteSettings);
         }
+
+        if (remoteBoards && remoteBoards.length > 0) {
+          const boardMap = new Map<string, Board>();
+          data.boards.forEach((b) => boardMap.set(b.id, b));
+          remoteBoards.forEach((b) => {
+            const local = boardMap.get(b.id);
+            if (local) {
+              boardMap.set(b.id, {
+                ...local,
+                ...b,
+                isPublic: b.isPublic !== undefined ? b.isPublic : local.isPublic,
+                order: local.order ?? b.order,
+                pinned: local.pinned ?? b.pinned,
+              });
+            } else {
+              boardMap.set(b.id, b);
+            }
+          });
+          const mergedBoards = Array.from(boardMap.values());
+          setBoards(mergedBoards);
+          saveStoreData.boards(mergedBoards);
+        }
       } catch (err) {
         console.error('Admin cloud load error:', err);
       }
@@ -107,11 +148,13 @@ export default function AdminPage() {
     const handleUpdate = () => loadData();
     window.addEventListener('store_updated', handleUpdate);
 
-    // ⚡ 다른 PC나 스마트폰에서 가입한 사용자를 즉각 감지하기 위한 Supabase 실시간 리스너 및 폴링
+    // ⚡ 다른 PC나 스마트폰에서 가입한 사용자 및 보드 공개/비공개 변경을 즉각 감지하기 위한 Supabase 실시간 리스너 및 폴링
     let channel: any = null;
+    let boardChannel: any = null;
     let pollTimer: any = null;
 
     if (isSupabaseConfigured && supabase) {
+      // 1. 사용자 실시간 리스너
       channel = supabase
         .channel('admin-users-cloud-sync')
         .on(
@@ -144,6 +187,47 @@ export default function AdminPage() {
         )
         .subscribe();
 
+      // 2. 보드(공개/비공개 및 신규 개설) 실시간 리스너
+      boardChannel = supabase
+        .channel('admin-boards-cloud-sync')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'boards',
+          },
+          () => {
+            fetchRemoteBoards().then((rb) => {
+              if (rb && rb.length > 0) {
+                const data = getStoreData();
+                const boardMap = new Map<string, Board>();
+                data.boards.forEach((b) => boardMap.set(b.id, b));
+                rb.forEach((b) => {
+                  const local = boardMap.get(b.id);
+                  boardMap.set(
+                    b.id,
+                    local
+                      ? {
+                          ...local,
+                          ...b,
+                          isPublic: b.isPublic !== undefined ? b.isPublic : local.isPublic,
+                          order: local.order ?? b.order,
+                          pinned: local.pinned ?? b.pinned,
+                        }
+                      : b
+                  );
+                });
+                const merged = Array.from(boardMap.values());
+                setBoards(merged);
+                saveStoreData.boards(merged);
+              }
+            });
+          }
+        )
+        .subscribe();
+
+      // 3. 주기적 동기화 폴링 (사용자 및 보드 최신화 100% 보장)
       pollTimer = setInterval(() => {
         fetchRemoteUsers().then((ru) => {
           if (ru && ru.length > 0) {
@@ -166,12 +250,51 @@ export default function AdminPage() {
             });
           }
         });
+
+        fetchRemoteBoards().then((rb) => {
+          if (rb && rb.length > 0) {
+            setBoards((prev) => {
+              const prevMap = new Map(prev.map((b) => [b.id, b]));
+              let changed = rb.length !== prev.length;
+              for (const r of rb) {
+                const existing = prevMap.get(r.id);
+                if (!existing || existing.isPublic !== r.isPublic || existing.title !== r.title) {
+                  changed = true;
+                  break;
+                }
+              }
+              if (changed) {
+                const mergedMap = new Map(prevMap);
+                rb.forEach((b) => {
+                  const local = mergedMap.get(b.id);
+                  mergedMap.set(
+                    b.id,
+                    local
+                      ? {
+                          ...local,
+                          ...b,
+                          isPublic: b.isPublic !== undefined ? b.isPublic : local.isPublic,
+                          order: local.order ?? b.order,
+                          pinned: local.pinned ?? b.pinned,
+                        }
+                      : b
+                  );
+                });
+                const merged = Array.from(mergedMap.values());
+                saveStoreData.boards(merged);
+                return merged;
+              }
+              return prev;
+            });
+          }
+        });
       }, 4000);
     }
 
     return () => {
       window.removeEventListener('store_updated', handleUpdate);
       if (channel && supabase) supabase.removeChannel(channel);
+      if (boardChannel && supabase) supabase.removeChannel(boardChannel);
       if (pollTimer) clearInterval(pollTimer);
     };
   }, []);
@@ -395,7 +518,7 @@ export default function AdminPage() {
   // 🌟 관리자 개설 보드 공개 / 비공개 즉시 전환
   const handleToggleBoardPublic = async (board: Board) => {
     const newStatus = !(board.isPublic !== false);
-    const updatedBoard: Board = { ...board, isPublic: newStatus };
+    const updatedBoard: Board = { ...board, isPublic: newStatus, updatedAt: Date.now() };
     const updatedBoards = boards.map((b) => (b.id === board.id ? updatedBoard : b));
     setBoards(updatedBoards);
     saveStoreData.boards(updatedBoards);
