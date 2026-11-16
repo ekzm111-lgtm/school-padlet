@@ -516,14 +516,30 @@ export const getStoreData = (): StoreData => {
     } catch (e) {}
   }
 
-  // '🌟 초·중·고 유용한 학습 사이트 & 에듀테크 링크 모음' (778899) 보드 및 15개 카드 자동 동기화
-  if (!boardsList.some((b) => b.id === USEFUL_SCHOOL_LINKS_BOARD.id || b.code === USEFUL_SCHOOL_LINKS_BOARD.code)) {
+  // '🌟 초·중·고 유용한 학습 사이트 & 에듀테크 링크 모음' (778899) 보드 및 에듀테크 링크 카드 자동 동기화
+  const usefulBoardIdx = boardsList.findIndex((b) => b.id === USEFUL_SCHOOL_LINKS_BOARD.id || b.code === USEFUL_SCHOOL_LINKS_BOARD.code);
+  if (usefulBoardIdx === -1) {
     boardsList = [USEFUL_SCHOOL_LINKS_BOARD, ...boardsList];
     try {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
     } catch (e) {}
     if (isSupabaseConfigured) {
       saveRemoteBoard(USEFUL_SCHOOL_LINKS_BOARD).catch(() => {});
+    }
+  } else {
+    // 컬럼 목록이 업데이트된 경우 최신 컬럼 구조로 자동 동기화
+    if (boardsList[usefulBoardIdx].columns?.length !== USEFUL_SCHOOL_LINKS_BOARD.columns?.length) {
+      boardsList[usefulBoardIdx] = {
+        ...boardsList[usefulBoardIdx],
+        columns: USEFUL_SCHOOL_LINKS_BOARD.columns,
+        description: USEFUL_SCHOOL_LINKS_BOARD.description,
+      };
+      try {
+        localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
+      } catch (e) {}
+      if (isSupabaseConfigured) {
+        saveRemoteBoard(boardsList[usefulBoardIdx]).catch(() => {});
+      }
     }
   }
 
@@ -532,14 +548,16 @@ export const getStoreData = (): StoreData => {
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
 
-  const hasUsefulLinksPost = postsList.some((p) => p.boardId === USEFUL_SCHOOL_LINKS_BOARD.id);
-  if (!hasUsefulLinksPost) {
-    postsList = [...USEFUL_SCHOOL_LINKS_POSTS, ...postsList];
+  // 유용한 학습 사이트 링크 중 누락된 포스트 자동 보강
+  const existingPostIds = new Set(postsList.map((p) => p.id));
+  const missingUsefulPosts = USEFUL_SCHOOL_LINKS_POSTS.filter((p) => !existingPostIds.has(p.id));
+  if (missingUsefulPosts.length > 0) {
+    postsList = [...missingUsefulPosts, ...postsList];
     try {
       localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(postsList));
     } catch (e) {}
     if (isSupabaseConfigured) {
-      USEFUL_SCHOOL_LINKS_POSTS.forEach((p) => {
+      missingUsefulPosts.forEach((p) => {
         saveRemotePost(p).catch(() => {});
       });
     }

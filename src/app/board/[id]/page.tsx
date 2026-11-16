@@ -1829,9 +1829,23 @@ export default function BoardDetailPage() {
               : 'overflow-x-auto overflow-y-auto block'
           }`}
         >
-          {currentLayout === 'kanban' ? (
-            /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤) */
-            <div className="flex gap-3 sm:gap-3.5 items-stretch h-full w-max min-w-full min-h-0 pb-1 snap-x snap-mandatory">
+          {currentLayout === 'kanban' ? (() => {
+            // 섹션(열) 수에 따른 반응형 유동적 너비 계산 (1~2개일 때 널찍하게, 섹션이 많아질수록 2번째 패들렛 이미지처럼 215px 콤팩트 크기로 최적화)
+            const getColWidthClass = (numCols: number) => {
+              if (numCols === 1) return 'w-full max-w-[360px] shrink-0';
+              if (numCols === 2) return 'w-full sm:w-[320px] max-w-[340px] shrink-0';
+              if (numCols === 3) return 'w-[82vw] sm:w-[280px] max-w-[300px] shrink-0';
+              if (numCols <= 5) return 'w-[75vw] sm:w-[250px] max-w-[270px] shrink-0';
+              if (numCols <= 7) return 'w-[70vw] sm:w-[230px] max-w-[245px] shrink-0';
+              return 'w-[68vw] sm:w-[215px] max-w-[225px] shrink-0';
+            };
+            const isFewCols = columns.length <= 2;
+
+            return (
+            /* 1) 모둠 칸반 열 (패들렛 표준 콤팩트 사이즈 & 모둠별 독립 스크롤 & 1~2개일 때 가운데 정렬) */
+            <div className={`flex gap-2.5 sm:gap-3 items-stretch h-full min-h-0 pb-1 snap-x snap-mandatory ${
+              isFewCols ? 'w-full justify-center px-2 sm:px-4' : 'w-max min-w-full justify-start'
+            }`}>
               {columns.map((colName, idx) => {
               const colPosts = posts
                 .filter((p) => (p.column || columns[0]) === colName || (!p.column && idx === 0))
@@ -1855,7 +1869,7 @@ export default function BoardDetailPage() {
                     }
                   }}
                   onDrop={(e) => handleDropOnColumn(e, colName, idx)}
-                  className={`w-[86vw] max-w-[320px] sm:w-[280px] shrink-0 snap-center bg-white/90 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border shadow-xs flex flex-col h-full max-h-full transition-all duration-200 min-h-0 ${
+                  className={`${getColWidthClass(columns.length)} snap-center bg-white/90 backdrop-blur-md rounded-2xl p-2.5 border shadow-xs flex flex-col h-full max-h-full transition-all duration-200 min-h-0 ${
                     isColDragged ? 'opacity-40 scale-95 border-dashed border-blue-400' : ''
                   } ${
                     isColDragOver
@@ -2029,7 +2043,7 @@ export default function BoardDetailPage() {
 
             {/* 새 모둠 추가 카드 */}
             {(!board.isLocked || isTeacherOrAdmin) && (
-              <div className="w-[82vw] max-w-[285px] sm:w-[280px] shrink-0">
+              <div className={`${columns.length >= 8 ? 'w-[68vw] sm:w-[215px]' : columns.length <= 2 ? 'w-full sm:w-[260px] max-w-[280px]' : 'w-[75vw] sm:w-[240px]'} shrink-0`}>
                 {showAddColInput ? (
                   <form
                     onSubmit={handleAddColumn}
@@ -2072,7 +2086,8 @@ export default function BoardDetailPage() {
               </div>
             )}
           </div>
-        ) : currentLayout === 'grid' ? (
+          );
+        })() : currentLayout === 'grid' ? (
           /* 2) 그리드 모드 */
           <div>
             <div className="mb-3 text-xs font-bold text-slate-500 flex items-center gap-1.5">

@@ -382,7 +382,7 @@ export default function PostCard({
   return (
     <>
       <div
-        className={`relative rounded-2xl p-3 sm:p-3.5 border shadow-xs transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
+        className={`relative rounded-2xl p-2.5 sm:p-3 border shadow-xs transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
       >
         {/* 상단 핀 & 작성자 & 작성일시 & 액션 버튼 */}
         <div className="mb-2">
@@ -585,7 +585,7 @@ export default function PostCard({
           {currentPost.title && (
             <h4
               onMouseDown={(e) => e.stopPropagation()}
-              className="font-bold text-sm text-slate-900 mb-1.5 leading-snug break-words [word-break:keep-all] select-text cursor-text tracking-tight"
+              className="font-bold text-xs sm:text-sm text-slate-900 mb-1 leading-snug break-words [word-break:keep-all] select-text cursor-text tracking-tight"
             >
               {currentPost.title}
             </h4>
@@ -595,7 +595,7 @@ export default function PostCard({
           {displayContent && (
             <p
               onMouseDown={(e) => e.stopPropagation()}
-              className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words [word-break:keep-all] select-text cursor-text"
+              className="text-[11px] sm:text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words [word-break:keep-all] select-text cursor-text"
             >
               {displayContent}
             </p>
@@ -603,21 +603,21 @@ export default function PostCard({
 
           {/* 🔥 다중 첨부 파일 다운로드 목록 (한글, PDF, 워드, PPT 등) */}
           {allAttachments.length > 0 && (
-            <div className="mt-2.5 space-y-1">
+            <div className="mt-2 space-y-1">
               {allAttachments.map((file, idx) => (
                 <div
                   key={idx}
-                  className="p-2 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 transition flex items-center justify-between gap-2"
+                  className="p-1.5 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 transition flex items-center justify-between gap-1.5"
                 >
-                  <div className="flex items-center gap-2 truncate">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                      <FileText className="w-3 h-3" />
+                  <div className="flex items-center gap-1.5 truncate">
+                    <div className="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                      <FileText className="w-2.5 h-2.5" />
                     </div>
                     <div className="truncate text-left">
-                      <div className="text-[11px] font-bold text-slate-800 truncate">
+                      <div className="text-[10px] font-bold text-slate-800 truncate">
                         {file.name}
                       </div>
-                      <div className="text-[9px] text-slate-500 font-mono">
+                      <div className="text-[8px] text-slate-500 font-mono">
                         {file.size}
                       </div>
                     </div>
@@ -628,11 +628,11 @@ export default function PostCard({
                     href={file.dataUrl}
                     download={file.name}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition shadow-xs shrink-0"
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold transition shadow-xs shrink-0"
                     title={`${file.name} 다운로드`}
                   >
-                    <Download className="w-3 h-3" />
-                    <span>다운로드</span>
+                    <Download className="w-2.5 h-2.5" />
+                    <span>다운</span>
                   </a>
                 </div>
               ))}
@@ -654,7 +654,7 @@ export default function PostCard({
                   setShowImageModal(true);
                 }
               }}
-              className="mt-3 relative overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group"
+              className="mt-2 relative overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group"
               title={
                 currentPost.linkUrl
                   ? `클릭하여 새 탭에서 링크 열기: ${currentPost.linkUrl}`
@@ -664,7 +664,7 @@ export default function PostCard({
               <img
                 src={cardImage}
                 alt="대표 이미지"
-                className="w-full max-h-56 object-cover group-hover:scale-105 transition duration-300"
+                className="w-full h-32 sm:h-36 object-cover group-hover:scale-105 transition duration-300"
               />
             </div>
           )}
@@ -684,7 +684,7 @@ export default function PostCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className={`mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition shadow-xs ${
+                className={`mt-2 flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition shadow-xs ${
                   isGoogleDrive
                     ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
                     : 'bg-black/5 hover:bg-black/10 text-blue-700'
@@ -699,49 +699,49 @@ export default function PostCard({
                     </>
                   ) : (
                     <>
-                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      <ExternalLink className="w-3 h-3 shrink-0" />
                       <span className="truncate">{currentPost.linkUrl}</span>
                     </>
                   )}
                 </div>
-                <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                <ExternalLink className="w-3 h-3 shrink-0 opacity-80" />
               </a>
             );
           })()}
         </div>
 
         {/* 하단 반응 및 댓글 바 */}
-        <div className="mt-2.5 pt-2 border-t border-black/10">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="mt-2 pt-1.5 border-t border-black/10">
+          <div className="flex items-center justify-between gap-1.5 flex-wrap">
             {allowReactions && (
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleReaction('like')}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/5 hover:bg-white text-[11px] font-bold text-slate-700 transition"
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/5 hover:bg-white text-[10px] font-bold text-slate-700 transition"
                   title="좋아요"
                 >
-                  <ThumbsUp className="w-3 h-3 text-blue-600" />
+                  <ThumbsUp className="w-2.5 h-2.5 text-blue-600" />
                   <span>{reactions.like || 0}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleReaction('heart')}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/5 hover:bg-white text-[11px] font-bold text-slate-700 transition"
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/5 hover:bg-white text-[10px] font-bold text-slate-700 transition"
                   title="멋져요"
                 >
-                  <Heart className="w-3 h-3 text-rose-500 fill-current" />
+                  <Heart className="w-2.5 h-2.5 text-rose-500 fill-current" />
                   <span>{reactions.heart || 0}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleReaction('insight')}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/5 hover:bg-white text-[11px] font-bold text-slate-700 transition"
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/5 hover:bg-white text-[10px] font-bold text-slate-700 transition"
                   title="좋은 생각"
                 >
-                  <Lightbulb className="w-3 h-3 text-amber-500" />
+                  <Lightbulb className="w-2.5 h-2.5 text-amber-500" />
                   <span>{reactions.insight || 0}</span>
                 </button>
               </div>
@@ -751,9 +751,9 @@ export default function PostCard({
               <button
                 type="button"
                 onClick={() => setShowComments(!showComments)}
-                className="flex items-center gap-1 text-[11px] font-bold text-slate-600 hover:text-slate-900 transition ml-auto"
+                className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-slate-600 hover:text-slate-900 transition ml-auto"
               >
-                <MessageCircle className="w-3.5 h-3.5" />
+                <MessageCircle className="w-3 h-3" />
                 <span>댓글 {comments.length}개</span>
               </button>
             )}
