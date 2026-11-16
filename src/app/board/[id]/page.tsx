@@ -2468,6 +2468,7 @@ export default function BoardDetailPage() {
                     allowReactions={board.allowReactions}
                     onDelete={handleDeletePost}
                     onUpdated={handlePostUpdated}
+                    layoutMode="grid"
                   />
                 </div>
               ))}
@@ -2514,6 +2515,7 @@ export default function BoardDetailPage() {
                     allowReactions={board.allowReactions}
                     onDelete={handleDeletePost}
                     onUpdated={handlePostUpdated}
+                    layoutMode="canvas"
                   />
                 </div>
               );

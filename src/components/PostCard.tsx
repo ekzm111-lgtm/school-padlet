@@ -23,6 +23,7 @@ import {
   ChevronsDown,
   ArrowUpDown,
   Maximize2,
+  MoreVertical,
 } from 'lucide-react';
 import { Post, User, FileAttachment, PostComment } from '@/lib/types';
 import { getStoreData, saveStoreData, getMyPostIds, getMyCommentIds, addMyCommentId } from '@/lib/store';
@@ -47,6 +48,7 @@ interface PostCardProps {
   onMoveToColumn?: (postId: string, targetCol: string) => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  layoutMode?: 'kanban' | 'grid' | 'canvas';
 }
 
 function formatPostDate(dateStr?: string | number): string {
@@ -107,7 +109,9 @@ export default function PostCard({
   onMoveToColumn,
   canMoveUp = false,
   canMoveDown = false,
+  layoutMode = 'kanban',
 }: PostCardProps) {
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -120,6 +124,14 @@ export default function PostCard({
   const [editCommentText, setEditCommentText] = useState('');
   const [showImageModal, setShowImageModal] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+
+  // 더보기 메뉴 외부 클릭 감지
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const handleClickOutside = () => setShowMoreMenu(false);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [showMoreMenu]);
 
   // 첨부 이미지 또는 링크 기반 대표 썸네일 자동 계산 (유튜브, GitHub 등 링크만 있어도 카드가 썸네일 자동 렌더링!)
   const cardImage = useMemo(() => {
@@ -350,13 +362,15 @@ export default function PostCard({
     currentUser?.role === 'admin' ||
     isAuthor;
 
+  const isStickyNote = layoutMode === 'grid' || layoutMode === 'canvas';
+
   const cardColorClass = {
-    white: 'card-color-white',
-    yellow: 'card-color-yellow',
-    pink: 'card-color-pink',
-    blue: 'card-color-blue',
-    green: 'card-color-green',
-    purple: 'card-color-purple',
+    white: isStickyNote ? 'bg-amber-50/95 border-amber-200/90 shadow-[2px_5px_15px_rgba(0,0,0,0.06)]' : 'card-color-white',
+    yellow: isStickyNote ? 'bg-yellow-100/95 border-yellow-300 shadow-[2px_5px_15px_rgba(234,179,8,0.15)]' : 'card-color-yellow',
+    pink: isStickyNote ? 'bg-pink-100/95 border-pink-300 shadow-[2px_5px_15px_rgba(244,114,182,0.15)]' : 'card-color-pink',
+    blue: isStickyNote ? 'bg-sky-100/95 border-sky-300 shadow-[2px_5px_15px_rgba(56,189,248,0.15)]' : 'card-color-blue',
+    green: isStickyNote ? 'bg-emerald-100/95 border-emerald-300 shadow-[2px_5px_15px_rgba(52,211,153,0.15)]' : 'card-color-green',
+    purple: isStickyNote ? 'bg-purple-100/95 border-purple-300 shadow-[2px_5px_15px_rgba(192,132,252,0.15)]' : 'card-color-purple',
   }[currentPost.color || 'white'] || 'card-color-white';
 
   // 첨부 파일 목록 취합 (다중 파일 + 단일 파일 호환 + 클라우드 메타데이터 복원)
@@ -385,14 +399,21 @@ export default function PostCard({
   return (
     <>
       <div
-        className={`relative rounded-2xl p-2.5 sm:p-3 border shadow-xs transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between`}
+        className={`relative rounded-2xl p-3 sm:p-3.5 border transition-all duration-200 hover:shadow-md ${cardColorClass} flex flex-col justify-between ${
+          isStickyNote ? 'hover:-translate-y-1' : ''
+        }`}
       >
-        {/* 상단 핀 & 작성자 & 작성일시 & 액션 버튼 */}
+        {/* 그리드 및 자유 드래그에서 아기자기한 마스킹 테이프 그래픽 효과 */}
+        {isStickyNote && (
+          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-14 sm:w-16 h-3 bg-amber-200/70 backdrop-blur-xs border-y border-amber-300/40 shadow-2xs rotate-[-1deg] rounded-xs pointer-events-none z-10" />
+        )}
+
+        {/* 상단 핀 & 작성자 & 작성일시 & 단정한 더보기 메뉴 */}
         <div className="mb-2">
-          <div className="flex items-start justify-between gap-1.5">
-            {/* 작성자 정보 & 작성시간 (세로 찌그러짐 원천 방지) */}
-            <div className="flex flex-col min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-start justify-between gap-1.5 min-w-0">
+            {/* 작성자 정보 & 뱃지 (가로 폭 100% 확보하여 학생 이름 찌그러짐 원천 해결!) */}
+            <div className="flex flex-col min-w-0 flex-1 pr-1">
+              <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                 {currentPost.pinned && (
                   <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 shrink-0">
                     <Pin className="w-2.5 h-2.5 fill-current rotate-45" />
@@ -400,7 +421,7 @@ export default function PostCard({
                   </span>
                 )}
                 <span
-                  className="font-bold text-xs text-slate-800 truncate"
+                  className="font-bold text-xs sm:text-[13px] text-slate-800 break-words leading-snug"
                   title={currentPost.authorName || '작성자'}
                 >
                   {currentPost.authorName || '작성자'}
@@ -416,7 +437,7 @@ export default function PostCard({
                 </span>
               </div>
 
-              {/* 작성 시간 (작성자 바로 아래에 단정하게 표시) */}
+              {/* 작성 시간 */}
               {formattedDate && (
                 <span className="text-[10px] text-slate-400 font-normal mt-0.5 select-none truncate">
                   {formattedDate}
@@ -424,162 +445,126 @@ export default function PostCard({
               )}
             </div>
 
-            {/* 오른쪽: 순서 이동 & 복사/수정/삭제 버튼 그룹 */}
-            <div className="flex items-center gap-0.5 shrink-0">
-              {/* 순서 이동 버튼: 위로 (▲) */}
-              {onMoveUp && canMoveUp && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveUp(currentPost.id);
-                  }}
-                  className="p-1 rounded-lg bg-black/5 hover:bg-blue-100 hover:text-blue-700 text-slate-600 transition shadow-xs"
-                  title="카드를 위로 한 칸 이동 (▲)"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                </button>
-              )}
+            {/* 오른쪽: 단정한 더보기 (···) 버튼 1개만 배치하여 이름 영역을 넓게 보호! */}
+            <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setShowMoreMenu((prev) => !prev)}
+                className={`p-1.5 rounded-xl transition ${
+                  showMoreMenu
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-700 hover:bg-black/5'
+                }`}
+                title="카드 메뉴 (수정, 복사, 순서 이동, 삭제)"
+              >
+                <MoreVertical className="w-3.5 h-3.5" />
+              </button>
 
-              {/* 순서 이동 버튼: 아래로 (▼) */}
-              {onMoveDown && canMoveDown && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveDown(currentPost.id);
-                  }}
-                  className="p-1 rounded-lg bg-black/5 hover:bg-blue-100 hover:text-blue-700 text-slate-600 transition shadow-xs"
-                  title="카드를 아래로 한 칸 이동 (▼)"
+              {/* 더보기 팝업 드롭다운 */}
+              {showMoreMenu && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-0 top-8 z-50 w-44 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-150"
                 >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
-              )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        setShowEditModal(true);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-blue-50 text-slate-700 hover:text-blue-600 flex items-center gap-2 font-bold transition"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                      <span>내용 수정</span>
+                    </button>
+                  )}
 
-              {/* 위치 및 다른 모둠 빠른 이동 메뉴 (맨위/맨아래/모둠변경) */}
-              {(onMoveToTop || onMoveToBottom || onMoveToColumn) && (
-                <div className="relative">
                   <button
                     type="button"
                     onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMoveMenu((prev) => !prev);
+                      setShowMoreMenu(false);
+                      handleCopyContent(e);
                     }}
-                    className={`p-1 rounded-lg transition shadow-xs flex items-center justify-center ${
-                      showMoveMenu
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-black/5 hover:bg-black/10 text-slate-600'
-                    }`}
-                    title="카드 위치(맨위/맨아래) 및 다른 모둠으로 이동"
+                    className="w-full px-3 py-2 text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition"
                   >
-                    <ArrowUpDown className="w-3.5 h-3.5" />
+                    <Copy className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{copiedText ? '복사 완료!' : '글 전체 복사'}</span>
                   </button>
 
-                  {showMoveMenu && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute right-0 top-7 z-30 w-44 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-150"
-                    >
-                      <div className="px-3 py-1 text-[10px] font-bold text-slate-400 border-b border-slate-100">
-                        순서 빠른 이동
-                      </div>
-                      {canMoveUp && onMoveToTop && (
+                  {/* 순서 이동 (위/아래) */}
+                  {(canMoveUp || canMoveDown) && (
+                    <div className="border-t border-slate-100 my-1 pt-1">
+                      {canMoveUp && onMoveUp && (
                         <button
                           type="button"
                           onClick={() => {
-                            setShowMoveMenu(false);
-                            onMoveToTop(currentPost.id);
+                            setShowMoreMenu(false);
+                            onMoveUp(currentPost.id);
                           }}
-                          className="w-full px-3 py-1.5 text-left hover:bg-blue-50 hover:text-blue-600 flex items-center gap-1.5 font-medium"
+                          className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-slate-700 flex items-center gap-2"
                         >
-                          <ChevronsUp className="w-3.5 h-3.5 text-blue-500" />
-                          <span>맨 위로 이동</span>
+                          <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                          <span>위로 한 칸 이동</span>
                         </button>
                       )}
-                      {canMoveDown && onMoveToBottom && (
+                      {canMoveDown && onMoveDown && (
                         <button
                           type="button"
                           onClick={() => {
-                            setShowMoveMenu(false);
-                            onMoveToBottom(currentPost.id);
+                            setShowMoreMenu(false);
+                            onMoveDown(currentPost.id);
                           }}
-                          className="w-full px-3 py-1.5 text-left hover:bg-blue-50 hover:text-blue-600 flex items-center gap-1.5 font-medium"
+                          className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-slate-700 flex items-center gap-2"
                         >
-                          <ChevronsDown className="w-3.5 h-3.5 text-blue-500" />
-                          <span>맨 아래로 이동</span>
+                          <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                          <span>아래로 한 칸 이동</span>
                         </button>
-                      )}
-
-                      {columns.filter((c) => c !== (currentPost.column || columns[0])).length > 0 && (
-                        <>
-                          <div className="px-3 py-1 text-[10px] font-bold text-slate-400 border-t border-slate-100 mt-1">
-                            다른 모둠으로 이동
-                          </div>
-                          {columns
-                            .filter((c) => c !== (currentPost.column || columns[0]))
-                            .map((col) => (
-                              <button
-                                key={col}
-                                type="button"
-                                onClick={() => {
-                                  setShowMoveMenu(false);
-                                  if (onMoveToColumn) onMoveToColumn(currentPost.id, col);
-                                }}
-                                className="w-full px-3 py-1.5 text-left hover:bg-blue-50 hover:text-blue-600 truncate font-medium flex items-center gap-1.5"
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                                <span className="truncate">{col}</span>
-                              </button>
-                            ))}
-                        </>
                       )}
                     </div>
                   )}
+
+                  {/* 다른 모둠으로 이동 */}
+                  {columns.filter((c) => c !== (currentPost.column || columns[0])).length > 0 && onMoveToColumn && (
+                    <div className="border-t border-slate-100 my-1 pt-1">
+                      <div className="px-3 py-1 text-[10px] font-bold text-slate-400">
+                        다른 모둠으로 이동
+                      </div>
+                      {columns
+                        .filter((c) => c !== (currentPost.column || columns[0]))
+                        .map((col) => (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => {
+                              setShowMoreMenu(false);
+                              onMoveToColumn(currentPost.id, col);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-slate-700 flex items-center gap-2 truncate"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                            <span className="truncate">{col}</span>
+                          </button>
+                        ))}
+                    </div>
+                  )}
+
+                  {canDelete && (
+                    <div className="border-t border-slate-100 my-1 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          onDelete(currentPost.id);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-red-50 text-red-600 flex items-center gap-2 font-bold transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        <span>카드 삭제</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {/* 글 전체 복사 버튼 */}
-              <button
-                type="button"
-                onClick={handleCopyContent}
-                className={`p-1 rounded-lg transition shadow-xs flex items-center justify-center ${
-                  copiedText
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-black/5 hover:bg-black/10 text-slate-600 hover:text-slate-900'
-                }`}
-                title={copiedText ? '복사 완료!' : '글 내용 전체 복사하기'}
-              >
-                {copiedText ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-
-              {/* 연필 수정 버튼 */}
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowEditModal(true);
-                  }}
-                  className="p-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white transition shadow-xs"
-                  title="내용 수정하기"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-              )}
-
-              {/* 삭제 버튼 */}
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(currentPost.id);
-                  }}
-                  className="p-1 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
-                  title="삭제하기"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
               )}
             </div>
           </div>
