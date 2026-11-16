@@ -16,6 +16,10 @@ import {
   USEFUL_SCHOOL_LINKS_BOARD,
   USEFUL_SCHOOL_LINKS_POSTS,
 } from '@/data/usefulSchoolLinksBoard';
+import {
+  ENTRY_MIDDLE_SCHOOL_BOARD,
+  ENTRY_MIDDLE_SCHOOL_POSTS,
+} from '@/data/entryMiddleSchoolBoard';
 
 const INITIAL_SETTINGS: SystemSettings = {
   autoApproveUsers: true,
@@ -77,6 +81,7 @@ const INITIAL_USERS: User[] = [
 
 const INITIAL_BOARDS: Board[] = [
   USEFUL_SCHOOL_LINKS_BOARD,
+  ENTRY_MIDDLE_SCHOOL_BOARD,
   {
     id: 'board-1792975588752',
     code: '105207',
@@ -179,6 +184,7 @@ const INITIAL_BOARDS: Board[] = [
 
 const INITIAL_POSTS: Post[] = [
   ...USEFUL_SCHOOL_LINKS_POSTS,
+  ...ENTRY_MIDDLE_SCHOOL_POSTS,
   {
     id: 'post-util-her',
     authorId: 'user-admin',
@@ -562,6 +568,18 @@ export const getStoreData = (): StoreData => {
     }
   }
 
+  // '🚀 중학교 엔트리 코딩 인기 추천 영상 & 실전 프로젝트' (334455) 보드 자동 동기화
+  const entryBoardIdx = boardsList.findIndex((b) => b.id === ENTRY_MIDDLE_SCHOOL_BOARD.id || b.code === ENTRY_MIDDLE_SCHOOL_BOARD.code);
+  if (entryBoardIdx === -1) {
+    boardsList = [ENTRY_MIDDLE_SCHOOL_BOARD, ...boardsList];
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
+    } catch (e) {}
+    if (isSupabaseConfigured) {
+      saveRemoteBoard(ENTRY_MIDDLE_SCHOOL_BOARD).catch(() => {});
+    }
+  }
+
   // 삭제된 디지털튜터 보드(202501)가 로컬에 남아있다면 영구 제거 필터링
   boardsList = boardsList.filter((b) => b.id !== 'board-digital-tutor-2025' && b.code !== '202501');
 
@@ -602,6 +620,20 @@ export const getStoreData = (): StoreData => {
     } catch (e) {}
     if (isSupabaseConfigured) {
       missingUsefulPosts.forEach((p) => {
+        saveRemotePost(p).catch(() => {});
+      });
+    }
+  }
+
+  // 엔트리 중학교 인기 추천 영상 카드 누락분 자동 보강
+  const missingEntryPosts = ENTRY_MIDDLE_SCHOOL_POSTS.filter((p) => !existingPostIds.has(p.id));
+  if (missingEntryPosts.length > 0) {
+    postsList = [...missingEntryPosts, ...postsList];
+    try {
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(postsList));
+    } catch (e) {}
+    if (isSupabaseConfigured) {
+      missingEntryPosts.forEach((p) => {
         saveRemotePost(p).catch(() => {});
       });
     }
