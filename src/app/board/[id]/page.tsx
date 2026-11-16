@@ -641,11 +641,9 @@ export default function BoardDetailPage() {
 
             let merged = localPending.length > 0 ? [...remote, ...localPending] : remote;
 
-            // 🔥 엔트리 중학교 보드: 구버전 unsplash 카드 정리 및 모든 카드 배경 흰색('white') 보장
+            // 🔥 엔트리 중학교 보드: 모든 카드 배경 흰색('white') 보장
             if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
-              merged = merged
-                .filter((p) => !(p.imageUrl && p.imageUrl.includes('unsplash.com')))
-                .map((p) => ({ ...p, color: 'white' }));
+              merged = merged.map((p) => ({ ...p, color: 'white' }));
             }
 
             // 🔥 카드 order 기준 오름차순 안정 정렬 보장!
@@ -722,18 +720,6 @@ export default function BoardDetailPage() {
                 '모둠 1', '모둠 2', '모둠 3', '모둠 1 (과제 수행 계획)', '모둠 2 (의견 및 아이디어)', '모둠 3 (최종 결과물)'
               ]);
               cleanCols = cleanCols.filter((c) => !foreignColumns.has(c));
-            }
-
-            // 🔥 엔트리 중학교 보드: 구버전 컬럼 격리
-            if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
-              const obsoleteEntryColumns = new Set([
-                '🎮 아케이드 & 액션 게임',
-                '🧠 뇌섹 퍼즐 & 스토리',
-                '🤖 엔트리 AI 인공지능',
-                '📊 실생활 유틸리티 & 수학',
-                '⚡ 중학 정보 핵심 알고리즘',
-              ]);
-              cleanCols = cleanCols.filter((c) => !obsoleteEntryColumns.has(c));
             }
 
             if (cleanCols.length > 0) {

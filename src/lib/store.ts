@@ -643,23 +643,8 @@ export const getStoreData = (): StoreData => {
   }
 
   // 엔트리 중학교 인기 추천 영상 보드 (board-entry-middle-school) 포스트 정규화:
-  // 1) 구버전 더미 카드(unsplash 이미지나 구버전 임의 ID 등) 정리
-  // 2) 22개 공식 검증 영상 카드 보강
-  // 3) 모든 카드의 배경색을 'white'로 보장
-  // 4) 썸네일을 해당 유튜브 영상의 공식 썸네일(img.youtube.com/vi/{id}/hqdefault.jpg)로 보장
-  const validEntryPostIds = new Set(ENTRY_MIDDLE_SCHOOL_POSTS.map((p) => p.id));
+  // 모든 카드의 배경색을 'white'로 보장하고, 썸네일을 해당 영상 공식 썸네일로 보장
   let entryPostsCleaned = false;
-
-  // 구버전 더미 카드(unsplash 이미지, 비디오 미매칭 구버전 포스트) 제거
-  postsList = postsList.filter((p) => {
-    if (p.boardId === ENTRY_MIDDLE_SCHOOL_BOARD.id) {
-      if (!validEntryPostIds.has(p.id) || (p.imageUrl && p.imageUrl.includes('unsplash.com'))) {
-        entryPostsCleaned = true;
-        return false;
-      }
-    }
-    return true;
-  });
 
   // 모든 엔트리 보드 카드의 배경을 'white'로, 썸네일을 해당 영상 썸네일로 보장
   postsList = postsList.map((p) => {

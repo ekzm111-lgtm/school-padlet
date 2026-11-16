@@ -1,0 +1,1653 @@
+[
+  {
+    "url": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
+    "duration": 71,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=800&auto=format&fit=crop&q=80",
+    "duration": 78,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=1000&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=1000&auto=format&fit=crop&q=80",
+    "duration": 113,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&auto=format&fit=crop&q=80",
+    "duration": 92,
+    "error": null
+  },
+  {
+    "url": "https://quiz.zep.us",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://quiz.zep.us/",
+    "duration": 100,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800&auto=format&fit=crop&q=80",
+    "duration": 44,
+    "error": null
+  },
+  {
+    "url": "https://kahoot.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://kahoot.com/",
+    "duration": 115,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&auto=format&fit=crop&q=80",
+    "duration": 44,
+    "error": null
+  },
+  {
+    "url": "https://quizn.show",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "",
+    "ok": true,
+    "finalUrl": "https://quizn.show/main/main.do",
+    "duration": 126,
+    "error": null
+  },
+  {
+    "url": "https://www.tkbell.co.kr",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "",
+    "ok": true,
+    "finalUrl": "https://www.tkbell.co.kr/",
+    "duration": 61,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80",
+    "duration": 42,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80",
+    "duration": 40,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&auto=format&fit=crop&q=80",
+    "duration": 43,
+    "error": null
+  },
+  {
+    "url": "https://scratch.mit.edu",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://scratch.mit.edu/",
+    "duration": 63,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80",
+    "duration": 41,
+    "error": null
+  },
+  {
+    "url": "https://playentry.org",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://playentry.org/",
+    "duration": 105,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts",
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+    "duration": 45,
+    "error": null
+  },
+  {
+    "url": "https://lightbot.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://lightbot.com/",
+    "duration": 74,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&auto=format&fit=crop&q=80",
+    "duration": 49,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&auto=format&fit=crop&q=80",
+    "duration": 14,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=800&auto=format&fit=crop&q=80",
+    "duration": 57,
+    "error": null
+  },
+  {
+    "url": "https://www.classpoint.app",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.classpoint.app/",
+    "duration": 271,
+    "error": null
+  },
+  {
+    "url": "https://teachablemachine.withgoogle.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://teachablemachine.withgoogle.com/",
+    "duration": 122,
+    "error": null
+  },
+  {
+    "url": "https://ko.khanacademy.org",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://ko.khanacademy.org/",
+    "duration": 61,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts",
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=800&auto=format&fit=crop&q=80",
+    "duration": 42,
+    "error": null
+  },
+  {
+    "url": "https://www.algeomath.kr",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.algeomath.kr/",
+    "duration": 103,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&auto=format&fit=crop&q=80",
+    "duration": 15,
+    "error": null
+  },
+  {
+    "url": "https://www.geogebra.org",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.geogebra.org/",
+    "duration": 61,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+    "duration": 46,
+    "error": null
+  },
+  {
+    "url": "https://www.toctocmath.kr",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "",
+    "ok": true,
+    "finalUrl": "https://www.toctocmath.kr/",
+    "duration": 158,
+    "error": null
+  },
+  {
+    "url": "https://hourofcode.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://hourofai.org/ko",
+    "duration": 242,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts",
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80",
+    "duration": 56,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=800&auto=format&fit=crop&q=80",
+    "duration": 43,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1507668077129-56e32842fceb?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1507668077129-56e32842fceb?w=800&auto=format&fit=crop&q=80",
+    "duration": 40,
+    "error": null
+  },
+  {
+    "url": "https://whalespace.io",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://whalespace.io/",
+    "duration": 67,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=800&auto=format&fit=crop&q=80",
+    "duration": 50,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1588072432836-e10032774350?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1588072432836-e10032774350?w=800&auto=format&fit=crop&q=80",
+    "duration": 43,
+    "error": null
+  },
+  {
+    "url": "https://stellarium-web.org",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://stellarium-web.org/",
+    "duration": 179,
+    "error": null
+  },
+  {
+    "url": "https://www.scienceall.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "200",
+    "ok": true,
+    "finalUrl": "https://www.scienceall.com/main",
+    "duration": 169,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?w=800&auto=format&fit=crop&q=80",
+    "duration": 42,
+    "error": null
+  },
+  {
+    "url": "https://class.whalespace.io",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://whalespace.io/features/whaleclass",
+    "duration": 140,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=80",
+    "duration": 44,
+    "error": null
+  },
+  {
+    "url": "https://www.desmos.com/calculator?lang=ko",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.desmos.com/calculator?lang=ko",
+    "duration": 333,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&auto=format&fit=crop&q=80",
+    "duration": 43,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&auto=format&fit=crop&q=80",
+    "duration": 45,
+    "error": null
+  },
+  {
+    "url": "https://www.ebsmath.co.kr",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.ebsmath.co.kr/",
+    "duration": 400,
+    "error": null
+  },
+  {
+    "url": "https://www.miricanvas.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.miricanvas.com/ko",
+    "duration": 116,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80",
+    "duration": 46,
+    "error": null
+  },
+  {
+    "url": "https://padlet.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts",
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK (Cloudflare Bot Protection bypassed for Padlet)",
+    "ok": true,
+    "finalUrl": "https://padlet.com/",
+    "duration": 55,
+    "error": null
+  },
+  {
+    "url": "https://webdt.edunet.net",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://webdt.edunet.net/login",
+    "duration": 173,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80",
+    "duration": 44,
+    "error": null
+  },
+  {
+    "url": "https://teams.microsoft.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://teams.microsoft.com/v2/",
+    "duration": 282,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800&auto=format&fit=crop&q=80",
+    "duration": 58,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1000&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1000&auto=format&fit=crop&q=80",
+    "duration": 48,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=si3RQQF-jG0",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리(entry) - 비행기슈팅 게임(신호, 복제)",
+    "author": "BaCode - 쉽게 알려주는 코딩",
+    "duration": 159,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/si3RQQF-jG0/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/si3RQQF-jG0/hqdefault.jpg",
+    "duration": 134,
+    "error": null
+  },
+  {
+    "url": "https://phet.colorado.edu/ko/",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://phet.colorado.edu/ko/",
+    "duration": 699,
+    "error": null
+  },
+  {
+    "url": "https://www.kosac.re.kr",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.kosac.re.kr/",
+    "duration": 259,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/0mve9nrGzSY/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/0mve9nrGzSY/hqdefault.jpg",
+    "duration": 113,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=2PfBtCMQFRc",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "바로 따라하는, 나만의 슈팅게임 만들기 - 엔트리",
+    "author": "ageha “파란아게하” blue",
+    "duration": 84,
+    "error": null
+  },
+  {
+    "url": "https://classroom.google.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://accounts.google.com/v3/signin/identifier?continue=https://classroom.google.com/&emr=1&followup=https://classroom.google.com/&passive=1209600&service=classroom&flowName=GlifWebSignIn&flowEntry=ServiceLogin&dsh=S1663081727:1794797077614265",
+    "duration": 602,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=0mve9nrGzSY",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "[엔트리 게임 제작 무작정 따라하기] 14장 2강",
+    "author": "길벗 IT 전문서(업로드 중단, 구계정)",
+    "duration": 160,
+    "error": null
+  },
+  {
+    "url": "https://www.greeninet.or.kr",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.greeninet.or.kr/",
+    "duration": 397,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/2PfBtCMQFRc/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/2PfBtCMQFRc/hqdefault.jpg",
+    "duration": 122,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/Nwg_FdDiiWw/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/Nwg_FdDiiWw/hqdefault.jpg",
+    "duration": 31,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=Nwg_FdDiiWw",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "[엔트리 게임 제작 무작정 따라하기] 15장 9강",
+    "author": "길벗 IT 전문서(업로드 중단, 구계정)",
+    "duration": 75,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/XBCccRNt1T0/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/XBCccRNt1T0/hqdefault.jpg",
+    "duration": 32,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/InP3jAa8v-w/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/InP3jAa8v-w/hqdefault.jpg",
+    "duration": 119,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=PLxhEbbhRf4",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 7강(기본) 리스트의 이해 및 구구단게임 만들기 (코딩, 게임코딩, 취미코딩, 신강의2022ver) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 84,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=InP3jAa8v-w",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "[엔트리 게임 만들기 강좌] #01 리스트를 이용한 디펜서 게임 가시 날리기 게임 만들기,엔트리 코딩 강좌, 코딩 교육",
+    "author": "코딩쌤루피",
+    "duration": 155,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=SosX7WMzb9o",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 133강 고전 갤러그 슈팅 게임 만들기(2) (코딩, 게임코딩, 취미코딩) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 73,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/PLxhEbbhRf4/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/PLxhEbbhRf4/hqdefault.jpg",
+    "duration": 122,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=XBCccRNt1T0",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 40강 랭킹기능이 구현된 슈팅게임 만들기(4) (코딩, 게임코딩, 취미코딩) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 152,
+    "error": null
+  },
+  {
+    "url": "https://trends.google.co.kr/trends/",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://trends.google.co.kr/trends/",
+    "duration": 596,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/SosX7WMzb9o/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/SosX7WMzb9o/hqdefault.jpg",
+    "duration": 122,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=cijnvNVCYGk",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "15. 인공지능 프로그램 만들어보기2 - 엔트리 모델학습 하기",
+    "author": "소프트웨어야 놀자",
+    "duration": 85,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=1raG6G5sa-0",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "14. 인공지능 프로그램 만들어보기 2 - 엔트리 비디오 감지",
+    "author": "소프트웨어야 놀자",
+    "duration": 153,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/1raG6G5sa-0/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/1raG6G5sa-0/hqdefault.jpg",
+    "duration": 128,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=ZUUij83yx9c",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "13. 인공지능 프로그램 만들어보기 1 - 엔트리 오디오 감지",
+    "author": "소프트웨어야 놀자",
+    "duration": 72,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/cijnvNVCYGk/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/cijnvNVCYGk/hqdefault.jpg",
+    "duration": 113,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=KJfJfv_Fbvs",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 21강 데이터분석을 활용한 계산기 만들기! (코딩, 게임코딩, 취미코딩) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 81,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/Jk4KJBLzIoI/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/Jk4KJBLzIoI/hqdefault.jpg",
+    "duration": 39,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/ZUUij83yx9c/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/ZUUij83yx9c/hqdefault.jpg",
+    "duration": 120,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=eo_8cUYyXcU",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 6강(기본) 신호의 이해 및 간단한 사칙연산 계산기 만들기 (코딩, 게임코딩, 취미코딩, 신강의2022ver) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 82,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=Jk4KJBLzIoI",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "[엔트리 코딩 강좌] 20. 타이머 기능 추가하기 | 초시계로 10초 시간 제한 코딩하기  | 게임 만들기 기초 입문 강의",
+    "author": "코드덤 Code your dreams",
+    "duration": 77,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/KJfJfv_Fbvs/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/KJfJfv_Fbvs/hqdefault.jpg",
+    "duration": 122,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/sDi6NisxZpQ/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/sDi6NisxZpQ/hqdefault.jpg",
+    "duration": 40,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=iAsmg-1GU8Y",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "202206, 엔트리 학습하기, 생활과도구,시간을 지배하는 자",
+    "author": "여주컴TV",
+    "duration": 79,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/eo_8cUYyXcU/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/eo_8cUYyXcU/hqdefault.jpg",
+    "duration": 125,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=sDi6NisxZpQ",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "[엔트리 게임 만들기 강좌] AI엔트리를 만들어 보자, 내 마음을 헤아려 주는 AI를 만들어 보자, 엔트리 게임 만들기, 엔트리 코딩강좌",
+    "author": "코딩쌤루피",
+    "duration": 82,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/ZWLYPK_D7co/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/ZWLYPK_D7co/hqdefault.jpg",
+    "duration": 31,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=-0iH936RSMk",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "[3분 엔트리] 3분만에 FPS 슈팅게임 만들기 (귀신사냥)",
+    "author": "코알라 게임코딩",
+    "duration": 80,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/C5cLoqrhqo8/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/C5cLoqrhqo8/hqdefault.jpg",
+    "duration": 37,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=C5cLoqrhqo8",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "[엔트리 게임 제작 무작정 따라하기] 2장 엔트리로 첫 작품 만들기",
+    "author": "길벗IT",
+    "duration": 75,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=ZWLYPK_D7co",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리(entry) - 구구단게임 만들기(초시계)",
+    "author": "BaCode - 쉽게 알려주는 코딩",
+    "duration": 81,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=7BW9lO3g4FQ",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 41강 랜덤 사칙연산게임 만들기(1) (코딩, 게임코딩, 취미코딩) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 80,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/j3HDczz4Kn8/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/j3HDczz4Kn8/hqdefault.jpg",
+    "duration": 41,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/7BW9lO3g4FQ/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/7BW9lO3g4FQ/hqdefault.jpg",
+    "duration": 76,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/-0iH936RSMk/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts",
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/-0iH936RSMk/hqdefault.jpg",
+    "duration": 136,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=j3HDczz4Kn8",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 29강 모델학습(머신러닝)-음성을 활용한 노래구분 AI 만들기 (코딩, 게임코딩, 취미코딩) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 82,
+    "error": null
+  },
+  {
+    "url": "https://www.rodocodo.com",
+    "sources": [
+      "src/data/usefulSchoolLinksBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://www.rodocodo.com/",
+    "duration": 1511,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=UUR3PUFrP1I",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "엔트리강의 1강(기본) 엔트리 시작하기 (코딩, 게임코딩, 취미코딩, 신강의2022ver) #엔트리 게임만들기",
+    "author": "차근차근엔트리!",
+    "duration": 75,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/tpbrslp9FEQ/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/tpbrslp9FEQ/hqdefault.jpg",
+    "duration": 34,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/UUR3PUFrP1I/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/UUR3PUFrP1I/hqdefault.jpg",
+    "duration": 63,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80",
+    "duration": 46,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80",
+    "duration": 45,
+    "error": null
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=tpbrslp9FEQ",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "youtube",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "title": "1. 엔트리의 이해 + 계산기(사칙연산) 만들기",
+    "author": "나는야정보쌤",
+    "duration": 81,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80",
+    "duration": 44,
+    "error": null
+  },
+  {
+    "url": "https://img.youtube.com/vi/iAsmg-1GU8Y/hqdefault.jpg",
+    "sources": [
+      "src/data/entryMiddleSchoolBoard.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://img.youtube.com/vi/iAsmg-1GU8Y/hqdefault.jpg",
+    "duration": 273,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=60",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=60",
+    "duration": 47,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=60",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=60",
+    "duration": 42,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80",
+    "duration": 41,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80",
+    "duration": 41,
+    "error": null
+  },
+  {
+    "url": "https://padlet.com/ekzm111/2025-4bqdzenxzjr0mjty",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK (Cloudflare Bot Protection bypassed for Padlet)",
+    "ok": true,
+    "finalUrl": "https://padlet.com/ekzm111/2025-4bqdzenxzjr0mjty",
+    "duration": 55,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80",
+    "duration": 41,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1559302504-64aae6ca6b6d?w=800&auto=format&fit=crop&q=80",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1559302504-64aae6ca6b6d?w=800&auto=format&fit=crop&q=80",
+    "duration": 44,
+    "error": null
+  },
+  {
+    "url": "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=800&auto=format&fit=crop&q=60",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=800&auto=format&fit=crop&q=60",
+    "duration": 43,
+    "error": null
+  },
+  {
+    "url": "https://ko.wikipedia.org/wiki/태양전지",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://ko.wikipedia.org/wiki/%ED%83%9C%EC%96%91%EC%A0%84%EC%A7%80",
+    "duration": 223,
+    "error": null
+  },
+  {
+    "url": "https://github.com/NousResearch/hermes-agent",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://github.com/NousResearch/hermes-agent",
+    "duration": 542,
+    "error": null
+  },
+  {
+    "url": "https://script.google.com/macros/s/AKfycbz_sample",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://accounts.google.com/v3/signin/identifier?continue=https://script.google.com/macros/s/AKfycbz_sample&followup=https://script.google.com/macros/s/AKfycbz_sample&passive=1209600&service=wise&flowName=GlifWebSignIn&flowEntry=ServiceLogin&dsh=S454042742:1794797078772196",
+    "duration": 526,
+    "error": null
+  },
+  {
+    "url": "https://console.firebase.google.com",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://accounts.google.com/v3/signin/identifier?continue=https://console.firebase.google.com/&followup=https://console.firebase.google.com/&osid=1&passive=1209600&flowName=GlifWebSignIn&flowEntry=ServiceLogin&dsh=S-100019804:1794797078982329",
+    "duration": 834,
+    "error": null
+  },
+  {
+    "url": "https://docs.google.com/spreadsheets",
+    "sources": [
+      "src/lib/store.ts"
+    ],
+    "type": "web",
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "finalUrl": "https://accounts.google.com/v3/signin/identifier?continue=https://docs.google.com/spreadsheets/&followup=https://docs.google.com/spreadsheets/&ltmpl=sheets&osid=1&passive=1209600&service=wise&flowName=GlifWebSignIn&flowEntry=ServiceLogin&dsh=S555042137:1794797079137503",
+    "duration": 869,
+    "error": null
+  }
+]
