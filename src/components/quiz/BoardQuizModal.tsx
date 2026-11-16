@@ -27,6 +27,10 @@ import {
   Calendar,
   Layers,
   FileText,
+  Globe,
+  Lock,
+  Share2,
+  UserCheck,
 } from 'lucide-react';
 import { ExamInfo, Question } from '@/types/exam';
 import { Board, User } from '@/lib/types';
@@ -42,6 +46,7 @@ import {
   getAllSavedQuizPackages,
   fetchQuizPackagesAsync,
   saveQuizPackage,
+  copyQuizPackage,
   updateSavedQuizPackage,
   deleteSavedQuizPackage,
 } from '@/utils/quizStorage';
@@ -70,6 +75,9 @@ export default function BoardQuizModal({
   // 모달 메인 탭: 'new'(새 퀴즈 출제) | 'history'(진행 기록 및 보관함 게시판)
   const [mainTab, setMainTab] = useState<'new' | 'history'>('new');
   
+  // 보관함 서브 필터: 'my'(내가 낸 문제) | 'shared'(공유 보관함) | 'all'(전체)
+  const [historyScope, setHistoryScope] = useState<'my' | 'shared' | 'all'>('my');
+
   // 새 퀴즈 출제 상태
   const [selectedPresetId, setSelectedPresetId] = useState<string>('general');
   const [showBatchText, setShowBatchText] = useState(false);
@@ -78,6 +86,7 @@ export default function BoardQuizModal({
   const [copiedAiPrompt, setCopiedAiPrompt] = useState(false);
   const [customQuestions, setCustomQuestions] = useState<Question[] | null>(null);
   const [with100Bots, setWith100Bots] = useState(false);
+  const [newQuizIsShared, setNewQuizIsShared] = useState(true); // 기본 공유 허용
 
   // 퀴즈 기록 보관함 상태
   const [savedPackages, setSavedPackages] = useState<SavedQuizPackage[]>([]);
@@ -109,6 +118,15 @@ export default function BoardQuizModal({
   const currentPreset = QUIZ_PRESETS.find((p) => p.id === selectedPresetId) || QUIZ_PRESETS[0];
   const activeQuestions = customQuestions || currentPreset.questions;
   const activeExamInfo = currentPreset.examInfo;
+
+  // 내가 만든 문제인지 판별하는 헬퍼
+  const isMyQuiz = (pkg: SavedQuizPackage) => {
+    if (!currentUser) return false;
+    if (pkg.authorId && pkg.authorId === currentUser.id) return true;
+    if (pkg.authorName && pkg.authorName === currentUser.name) return true;
+    // 작성자 정보가 없는 기본 패키지는 'shared'로 분류
+    return false;
+  };
 
   // 텍스트 일괄 붙여넣기 파싱
   const handleApplyBatchText = () => {
@@ -186,7 +204,7 @@ export default function BoardQuizModal({
     };
     const room = createQuizRoom(examInfoToUse, activeQuestions, 20, true);
 
-    // 🔥 진행 퀴즈 자동 보관함/기록 저장 (다시 풀기 및 열람 지원)
+    // 🔥 진행 퀴즈 자동 보관함/기록 저장 (작성자 ID 및 공유 설정 반영)
     try {
       const quizTitle = customQuestions
         ? `[${board.title}] 직접 출제 퀴즈 (${activeQuestions.length}문항)`
@@ -199,7 +217,9 @@ export default function BoardQuizModal({
         `[${board.title}] 보드에서 진행된 실시간 퀴즈 (참여 PIN: ${room.pin})`,
         {
           boardId: board.id,
+          authorId: currentUser?.id,
           authorName: currentUser?.name || '선생님',
+          isShared: newQuizIsShared,
           lastPin: room.pin,
         }
       );
@@ -229,7 +249,28 @@ export default function BoardQuizModal({
     onClose();
   };
 
-  // 🗑️ 보관함 퀴즈 삭제
+  // 📋 다른 사람의 공유 퀴즈를 내 보관함으로 복사해오기
+  const handleCopyPackage = (pkg: SavedQuizPackage) => {
+    if (!currentUser) {
+      alert('퀴즈를 복사하려면 먼저 로그인해 주세요.');
+      return;
+    }
+    const copied = copyQuizPackage(pkg, { id: currentUser.id, name: currentUser.name });
+    setSavedPackages((prev) => [copied, ...prev]);
+    setHistoryScope('my'); // 내가 낸 문제 탭으로 즉시 이동하여 바로 확인/수정 가능하게 안내
+    alert(`🎉 '${pkg.title}' 퀴즈를 [내 퀴즈 보관함]으로 복사했습니다!\n이제 내 취향대로 문제를 자유롭게 수정하여 출제할 수 있습니다.`);
+  };
+
+  // 🌐 공유 / 🔒 비공개 토글 스위치 (내가 만든 퀴즈 전용)
+  const handleToggleShare = (pkg: SavedQuizPackage) => {
+    const nextShared = !(pkg.isShared !== false);
+    const updated = updateSavedQuizPackage(pkg.id, { isShared: nextShared });
+    if (updated) {
+      setSavedPackages((prev) => prev.map((p) => (p.id === pkg.id ? updated : p)));
+    }
+  };
+
+  // 🗑️ 보관함 퀴즈 삭제 (본인 퀴즈 전용)
   const handleDeletePackage = (id: string, title: string) => {
     if (confirm(`'${title}' 퀴즈 기록을 삭제하시겠습니까?`)) {
       deleteSavedQuizPackage(id);
@@ -249,6 +290,7 @@ export default function BoardQuizModal({
       title: editingPackage.title,
       description: editingPackage.description,
       questions: editingPackage.questions,
+      isShared: editingPackage.isShared,
     });
 
     if (updated) {
@@ -260,14 +302,31 @@ export default function BoardQuizModal({
     }
   };
 
-  // 검색 필터링된 기록 패키지 목록
+  // 통계 계산
+  const myPackagesCount = savedPackages.filter((p) => isMyQuiz(p)).length;
+  const sharedPackagesCount = savedPackages.filter(
+    (p) => !isMyQuiz(p) && p.isShared !== false
+  ).length;
+
+  // 검색 및 탭 필터링된 퀴즈 목록
   const filteredPackages = savedPackages.filter((pkg) => {
     const q = historySearchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       pkg.title.toLowerCase().includes(q) ||
       (pkg.description && pkg.description.toLowerCase().includes(q)) ||
-      (pkg.savedAt && pkg.savedAt.includes(q))
-    );
+      (pkg.authorName && pkg.authorName.toLowerCase().includes(q)) ||
+      (pkg.savedAt && pkg.savedAt.includes(q));
+
+    if (!matchesSearch) return false;
+
+    if (historyScope === 'my') {
+      return isMyQuiz(pkg);
+    } else if (historyScope === 'shared') {
+      // 다른 사용자가 공유한 퀴즈이거나 공식 제공 퀴즈
+      return !isMyQuiz(pkg) && pkg.isShared !== false;
+    }
+    // 'all'
+    return isMyQuiz(pkg) || pkg.isShared !== false;
   });
 
   return (
@@ -397,7 +456,7 @@ export default function BoardQuizModal({
               </span>
             </div>
 
-            {/* 기본 정보 */}
+            {/* 기본 정보 및 공유 여부 설정 */}
             <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
               <div>
                 <label className="block text-xs font-black text-slate-700 mb-1">
@@ -426,6 +485,49 @@ export default function BoardQuizModal({
                   }
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
+              </div>
+
+              {/* 🌐 다른 선생님과 공유 여부 토글 */}
+              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    {editingPackage.isShared !== false ? (
+                      <Globe className="w-3.5 h-3.5 text-blue-600" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                    <span>다른 선생님과 문제 공유 허용</span>
+                  </span>
+                  <p className="text-[11px] text-slate-500">
+                    공유하면 다른 선생님이 [공유 보관함]에서 이 문제를 복사하여 수업에 활용할 수 있습니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingPackage({
+                      ...editingPackage,
+                      isShared: !(editingPackage.isShared !== false),
+                    })
+                  }
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                    editingPackage.isShared !== false
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {editingPackage.isShared !== false ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>공유 중</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>비공개</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -621,31 +723,81 @@ export default function BoardQuizModal({
           /* 📜 지난 퀴즈 진행 기록 및 보관함 (게시판 형태 화면)        */
           /* ======================================================== */
           <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
-            {/* 검색 바 및 헤더 요약 */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
+            {/* 서브 필터 탭: [내가 낸 문제] vs [공유 보관함] vs [전체] */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-slate-100">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setHistoryScope('my')}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs transition flex items-center gap-1.5 ${
+                    historyScope === 'my'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>내가 낸 문제 ({myPackagesCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryScope('shared')}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs transition flex items-center gap-1.5 ${
+                    historyScope === 'shared'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>선생님 공유 보관함 ({sharedPackagesCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryScope('all')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition ${
+                    historyScope === 'all'
+                      ? 'bg-slate-800 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  전체 ({savedPackages.length})
+                </button>
+              </div>
+
+              <div className="relative flex-1 min-w-[170px] max-w-xs">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="퀴즈 제목, 진행 일시 검색..."
+                  placeholder="제목, 출제자 검색..."
                   value={historySearchTerm}
                   onChange={(e) => setHistorySearchTerm(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
-
-              <div className="text-xs text-slate-500 font-medium">
-                보관된 퀴즈 총 <strong className="text-slate-800">{filteredPackages.length}개</strong>
-              </div>
             </div>
+
+            {/* 안내 배너 */}
+            {historyScope === 'shared' && (
+              <div className="p-3 rounded-2xl bg-blue-50/80 border border-blue-200/80 text-xs text-blue-900 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>
+                    다른 선생님들이 공유한 퀴즈 문제입니다. <strong>[내 보관함으로 복사]</strong> 버튼을 누르면 내 입맛에 맞게 문제를 자유롭게 수정해서 출제할 수 있습니다!
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* 퀴즈 기록 목록 (게시판 카드 리스트) */}
             {filteredPackages.length === 0 ? (
               <div className="py-14 text-center text-slate-400 text-xs space-y-2">
                 <History className="w-10 h-10 text-slate-300 mx-auto" />
-                <p className="font-bold text-slate-600 text-sm">보관된 퀴즈 기록이 없습니다.</p>
+                <p className="font-bold text-slate-600 text-sm">
+                  {historyScope === 'my'
+                    ? '내가 직접 출제한 퀴즈 기록이 없습니다.'
+                    : '조건에 맞는 공유 퀴즈가 없습니다.'}
+                </p>
                 <p>
-                  새 퀴즈를 출제하여 시작하면 여기에 자동으로 기록되어 언제든 다시 풀 수 있습니다.
+                  새 퀴즈를 출제하여 시작하면 여기에 자동으로 기록되어 언제든 다시 풀고 공유할 수 있습니다.
                 </p>
                 <button
                   type="button"
@@ -660,12 +812,15 @@ export default function BoardQuizModal({
               <div className="space-y-2.5">
                 {filteredPackages.map((pkg) => {
                   const isCurrentBoard = pkg.boardId === board.id;
+                  const isMine = isMyQuiz(pkg);
+                  const isShared = pkg.isShared !== false;
+
                   return (
                     <div
                       key={pkg.id}
                       className={`p-4 rounded-2xl border transition shadow-xs hover:shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                        isCurrentBoard
-                          ? 'bg-gradient-to-r from-purple-50/50 to-white border-purple-200'
+                        isMine
+                          ? 'bg-gradient-to-r from-purple-50/40 via-white to-white border-purple-200'
                           : 'bg-white border-slate-200'
                       }`}
                     >
@@ -677,6 +832,38 @@ export default function BoardQuizModal({
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200 whitespace-nowrap">
                             {pkg.questionCount || (pkg.questions ? pkg.questions.length : 0)}문항
                           </span>
+
+                          {/* 내가 만든 퀴즈인 경우: 공유/비공개 토글 뱃지 */}
+                          {isMine ? (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleShare(pkg)}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition flex items-center gap-1 whitespace-nowrap ${
+                                isShared
+                                  ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-500 border-slate-200'
+                              }`}
+                              title={isShared ? '클릭 시 비공개로 전환' : '클릭 시 다른 선생님과 공유로 전환'}
+                            >
+                              {isShared ? (
+                                <>
+                                  <Globe className="w-3 h-3 text-blue-600" />
+                                  <span>공유 중 (복사 허용)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Lock className="w-3 h-3 text-slate-400" />
+                                  <span>비공개 (나만 보기)</span>
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap flex items-center gap-1">
+                              <Globe className="w-3 h-3" />
+                              <span>선생님 공유본</span>
+                            </span>
+                          )}
+
                           {isCurrentBoard && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
                               현재 보드 진행
@@ -701,14 +888,17 @@ export default function BoardQuizModal({
                           {pkg.authorName && (
                             <>
                               <span>·</span>
-                              <span>출제: {pkg.authorName}</span>
+                              <span className={isMine ? 'text-indigo-600 font-bold' : ''}>
+                                출제자: {pkg.authorName} {isMine ? '(나)' : ''}
+                              </span>
                             </>
                           )}
                         </div>
                       </div>
 
-                      {/* 액션 버튼 그룹: [🚀 다시 풀기] [✏️ 수정] [🗑️ 삭제] */}
+                      {/* 액션 버튼 그룹 */}
                       <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                        {/* 1. 이 퀴즈로 바로 풀기 */}
                         <button
                           type="button"
                           onClick={() => handleStartFromPackage(pkg)}
@@ -719,23 +909,39 @@ export default function BoardQuizModal({
                           <span>다시 풀기</span>
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => setEditingPackage(pkg)}
-                          className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold transition"
-                          title="퀴즈 제목 및 문항 수정"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
+                        {/* 2. 다른 사람의 공유 문제인 경우: [내 보관함으로 복사] */}
+                        {!isMine ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPackage(pkg)}
+                            className="px-2.5 py-1.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-blue-700 text-xs font-bold transition flex items-center gap-1 shadow-2xs active:scale-95"
+                            title="이 문제를 복사해서 내 보관함으로 가져와 문제 내용 수정 후 출제하기"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>내 보관함으로 복사</span>
+                          </button>
+                        ) : (
+                          /* 내가 만든 문제인 경우: [수정] 및 [삭제] */
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setEditingPackage(pkg)}
+                              className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold transition"
+                              title="퀴즈 제목 및 문항 수정"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePackage(pkg.id, pkg.title)}
-                          className="p-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition"
-                          title="퀴즈 기록 삭제"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePackage(pkg.id, pkg.title)}
+                              className="p-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition"
+                              title="퀴즈 기록 삭제"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
@@ -881,23 +1087,43 @@ export default function BoardQuizModal({
               </div>
             </div>
 
-            {/* 3. 100명 모의 학생 시뮬레이션 체크박스 */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-50/70 to-indigo-50/70 border border-purple-200/80 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
-                  <Bot className="w-4 h-4 text-purple-600" />
-                  <span>100명 가상 학생 동시 응시 시뮬레이션</span>
-                </span>
-                <p className="text-[11px] text-slate-500">
-                  컴퓨터 100대 없이도 100명의 가상 학생이 자동 입장하고 랜덤 응시하여 순위표를 테스트합니다.
-                </p>
+            {/* 3. 공유 설정 및 100명 모의 학생 시뮬레이션 */}
+            <div className="space-y-2">
+              <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/70 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-black text-blue-900 flex items-center gap-1.5">
+                    <Globe className="w-4 h-4 text-blue-600" />
+                    <span>다른 선생님과 문제 공유하기</span>
+                  </span>
+                  <p className="text-[11px] text-slate-500">
+                    체크하면 다른 선생님들이 [선생님 공유 보관함]에서 이 문제를 복사하여 활용할 수 있습니다.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={newQuizIsShared}
+                  onChange={(e) => setNewQuizIsShared(e.target.checked)}
+                  className="w-5 h-5 accent-blue-600 rounded cursor-pointer shrink-0 ml-3"
+                />
               </div>
-              <input
-                type="checkbox"
-                checked={with100Bots}
-                onChange={(e) => setWith100Bots(e.target.checked)}
-                className="w-5 h-5 accent-purple-600 rounded cursor-pointer shrink-0 ml-3"
-              />
+
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-50/70 to-indigo-50/70 border border-purple-200/80 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
+                    <Bot className="w-4 h-4 text-purple-600" />
+                    <span>100명 가상 학생 동시 응시 시뮬레이션</span>
+                  </span>
+                  <p className="text-[11px] text-slate-500">
+                    컴퓨터 100대 없이도 100명의 가상 학생이 자동 입장하고 랜덤 응시하여 순위표를 테스트합니다.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={with100Bots}
+                  onChange={(e) => setWith100Bots(e.target.checked)}
+                  className="w-5 h-5 accent-purple-600 rounded cursor-pointer shrink-0 ml-3"
+                />
+              </div>
             </div>
 
             {/* 시작 버튼 */}

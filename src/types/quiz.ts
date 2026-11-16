@@ -610,7 +610,9 @@ export interface SavedQuizPackage {
   questionCount: number;
   description?: string;
   boardId?: string;
+  authorId?: string;
   authorName?: string;
+  isShared?: boolean;
   lastPin?: string;
 }
 

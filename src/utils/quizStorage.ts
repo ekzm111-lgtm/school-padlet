@@ -283,7 +283,7 @@ export function saveQuizPackage(
   examInfo: ExamInfo,
   questions: Question[],
   description?: string,
-  meta?: { boardId?: string; authorName?: string; lastPin?: string }
+  meta?: { boardId?: string; authorId?: string; authorName?: string; isShared?: boolean; lastPin?: string }
 ): SavedQuizPackage {
   const list = getAllSavedQuizPackages();
   const now = new Date();
@@ -299,7 +299,9 @@ export function saveQuizPackage(
     questionCount: questions.length,
     description: description || `${examInfo.schoolName} ${examInfo.grade} ${examInfo.term}`,
     boardId: meta?.boardId,
+    authorId: meta?.authorId,
     authorName: meta?.authorName,
+    isShared: meta?.isShared ?? true, // 기본값: 공유 가능
     lastPin: meta?.lastPin,
   };
 
@@ -317,6 +319,41 @@ export function saveQuizPackage(
   } catch {}
 
   return newPkg;
+}
+
+// 🔥 다른 사용자의 공유 퀴즈를 내 보관함으로 복사해오기 (내 취향대로 문제 수정 및 출제 가능)
+export function copyQuizPackage(
+  sourcePackage: SavedQuizPackage,
+  currentUser: { id: string; name: string }
+): SavedQuizPackage {
+  const list = getAllSavedQuizPackages();
+  const now = new Date();
+  const savedAt = `${now.getFullYear()}. ${String(now.getMonth() + 1).padStart(2, '0')}. ${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const copiedPkg: SavedQuizPackage = {
+    ...sourcePackage,
+    id: `pkg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    title: `[복사본] ${sourcePackage.title.replace(/^\[복사본\]\s*/, '')}`,
+    authorId: currentUser.id,
+    authorName: currentUser.name,
+    savedAt,
+    isShared: false, // 복사해온 것은 일단 나만의 문제(비공개)로 시작
+    description: `[${sourcePackage.authorName || '선생님'} 공유본 복사] ${sourcePackage.description || ''}`.trim(),
+  };
+
+  const updated = [copiedPkg, ...list];
+  localStorage.setItem(PACKAGES_KEY, JSON.stringify(updated));
+  notifyChannel({ type: 'PACKAGE_SAVED', package: copiedPkg });
+
+  try {
+    fetch(`${getApiBaseUrl()}/api/quiz/package`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(copiedPkg),
+    }).catch(() => {});
+  } catch {}
+
+  return copiedPkg;
 }
 
 export function deleteSavedQuizPackage(id: string): void {
