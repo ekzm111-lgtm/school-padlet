@@ -197,6 +197,17 @@ export default function AdminPage() {
     const updated = users.map((u) => (u.id === userId ? { ...u, role: newRole } : u));
     saveStoreData.users(updated);
     setUsers(updated);
+
+    // 만약 현재 브라우저에 로그인된 사용자의 권한이 변경된 경우 currentUser도 즉각 갱신
+    const currentData = getStoreData();
+    if (
+      currentData.currentUser &&
+      (currentData.currentUser.id === userId ||
+        currentData.currentUser.username === updated.find((u) => u.id === userId)?.username ||
+        currentData.currentUser.name === updated.find((u) => u.id === userId)?.name)
+    ) {
+      saveStoreData.currentUser({ ...currentData.currentUser, role: newRole });
+    }
     showToast(`권한이 '${newRole === 'admin' ? '관리자' : newRole === 'teacher' ? '교사' : '학생'}'(으)로 변경되었습니다.`);
   };
 

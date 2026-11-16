@@ -40,6 +40,7 @@ export interface Board {
   category?: '수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트';
   copiedFromTitle?: string;
   order?: number; // 메인 페이지 보드 순서 정렬용
+  pinned?: boolean; // 메인 페이지 상단 우선 고정 여부
   createdAt: string;
   updatedAt?: string | number;
   postCount?: number;

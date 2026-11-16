@@ -708,12 +708,42 @@ export const getStoreData = (): StoreData => {
     postsList = [...dtPosts, ...postsList];
   }
 
+  const usersList: User[] = storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS;
+  let parsedUser: User | null = storedCurrentUser ? JSON.parse(storedCurrentUser) : null;
+
+  // 🔥 현재 로그인한 사용자의 최신 권한(role)과 승인 상태를 users 목록과 100% 실시간 동기화
+  if (parsedUser) {
+    const matched = usersList.find(
+      (u) =>
+        u.id === parsedUser!.id ||
+        (u.username && u.username === parsedUser!.username) ||
+        (u.name && u.name === parsedUser!.name)
+    );
+    if (matched) {
+      if (
+        parsedUser.role !== matched.role ||
+        parsedUser.status !== matched.status ||
+        parsedUser.name !== matched.name
+      ) {
+        parsedUser = {
+          ...parsedUser,
+          role: matched.role,
+          status: matched.status,
+          name: matched.name,
+        };
+        try {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(parsedUser));
+        } catch (e) {}
+      }
+    }
+  }
+
   return {
     settings: storedSettings ? JSON.parse(storedSettings) : INITIAL_SETTINGS,
-    users: storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS,
+    users: usersList,
     boards: boardsList,
     posts: postsList,
-    currentUser: storedCurrentUser ? JSON.parse(storedCurrentUser) : null,
+    currentUser: parsedUser,
   };
 };
 

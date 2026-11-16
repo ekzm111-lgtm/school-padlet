@@ -90,20 +90,48 @@ export default function EditBoardModal({
     setAllowReactions(board.allowReactions ?? true);
   }, [board]);
 
-  // 이미지 파일 처리 (10MB 제한 및 Base64 인코딩)
+  // 이미지 파일 처리 (캔버스 자동 리사이징 & 압축으로 수십 KB 초경량화 -> Supabase 업로드 실패 원천 차단)
   const processImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('이미지 파일(JPG, PNG, GIF, WebP 등)만 첨부할 수 있습니다.');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      alert('이미지 용량은 최대 10MB까지 가능합니다.');
+    if (file.size > 15 * 1024 * 1024) {
+      alert('이미지 용량은 최대 15MB까지 가능합니다.');
       return;
     }
     const reader = new FileReader();
     reader.onload = (e) => {
-      if (typeof e.target?.result === 'string') {
-        setCoverImageUrl(e.target.result);
+      const dataUrl = e.target?.result;
+      if (typeof dataUrl === 'string') {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 800; // 카드 커버용 가로/세로 최대 800px
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL('image/jpeg', 0.8);
+            setCoverImageUrl(compressed);
+          } else {
+            setCoverImageUrl(dataUrl);
+          }
+        };
+        img.onerror = () => setCoverImageUrl(dataUrl);
+        img.src = dataUrl;
       }
     };
     reader.readAsDataURL(file);
@@ -171,48 +199,48 @@ export default function EditBoardModal({
     if (!title.trim() || isSaving) return;
     setIsSaving(true);
 
-    const now = Date.now();
-    const updatedBoard: Board = {
-      ...board,
-      title: title.trim(),
-      description: description.trim(),
-      layout,
-      theme,
-      coverImageUrl: coverImageUrl.trim() || undefined,
-      // 안쪽 배경은 기존 보드의 customBgUrl 유지 (보드 내부에서 별도로 관리)
-      customBgUrl: board.customBgUrl,
-      category,
-      isPublic,
-      allowStudentPost,
-      allowComments,
-      allowReactions,
-      updatedAt: now,
-    };
+    try {
+      const now = Date.now();
+      const updatedBoard: Board = {
+        ...board,
+        title: title.trim(),
+        description: description.trim(),
+        layout,
+        theme,
+        coverImageUrl: coverImageUrl.trim() || undefined,
+        customBgUrl: board.customBgUrl,
+        category,
+        isPublic,
+        allowStudentPost,
+        allowComments,
+        allowReactions,
+        updatedAt: now,
+      };
 
-    // 1. 로컬 스토리지 즉각 저장 및 UI 반영
-    const currentData = getStoreData();
-    saveStoreData.boards(
-      currentData.boards.map((b) => (b.id === board.id ? updatedBoard : b))
-    );
+      // 1. 로컬 스토리지 즉각 저장 및 UI 반영
+      const currentData = getStoreData();
+      saveStoreData.boards(
+        currentData.boards.map((b) => (b.id === board.id ? updatedBoard : b))
+      );
 
-    // 2. 클라우드 DB에 확실하게 먼저 원격 저장 (덮어쓰기 방어)
-    if (isSupabaseConfigured) {
-      try {
-        await saveRemoteBoard(updatedBoard);
-        const boardPosts = currentData.posts.filter((p) => p.boardId === board.id);
-        if (boardPosts.length > 0) {
-          boardPosts.forEach((p) => {
-            saveRemotePost(p).catch(() => {});
-          });
+      // 2. 클라우드 DB 원격 저장 (4초 타임아웃 방어)
+      if (isSupabaseConfigured) {
+        try {
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ error: 'timeout' }), 4000));
+          await Promise.race([saveRemoteBoard(updatedBoard), timeoutPromise]);
+        } catch (err) {
+          console.error('Remote board update error:', err);
         }
-      } catch (err) {
-        console.error('Remote board update error:', err);
       }
-    }
 
-    setIsSaving(false);
-    onUpdated(updatedBoard);
-    onClose();
+      onUpdated(updatedBoard);
+      onClose();
+    } catch (err) {
+      console.error('Board save error:', err);
+      alert('저장 중 일시적 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDelete = async () => {

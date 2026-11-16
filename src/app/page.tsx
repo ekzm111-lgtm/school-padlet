@@ -30,6 +30,8 @@ import {
   Megaphone,
   X,
   Bell,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import StudentHomeView from '@/components/StudentHomeView';
@@ -40,7 +42,13 @@ import NoticeModal from '@/components/NoticeModal';
 import Footer from '@/components/Footer';
 import { getStoreData, saveStoreData, duplicateBoard, getMyBoardIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchRemoteBoards, saveRemoteBoard, fetchRemoteNotice, saveRemoteNotice } from '@/lib/supabaseStore';
+import {
+  fetchRemoteBoards,
+  saveRemoteBoard,
+  fetchRemoteNotice,
+  saveRemoteNotice,
+  fetchRemoteUsers,
+} from '@/lib/supabaseStore';
 import { Board, User, Notice } from '@/lib/types';
 import confetti from 'canvas-confetti';
 
@@ -215,6 +223,33 @@ export default function HomePage() {
           })
           .catch(() => {});
 
+        // 👥 원격 사용자 목록 조회하여 현재 로그인한 유저의 최신 권한(교사/관리자 등) 실시간 동기화
+        fetchRemoteUsers()
+          .then((remUsers) => {
+            if (remUsers && remUsers.length > 0) {
+              const cur = getStoreData().currentUser;
+              if (cur) {
+                const matched = remUsers.find(
+                  (u) =>
+                    u.id === cur.id ||
+                    (u.username && u.username === cur.username) ||
+                    (u.name && u.name === cur.name)
+                );
+                if (matched && (matched.role !== cur.role || matched.status !== cur.status)) {
+                  const updatedUser = {
+                    ...cur,
+                    role: matched.role,
+                    status: matched.status,
+                    name: matched.name,
+                  };
+                  setCurrentUser(updatedUser);
+                  saveStoreData.currentUser(updatedUser);
+                }
+              }
+            }
+          })
+          .catch(() => {});
+
         const remote = await fetchRemoteBoards();
         if (remote && remote.length > 0) {
           const currentLocal = getStoreData().boards;
@@ -229,8 +264,12 @@ export default function HomePage() {
             if (local && rem) {
               const localTime = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
               const remTime = typeof rem.updatedAt === 'number' ? rem.updatedAt : 0;
-              // 로컬이 더 최신이거나 같으면 로컬 우선 (사용자가 방금 수정한 보드가 원격 구버전으로 덮어씌워지는 것 차단)
-              merged.push(localTime >= remTime ? local : rem);
+              // 원격 데이터가 더 최신이거나 같으면 원격의 최신 커버 이미지 및 내용 반영
+              if (remTime >= localTime) {
+                merged.push({ ...local, ...rem, order: local.order ?? rem.order, pinned: local.pinned ?? rem.pinned });
+              } else {
+                merged.push({ ...rem, ...local });
+              }
             } else if (local) {
               merged.push(local);
             } else if (rem) {
@@ -313,6 +352,25 @@ export default function HomePage() {
       await saveRemoteBoard(updated);
     }
     loadData();
+  };
+
+  // 5) 보드 상단 고정(Pin) 상태 토글
+  const handleTogglePinBoard = async (e: React.MouseEvent, targetBoard: Board) => {
+    e.stopPropagation();
+    const newPinned = !targetBoard.pinned;
+    const updated = { ...targetBoard, pinned: newPinned, updatedAt: Date.now() };
+
+    const updatedAll = boards.map((b) => (b.id === targetBoard.id ? updated : b));
+    setBoards(updatedAll);
+    const data = getStoreData();
+    saveStoreData.boards(updatedAll);
+    try {
+      localStorage.setItem('school_padlet_boards', JSON.stringify(updatedAll));
+    } catch (err) {}
+
+    if (isSupabaseConfigured) {
+      await saveRemoteBoard(updated).catch(() => {});
+    }
   };
 
   // 🔥 내가 만든 보드 판정 (직접 생성한 보드 + 다른 사람 보드에서 복사해 온 복사본 100% 내 자료로 분류)
@@ -789,9 +847,12 @@ export default function HomePage() {
 
         {/* 보드 카드 그리드 & 섹터 분리 (내가 만든 자료 vs 다른 사람 자료) */}
         {(() => {
-          // 정렬 헬퍼
+          // 정렬 헬퍼 (📌 고정된 카드가 항상 제일 위쪽으로 우선 정렬)
           const sortList = (items: Board[]) => {
             return [...items].sort((a, b) => {
+              const pa = a.pinned ? 0 : 1;
+              const pb = b.pinned ? 0 : 1;
+              if (pa !== pb) return pa - pb; // 📌 고정된 카드가 무조건 최상단
               const oa = typeof a.order === 'number' ? a.order : 999999;
               const ob = typeof b.order === 'number' ? b.order : 999999;
               if (oa !== ob) return oa - ob;
@@ -852,12 +913,26 @@ export default function HomePage() {
                   themeStyles[board.theme] || 'from-white to-slate-50 border-slate-200'
                 } ${isDragging ? 'opacity-40 scale-95' : 'opacity-100'} ${
                   isDragOver ? 'ring-2 ring-blue-500 ring-offset-2 scale-[1.02] shadow-lg' : ''
-                }`}
+                } ${board.pinned ? 'ring-2 ring-amber-400/90 shadow-md border-amber-300' : ''}`}
               >
                 <div>
                   {/* 상단 태그 & 순서 변경 컨트롤 바 */}
                   <div className="flex items-center justify-between gap-1 mb-2">
                     <div className="flex items-center gap-1 flex-wrap min-w-0">
+                      {/* 📌 상단 고정 / 고정 풀림 토글 버튼 */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleTogglePinBoard(e, board)}
+                        className={`p-1 rounded-lg transition shrink-0 ${
+                          board.pinned
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 shadow-2xs font-bold'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-black/5 opacity-60 hover:opacity-100'
+                        }`}
+                        title={board.pinned ? '상단 고정 해제하기' : '이 보드를 맨 위쪽으로 항상 고정하기'}
+                      >
+                        <Pin className={`w-3.5 h-3.5 ${board.pinned ? 'fill-amber-500 text-amber-600 rotate-45' : ''}`} />
+                      </button>
+
                       {/* 드래그 핸들 */}
                       <span
                         className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 p-0.5 rounded transition shrink-0"
@@ -865,6 +940,13 @@ export default function HomePage() {
                       >
                         <GripVertical className="w-3 h-3" />
                       </span>
+
+                      {/* 고정 배지 */}
+                      {board.pinned && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 border border-amber-300/80 shrink-0 flex items-center gap-0.5 shadow-2xs">
+                          <span>📌 고정</span>
+                        </span>
+                      )}
 
                       {board.category && (
                         <span

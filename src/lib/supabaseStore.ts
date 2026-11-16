@@ -27,6 +27,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
       let metaAuthorRole: string | undefined = undefined;
       let metaIsPublic: boolean | undefined = undefined;
       let metaOrder: number | undefined = undefined;
+      let metaPinned: boolean | undefined = undefined;
 
       if (rawDesc.includes('<!--SCHOOLPAD_BOARD_META:')) {
         const match = rawDesc.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
@@ -45,6 +46,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
             if (parsed.authorRole) metaAuthorRole = parsed.authorRole;
             if (parsed.isPublic !== undefined) metaIsPublic = parsed.isPublic;
             if (typeof parsed.order === 'number') metaOrder = parsed.order;
+            if (parsed.pinned !== undefined) metaPinned = Boolean(parsed.pinned);
           } catch (e) {}
         }
         rawDesc = rawDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
@@ -60,6 +62,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
         layout: metaLayout || b.layout || 'kanban',
         theme: metaTheme || b.theme || 'blue',
         order: metaOrder !== undefined ? metaOrder : undefined,
+        pinned: metaPinned === true,
         coverImageUrl:
           metaCover ||
           b.cover_image_url ||
@@ -105,6 +108,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       authorName: board.authorName,
       authorRole: board.authorRole || 'teacher',
       order: board.order,
+      pinned: board.pinned === true,
       updatedAt: board.updatedAt || Date.now(),
     });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
