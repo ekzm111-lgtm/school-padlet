@@ -276,41 +276,24 @@ export default function HomePage() {
           for (const id of allIds) {
             const local = localMap.get(id);
             const rem = remoteMap.get(id);
-            if (local && rem) {
-              const localTime = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
-              const remTime = typeof rem.updatedAt === 'number' ? rem.updatedAt : 0;
-              const remoteIsNewer = remTime > localTime;
-              const base = remoteIsNewer ? { ...local, ...rem } : { ...rem, ...local };
-              // 최신 타임스탬프를 가진 쪽의 isPublic 우선 채택 (로컬 수정 직후 서버 덮어쓰기 방지)
-              const chosenIsPublic = remoteIsNewer
-                ? (rem.isPublic !== undefined ? rem.isPublic : local.isPublic)
-                : (local.isPublic !== undefined ? local.isPublic : rem.isPublic);
-
+            if (rem) {
+              // 🔥 원격 클라우드 DB가 공유 여부(isPublic) 및 내용의 단일 진실 소스(Single Source of Truth)!
               merged.push({
-                ...base,
-                isPublic: chosenIsPublic !== false,
-                title: remoteIsNewer ? (rem.title || local.title) : (local.title || rem.title),
-                category: remoteIsNewer ? (rem.category || local.category) : (local.category || rem.category),
-                order: local.order ?? rem.order,
-                pinned: local.pinned ?? rem.pinned,
+                ...rem,
+                // 기기별 개인 설정(화면 순서, 개인 고정 등)만 로컬 설정 보존
+                order: local?.order ?? rem.order,
+                pinned: local?.pinned ?? rem.pinned,
               });
             } else if (local) {
+              // 원격에 아직 없는 로컬 신규 보드
               merged.push(local);
-            } else if (rem) {
-              merged.push(rem);
             }
           }
 
-          // 🔥 내 로컬 보드 중 원격 DB에 아직 업로드되지 않았거나 상태가 갱신된 보드 즉시 자동 동기화 업로드!
+          // 🔥 원격 DB에 아직 없는 로컬 보드만 최초 1회 안전 업로드
           for (const b of currentLocal) {
-            const isMine = isMyBoard(b) || b.id.startsWith('board-copy-') || b.title.includes('복제본');
-            if (isMine) {
-              const rem = remoteMap.get(b.id);
-              const localTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
-              const remTime = rem && typeof rem.updatedAt === 'number' ? rem.updatedAt : 0;
-              if (!rem || rem.isPublic !== b.isPublic || localTime > remTime) {
-                await saveRemoteBoard(b).catch(() => {});
-              }
+            if (!remoteMap.has(b.id) && isMyBoard(b)) {
+              saveRemoteBoard(b).catch(() => {});
             }
           }
 
@@ -409,15 +392,23 @@ export default function HomePage() {
     e.stopPropagation();
     const isPublicNow = targetBoard.isPublic !== false;
     const newStatus = !isPublicNow;
-    const updated = { ...targetBoard, isPublic: newStatus, updatedAt: Date.now() };
+    const updated: Board = { ...targetBoard, isPublic: newStatus, updatedAt: Date.now() };
+
+    // 1. 화면 UI 즉시 반응 (낙관적 업데이트)
+    setBoards((prev) => prev.map((b) => (b.id === targetBoard.id ? updated : b)));
+
+    // 2. 로컬 스토리지에 즉시 동기화
     const data = getStoreData();
     const updatedBoards = data.boards.map((b) => (b.id === targetBoard.id ? updated : b));
-    saveStoreData.boards(updatedBoards);
-    setBoards(applySavedOrders(updatedBoards));
+    if (!updatedBoards.some((b) => b.id === targetBoard.id)) {
+      updatedBoards.push(updated);
+    }
+    localStorage.setItem('school_padlet_boards', JSON.stringify(updatedBoards));
+
+    // 3. Supabase 원격 DB에 즉시 확정 저장 (모든 기기에 실시간 반영)
     if (isSupabaseConfigured) {
       await saveRemoteBoard(updated);
     }
-    loadData();
   };
 
   // 5) 보드 상단 고정(Pin) 상태 토글

@@ -117,35 +117,33 @@ export default function AdminPage() {
         }
 
         if (remoteBoards && remoteBoards.length > 0) {
-          const boardMap = new Map<string, Board>();
-          data.boards.forEach((b) => boardMap.set(b.id, b));
-          remoteBoards.forEach((b) => {
-            const local = boardMap.get(b.id);
-            if (local) {
-              const localTime = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
-              const remTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
-              const remoteIsNewer = remTime > localTime;
-              const chosenIsPublic = remoteIsNewer
-                ? (b.isPublic !== undefined ? b.isPublic : local.isPublic)
-                : (local.isPublic !== undefined ? local.isPublic : b.isPublic);
-              boardMap.set(b.id, {
-                ...local,
-                ...b,
-                isPublic: chosenIsPublic !== false,
-                order: local.order ?? b.order,
-                pinned: local.pinned ?? b.pinned,
+          const localBoards = data.boards;
+          const localMap = new Map(localBoards.map((b) => [b.id, b]));
+          const remoteMap = new Map(remoteBoards.map((b) => [b.id, b]));
+          const allIds = Array.from(new Set([...localBoards.map((b) => b.id), ...remoteBoards.map((b) => b.id)]));
+
+          const mergedBoards: Board[] = [];
+          for (const id of allIds) {
+            const local = localMap.get(id);
+            const rem = remoteMap.get(id);
+            if (rem) {
+              // 원격 클라우드 DB가 단일 진실 소스
+              mergedBoards.push({
+                ...rem,
+                order: local?.order ?? rem.order,
+                pinned: local?.pinned ?? rem.pinned,
               });
-            } else {
-              boardMap.set(b.id, b);
+            } else if (local) {
+              mergedBoards.push(local);
             }
-          });
-          const mergedBoards = Array.from(boardMap.values());
+          }
+
           setBoards(mergedBoards);
-          saveStoreData.boards(mergedBoards);
+          localStorage.setItem('school_padlet_boards', JSON.stringify(mergedBoards));
 
           // 로컬에만 있는 보드가 있다면 원격 DB로 안전 동기화
-          for (const b of data.boards) {
-            if (!remoteBoards.some((rb) => rb.id === b.id)) {
+          for (const b of localBoards) {
+            if (!remoteMap.has(b.id)) {
               saveRemoteBoard(b).catch(() => {});
             }
           }
@@ -534,7 +532,11 @@ export default function AdminPage() {
     const updatedBoard: Board = { ...board, isPublic: newStatus, updatedAt: Date.now() };
     const updatedBoards = boards.map((b) => (b.id === board.id ? updatedBoard : b));
     setBoards(updatedBoards);
-    saveStoreData.boards(updatedBoards);
+    const data = getStoreData();
+    const storeBoards = data.boards.map((b) => (b.id === board.id ? updatedBoard : b));
+    if (!storeBoards.some((b) => b.id === board.id)) storeBoards.push(updatedBoard);
+    localStorage.setItem('school_padlet_boards', JSON.stringify(storeBoards));
+
     if (isSupabaseConfigured) {
       await saveRemoteBoard(updatedBoard).catch(() => {});
     }

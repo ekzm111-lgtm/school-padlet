@@ -131,22 +131,13 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       custom_bg_url: board.customBgUrl || null,
     };
 
-    // 1. onConflict: 'id' 명시하여 upsert 시도
-    let { error } = await supabase.from('boards').upsert(fullPayload, { onConflict: 'id' });
+    // 1. 기존 보드 id에 대해 update 먼저 시도 (가장 안전하고 빠른 방법으로 원격 DB에 is_public 즉시 반영)
+    const upRes = await supabase.from('boards').update(fullPayload).eq('id', board.id);
+    let error = upRes.error;
 
-    // 2. 만약 upsert가 실패하면, 기존 행 직접 update 시도
+    // 만약 전체 컬럼 update 실패 시 (일부 부가 컬럼이 Supabase 스키마에 없을 경우), 핵심 컬럼으로 update 재시도
     if (error) {
-      const upRes = await supabase.from('boards').update(fullPayload).eq('id', board.id);
-      if (!upRes.error) {
-        error = null;
-      }
-    }
-
-    // 3. 만약 여전히 실패하면 core 컬럼으로 upsert 및 update 시도
-    if (error) {
-      console.warn('saveRemoteBoard full save failed, retrying with core columns:', error);
       const corePayload = {
-        id: board.id,
         code: finalCode,
         title: board.title,
         description: finalDesc,
@@ -154,29 +145,29 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
         is_public: isPub,
         category: board.category || '수업자료',
       };
-      let retry = await supabase.from('boards').upsert(corePayload, { onConflict: 'id' });
-      if (retry.error) {
-        const coreUp = await supabase.from('boards').update(corePayload).eq('id', board.id);
-        if (!coreUp.error) retry = { error: null } as any;
+      const coreUp = await supabase.from('boards').update(corePayload).eq('id', board.id);
+      if (!coreUp.error) {
+        error = null;
       }
+    }
 
-      // 4. 최후의 보루: minimal 컬럼으로 update/upsert 시도 (metaPayload가 description에 100% 보존됨)
-      if (retry.error) {
-        console.warn('saveRemoteBoard core retry failed, retrying with minimal columns:', retry.error);
-        const minPayload = {
+    // 2. 만약 해당 id의 보드가 DB에 아직 없다면(신규 보드), upsert/insert 시도
+    if (error) {
+      const insRes = await supabase.from('boards').upsert(fullPayload, { onConflict: 'id' });
+      if (insRes.error) {
+        await supabase.from('boards').upsert({
           id: board.id,
           code: finalCode,
           title: board.title,
           description: finalDesc,
-        };
-        const minUp = await supabase.from('boards').update(minPayload).eq('id', board.id);
-        if (minUp.error) {
-          await supabase.from('boards').upsert(minPayload, { onConflict: 'id' });
-        }
+          theme: board.theme || 'blue',
+          is_public: isPub,
+          category: board.category || '수업자료',
+        }, { onConflict: 'id' });
       }
     }
 
-    // 2. 🔥 학생-교사 실시간 동기화 보장: posts 테이블의 시스템 메타 레코드에 동시 저장
+    // 3. 🔥 학생-교사 실시간 동기화 보장: posts 테이블의 시스템 메타 레코드에 동시 저장
     try {
       await supabase.from('posts').upsert({
         id: `board_columns_${board.id}`,
@@ -189,6 +180,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
           title: board.title,
           coverImageUrl: board.coverImageUrl,
           category: board.category,
+          isPublic: isPub,
           updatedAt: board.updatedAt || Date.now(),
         }),
         color: 'white',
