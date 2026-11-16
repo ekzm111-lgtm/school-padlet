@@ -174,7 +174,7 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
     const { data, error } = await query;
     if (error || !data) return null;
 
-    // 시스템 메타데이터 레코드 분리 (열 실시간 동기화용)
+    // 시스템 메타데이터 레코드 분리 (열 실시간 동기화용 - 보드별로 격리 캐싱)
     const normalRows = data.filter((p) => {
       if (
         p.column_name === '__system_meta__' ||
@@ -183,8 +183,12 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
       ) {
         try {
           const parsed = JSON.parse(p.content);
-          if (Array.isArray(parsed.columns) && typeof window !== 'undefined') {
-            (window as any).__LATEST_BOARD_COLUMNS__ = parsed.columns;
+          const metaBoardId = p.board_id || (p.id?.startsWith('board_columns_') ? p.id.replace('board_columns_', '') : null);
+          if (Array.isArray(parsed.columns) && typeof window !== 'undefined' && metaBoardId) {
+            if (!(window as any).__BOARD_COLUMNS_CACHE__) {
+              (window as any).__BOARD_COLUMNS_CACHE__ = {};
+            }
+            (window as any).__BOARD_COLUMNS_CACHE__[metaBoardId] = parsed.columns;
           }
         } catch (e) {}
         return false;

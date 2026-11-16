@@ -496,6 +496,16 @@ export default function BoardDetailPage() {
               if (name === '📚 교과 종합 & 디자인 협업') name = '📚 교과 종합 & 디자인 학습도구';
               return name;
             })));
+
+            // 🔥 타 보드(바이브코딩 등)의 무관한 열이 유입되는 것 원천 차단
+            if (targetId === 'board-useful-school-links' || targetId === '778899') {
+              const foreignColumns = new Set([
+                'Ai 모델', '몸풀기 예제', '몸풀기', '몸플기 예제', '실습', 'util', '바이브코딩', 
+                '바이브코딩 편집기', '바이브코딩 맛보기', '무료 AI (api)', '샘플1 공유', '샘플2 공유',
+                '모둠 1', '모둠 2', '모둠 3', '모둠 1 (과제 수행 계획)', '모둠 2 (의견 및 아이디어)', '모둠 3 (최종 결과물)'
+              ]);
+              activeCols = activeCols.filter((c) => !foreignColumns.has(c));
+            }
           }
 
           if (foundBoard) {
@@ -526,11 +536,25 @@ export default function BoardDetailPage() {
     const postCols = posts.map((p) => {
       let name = p.column;
       if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+      if (name === '💻 코딩 & 컴퓨팅 사고력') name = '💻 코딩 & AI 인공지능';
+      if (name === '📐 수학 탐구 & AI 학습') name = '📐 수학 탐구 & 그래프 도구';
+      if (name === '📚 교과 종합 & 디자인 협업') name = '📚 교과 종합 & 디자인 학습도구';
       return name;
     }).filter(Boolean) as string[];
-    const missingCols = postCols.filter((c) => !columns.includes(c));
+
+    const foreignColumns = new Set([
+      'Ai 모델', '몸풀기 예제', '몸풀기', '몸플기 예제', '실습', 'util', '바이브코딩', 
+      '바이브코딩 편집기', '바이브코딩 맛보기', '무료 AI (api)', '샘플1 공유', '샘플2 공유',
+      '모둠 1', '모둠 2', '모둠 3'
+    ]);
+    const isUseful = board?.id === 'board-useful-school-links' || board?.code === '778899' || boardId === 'board-useful-school-links' || boardId === '778899';
+    const filteredPostCols = isUseful ? postCols.filter((c) => !foreignColumns.has(c)) : postCols;
+    const missingCols = filteredPostCols.filter((c) => !columns.includes(c));
     if (missingCols.length > 0) {
-      const updated = Array.from(new Set([...columns, ...missingCols]));
+      let updated = Array.from(new Set([...columns, ...missingCols]));
+      if (isUseful) {
+        updated = updated.filter((c) => !foreignColumns.has(c));
+      }
       setColumns(updated);
       if (board) {
         const updatedBoard = { ...board, columns: updated };
@@ -542,7 +566,7 @@ export default function BoardDetailPage() {
         }
       }
     }
-  }, [posts, columns, board]);
+  }, [posts, columns, board, boardId]);
 
   // 🔥 실시간 동기화 (Supabase Realtime 채널 + 1초 주기 자동 폴링 백업)
   // 학생과 교사가 서로 다른 기기에서 작업할 때 1~2초 내에 자동 화면 반영 (게시글 + 모둠 열)!
@@ -634,9 +658,12 @@ export default function BoardDetailPage() {
         if (Date.now() - lastUserActionTimeRef.current >= 15000) {
           let latestCols: string[] | null = null;
 
-          // 2-1. posts 시스템 메타데이터로부터 실시간 열 목록 확인
-          if (typeof window !== 'undefined' && Array.isArray((window as any).__LATEST_BOARD_COLUMNS__)) {
-            latestCols = (window as any).__LATEST_BOARD_COLUMNS__;
+          // 2-1. posts 시스템 메타데이터로부터 해당 보드의 실시간 열 목록 확인 (보드별 격리 캐시)
+          if (typeof window !== 'undefined' && (window as any).__BOARD_COLUMNS_CACHE__) {
+            const cachedCols = (window as any).__BOARD_COLUMNS_CACHE__[targetBoardId];
+            if (Array.isArray(cachedCols) && cachedCols.length > 0) {
+              latestCols = cachedCols;
+            }
           }
 
           // 2-2. boards 테이블에서 select('*')로 안전 조회
@@ -668,7 +695,7 @@ export default function BoardDetailPage() {
           if (latestCols && Array.isArray(latestCols) && latestCols.length > 0) {
             const postCols = posts.map((p) => p.column).filter(Boolean) as string[];
             // 🔥 원격 열 목록 + 현재 로컬 열 목록(방금 추가한 빈 모둠 등) + 게시글 열 목록을 통합 및 정규화
-            const cleanCols = Array.from(
+            let cleanCols = Array.from(
               new Set([...latestCols, ...postCols].map((c: any) => {
                 let name = String(c || '').trim();
                 if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
@@ -678,6 +705,16 @@ export default function BoardDetailPage() {
                 return name;
               }).filter(Boolean))
             ) as string[];
+
+            // 🔥 타 보드 오염 컬럼 원천 차단
+            if (targetBoardId === 'board-useful-school-links' || targetBoardId === '778899') {
+              const foreignColumns = new Set([
+                'Ai 모델', '몸풀기 예제', '몸풀기', '몸플기 예제', '실습', 'util', '바이브코딩', 
+                '바이브코딩 편집기', '바이브코딩 맛보기', '무료 AI (api)', '샘플1 공유', '샘플2 공유',
+                '모둠 1', '모둠 2', '모둠 3', '모둠 1 (과제 수행 계획)', '모둠 2 (의견 및 아이디어)', '모둠 3 (최종 결과물)'
+              ]);
+              cleanCols = cleanCols.filter((c) => !foreignColumns.has(c));
+            }
 
             if (cleanCols.length > 0) {
               // 🔥 사용자가 배치한 순서를 최우선 보존 (원격이나 다른 참여자가 새로 생성한 열만 끝에 덧붙임)
@@ -912,9 +949,13 @@ export default function BoardDetailPage() {
     setNewColName('');
     setShowAddColInput(false);
 
-    // 🔥 즉각 메모리 및 브라우저 세션에 새 모둠 등록 (원격 폴링으로 지워지는 것 100% 방어)
-    if (typeof window !== 'undefined') {
-      (window as any).__LATEST_BOARD_COLUMNS__ = updatedCols;
+    // 🔥 즉각 메모리 및 브라우저 세션에 새 모둠 등록 (해당 보드 전용 캐시)
+    const curId = board?.id || boardId;
+    if (typeof window !== 'undefined' && curId) {
+      if (!(window as any).__BOARD_COLUMNS_CACHE__) {
+        (window as any).__BOARD_COLUMNS_CACHE__ = {};
+      }
+      (window as any).__BOARD_COLUMNS_CACHE__[curId] = updatedCols;
     }
 
     const now = Date.now();
@@ -950,8 +991,12 @@ export default function BoardDetailPage() {
     setColumns(cleanCols);
     setEditingColIdx(null);
 
-    if (typeof window !== 'undefined') {
-      (window as any).__LATEST_BOARD_COLUMNS__ = cleanCols;
+    const curId = board?.id || boardId;
+    if (typeof window !== 'undefined' && curId) {
+      if (!(window as any).__BOARD_COLUMNS_CACHE__) {
+        (window as any).__BOARD_COLUMNS_CACHE__ = {};
+      }
+      (window as any).__BOARD_COLUMNS_CACHE__[curId] = cleanCols;
     }
 
     // 2. 해당 열에 속한 모든 카드의 column도 새 이름으로 일괄 교체
@@ -1055,8 +1100,12 @@ export default function BoardDetailPage() {
     setDragOverColIdx(null);
 
     // 🔥 즉시 브라우저 메모리에 최신 열 순서 기록 (백그라운드 동기화 루프가 이전 순서로 되돌리지 못하도록 방어)
-    if (typeof window !== 'undefined') {
-      (window as any).__LATEST_BOARD_COLUMNS__ = cleanCols;
+    const curId = board?.id || boardId;
+    if (typeof window !== 'undefined' && curId) {
+      if (!(window as any).__BOARD_COLUMNS_CACHE__) {
+        (window as any).__BOARD_COLUMNS_CACHE__ = {};
+      }
+      (window as any).__BOARD_COLUMNS_CACHE__[curId] = cleanCols;
     }
 
     const now = Date.now();
@@ -1492,18 +1541,20 @@ export default function BoardDetailPage() {
         <Header
           extraRight={
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {/* 👥 실시간 참여 인원 수 배지 & 클릭 시 명단 모달 (관리자 버튼 앞쪽) */}
-              <button
-                onClick={() => setShowParticipantsModal(true)}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition shadow-xs active:scale-95 shrink-0 whitespace-nowrap"
-                title="현재 보드에 접속 중인 학생 및 참여자 명단 확인"
-              >
-                <Users className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  <span>참여자 {allParticipants.filter((u) => u.isOnline).length}명</span>
-                </span>
-              </button>
+              {/* 👥 실시간 참여 인원 수 배지 & 클릭 시 명단 모달 (선생님/관리자만 표시, 학생에게는 비표시) */}
+              {isTeacherOrAdmin && currentUser?.role !== 'student' && (
+                <button
+                  onClick={() => setShowParticipantsModal(true)}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition shadow-xs active:scale-95 shrink-0 whitespace-nowrap"
+                  title="현재 보드에 접속 중인 학생 및 참여자 명단 확인"
+                >
+                  <Users className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span>참여자 {allParticipants.filter((u) => u.isOnline).length}명</span>
+                  </span>
+                </button>
+              )}
 
               {/* 🎯 이 보드 전용 실시간 퀴즈 버튼 (관리자 버튼 앞쪽) */}
               <button

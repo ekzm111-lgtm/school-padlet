@@ -527,14 +527,19 @@ export const getStoreData = (): StoreData => {
       saveRemoteBoard(USEFUL_SCHOOL_LINKS_BOARD).catch(() => {});
     }
   } else {
-    // 컬럼 정규화 (중복 및 구버전 컬럼명 자동 정리)
+    // 컬럼 정규화 (중복, 구버전 컬럼명 및 타 보드 유입 컬럼 원천 필터링)
+    const foreignColumns = new Set([
+      'Ai 모델', '몸풀기 예제', '몸풀기', '몸플기 예제', '실습', 'util', '바이브코딩', 
+      '바이브코딩 편집기', '바이브코딩 맛보기', '무료 AI (api)', '샘플1 공유', '샘플2 공유',
+      '모둠 1', '모둠 2', '모둠 3', '모둠 1 (과제 수행 계획)', '모둠 2 (의견 및 아이디어)', '모둠 3 (최종 결과물)'
+    ]);
     const rawCols = boardsList[usefulBoardIdx].columns || [];
     const normalizedCols = Array.from(new Set(rawCols.map((c: string) => {
       if (c === '💻 코딩 & 컴퓨팅 사고력') return '💻 코딩 & AI 인공지능';
       if (c === '📐 수학 탐구 & AI 학습') return '📐 수학 탐구 & 그래프 도구';
       if (c === '📚 교과 종합 & 디자인 협업') return '📚 교과 종합 & 디자인 학습도구';
       return c;
-    }))).filter(Boolean);
+    }))).filter((c: string) => Boolean(c) && !foreignColumns.has(c));
 
     // 최신 기본 컬럼 중 누락된 컬럼 보강
     const curSet = new Set(normalizedCols);
