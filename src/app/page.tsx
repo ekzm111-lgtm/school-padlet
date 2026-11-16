@@ -198,23 +198,43 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1 w-full px-4 sm:px-8 lg:px-12 py-6 sm:py-8">
-        {/* 🔥 학교/교실 실사진 배경을 적용한 프리미엄 히어로 배너 */}
-        <div className="relative overflow-hidden rounded-[2.5rem] text-white p-8 sm:p-12 shadow-2xl mb-10 border border-white/20 group">
-          {/* 한국 선생님과 교복 입은 학생들 실사진 배경 */}
+        {/* 🔥 학교/교실 실사진 배경을 적용한 프리미엄 다이나믹 히어로 배너 */}
+        <div className="relative overflow-hidden rounded-[2.5rem] text-white p-7 sm:p-12 shadow-2xl mb-10 border border-white/20 group min-h-[360px] flex items-center">
+          {/* 한국 교실 실사진 배경 (풀스크린 최적화 & 서서히 살아 움직이는 켄 번스 슬로우 모션) */}
           <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+            className="absolute inset-0 bg-cover bg-[center_top_25%] transition-transform duration-1000 animate-ken-burns scale-105"
             style={{
               backgroundImage: `url('/korean_classroom_banner.jpg')`,
             }}
           />
 
-          {/* 선명한 텍스트 가독성을 위한 고급 그라데이션 오버레이 */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-blue-950/85 to-indigo-950/75 backdrop-blur-[1px]" />
+          {/* 선명한 텍스트 가독성을 위한 고급 듀얼 그라데이션 오버레이 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/94 via-blue-950/85 to-indigo-950/75 backdrop-blur-[0.5px]" />
+          <div className="absolute inset-0 bg-radial at-top-left from-blue-500/10 via-transparent to-black/40" />
 
-          {/* 은은한 빛 효과 */}
-          <div className="absolute -right-12 -top-12 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+          {/* 🌟 다이나믹 펄스 오로라 글로우 백라이트 */}
+          <div className="absolute -right-16 -top-16 w-[420px] h-[420px] bg-gradient-to-tr from-blue-500/30 via-indigo-500/25 to-purple-500/20 rounded-full blur-3xl pointer-events-none animate-pulse-glow" />
+          <div className="absolute left-1/3 -bottom-20 w-80 h-80 bg-sky-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
 
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          {/* 🌟 교실 안을 둥둥 떠다니는 실시간 협업 인터랙티브 플로팅 포스트잇 카드들 */}
+          <div className="absolute left-8 bottom-4 sm:bottom-6 hidden xl:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white shadow-xl shadow-black/20 animate-float-slow pointer-events-none z-10">
+            <span className="w-6 h-6 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center font-black text-xs shadow-xs">
+              💡
+            </span>
+            <div className="text-left">
+              <div className="text-[11px] font-black tracking-tight">AI 모델 이미지 분석 완료!</div>
+              <div className="text-[9px] text-blue-100 font-medium">1모둠 실습 카드 제출됨 🚀</div>
+            </div>
+          </div>
+
+          <div className="absolute right-[360px] top-7 hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/18 backdrop-blur-md border border-white/25 text-white shadow-lg animate-float-slow-rev pointer-events-none z-10">
+            <span className="w-5 h-5 rounded-lg bg-emerald-400 text-slate-900 flex items-center justify-center font-bold text-[10px]">
+              🎯
+            </span>
+            <span className="text-[11px] font-bold">실시간 퀴즈 1위 등극! 🏆</span>
+          </div>
+
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8 w-full">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-xs font-bold mb-4 border border-white/20 shadow-inner">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
@@ -223,13 +243,13 @@ export default function HomePage() {
 
               <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.15]">
                 생각을 붙이고, 나누고, <br />
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-200 via-white to-sky-200">
-                  함께 카피하며 성장하는 교실
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-200 via-sky-200 to-indigo-200 animate-text-shimmer font-black">
+                  함께 카피하며 성장하는 교실 ✨
                 </span>
               </h1>
 
               <p className="mt-4 text-sm sm:text-base text-blue-100/90 leading-relaxed font-normal">
-                학생들은 6자리 PIN 링크로 1초 만에 참여하고, <br className="hidden sm:inline" />
+                학생들은 6자리 참여 링크로 1초 만에 참여하고, <br className="hidden sm:inline" />
                 선생님들은 다른 학급의 수업 보드를 클릭 한 번으로 내 보드로 복제(Copy)해 활용하세요.
               </p>
 
@@ -237,7 +257,7 @@ export default function HomePage() {
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-blue-800 hover:bg-blue-50 font-black text-sm shadow-xl shadow-black/20 transition-all hover:scale-105 active:scale-95"
+                  className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-blue-800 hover:bg-blue-50 font-black text-sm shadow-xl shadow-black/25 transition-all hover:scale-105 active:scale-95"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
                   <span>새 협업 보드 만들기</span>
@@ -245,7 +265,7 @@ export default function HomePage() {
 
                 <button
                   onClick={() => setActiveTab('template')}
-                  className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white/20 hover:bg-white/30 border border-white/25 backdrop-blur-md text-white font-bold text-sm transition"
+                  className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white/20 hover:bg-white/30 border border-white/25 backdrop-blur-md text-white font-bold text-sm transition hover:scale-105 active:scale-95"
                 >
                   <Layers className="w-4 h-4 text-amber-300" />
                   <span>추천 템플릿 복제하기</span>
@@ -253,9 +273,9 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 우측 다이나믹 통계 위젯 카드 */}
+            {/* 우측 다이나믹 통계 위젯 카드 (글래스모피즘 & 호버 인터랙션) */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full lg:w-80 shrink-0">
-              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 flex flex-col justify-between shadow-lg">
+              <div className="bg-white/15 hover:bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/20 flex flex-col justify-between shadow-lg transition-transform hover:-translate-y-1">
                 <div className="text-[11px] font-bold text-blue-200 flex items-center gap-1.5">
                   <Globe className="w-3.5 h-3.5 text-sky-300" />
                   <span>공유된 보드</span>
@@ -266,7 +286,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 flex flex-col justify-between shadow-lg">
+              <div className="bg-white/15 hover:bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/20 flex flex-col justify-between shadow-lg transition-transform hover:-translate-y-1">
                 <div className="text-[11px] font-bold text-blue-200 flex items-center gap-1.5">
                   <FileCheck className="w-3.5 h-3.5 text-emerald-300" />
                   <span>나눈 메모/카드</span>
@@ -277,17 +297,18 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="col-span-2 bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-lg">
+              <div className="col-span-2 bg-white/15 hover:bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-lg transition-transform hover:-translate-y-0.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-amber-200 flex items-center gap-1">
+                  <span className="font-bold text-amber-200 flex items-center gap-1.5">
                     <TrendingUp className="w-3.5 h-3.5 text-amber-300" />
                     <span>실시간 협업 상태</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-bold animate-pulse shadow-xs">
-                    LIVE 연결됨
+                  <span className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500 text-white font-black shadow-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    <span>LIVE 연결됨</span>
                   </span>
                 </div>
-                <div className="text-[11px] text-white/85 mt-1.5">
+                <div className="text-[11px] text-white/90 mt-1.5 font-medium leading-relaxed">
                   수업 중 학생들의 카드와 모둠 활동이 실시간 동기화 중입니다.
                 </div>
               </div>
@@ -394,7 +415,7 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
             {filteredBoards.map((board) => {
               const themeStyles = {
                 blue: 'from-blue-50 to-indigo-50/70 border-blue-200/80',
@@ -414,7 +435,6 @@ export default function HomePage() {
                 )
               );
               // 보드 수정 권한: 본인이 만든 보드(isMyBoard)이거나, 전체 시스템 최고 관리자(admin)만 수정 가능!
-              // 다른 교사가 만든 보드는 교사라도 임의 수정 불가 (복제해서 사용)
               const canEditBoard = Boolean(
                 currentUser && (isMyBoard || currentUser.role === 'admin')
               );
@@ -423,17 +443,17 @@ export default function HomePage() {
                 <div
                   key={board.id}
                   onClick={() => router.push(`/board/${board.id}`)}
-                  className={`group relative rounded-2xl p-3.5 sm:p-4 border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer bg-gradient-to-br flex flex-col justify-between ${
+                  className={`group relative rounded-3xl p-5 sm:p-6 border transition-all duration-200 hover:-translate-y-1.5 hover:shadow-xl cursor-pointer bg-gradient-to-br flex flex-col justify-between ${
                     themeStyles[board.theme] || 'from-white to-slate-50 border-slate-200'
                   }`}
                 >
                   <div>
                     {/* 상단 태그 & 공개 여부 & 핀코드 */}
-                    <div className="flex items-center justify-between gap-1.5 mb-2.5">
-                      <div className="flex items-center gap-1 flex-wrap">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {board.category && (
                           <span
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                               isBlackboard ? 'bg-emerald-800 text-emerald-200' : 'bg-white text-blue-700 shadow-2xs'
                             }`}
                           >
@@ -443,17 +463,17 @@ export default function HomePage() {
 
                         {/* 복제본 배지 */}
                         {board.copiedFromTitle && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
                             카피본
                           </span>
                         )}
 
-                        {/* 공개 / 비공개 상태 배지 및 토글 (교사/관리자/작성자는 클릭 변경 가능) */}
+                        {/* 공개 / 비공개 상태 배지 및 토글 */}
                         {canEditBoard ? (
                           <button
                             type="button"
                             onClick={(e) => handleTogglePublic(e, board)}
-                            className={`flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full transition shadow-2xs ${
+                            className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full transition shadow-2xs ${
                               board.isPublic !== false
                                 ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
                                 : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
@@ -462,23 +482,23 @@ export default function HomePage() {
                           >
                             {board.isPublic !== false ? (
                               <>
-                                <Globe className="w-2.5 h-2.5 text-emerald-600" />
+                                <Globe className="w-3 h-3 text-emerald-600" />
                                 <span>공개중</span>
                               </>
                             ) : (
                               <>
-                                <Lock className="w-2.5 h-2.5 text-slate-500" />
+                                <Lock className="w-3 h-3 text-slate-500" />
                                 <span>나만보기</span>
                               </>
                             )}
                           </button>
                         ) : (
                           <span
-                            className={`flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
                               isBlackboard ? 'bg-emerald-900/80 text-emerald-300' : 'bg-white/80 text-slate-600'
                             }`}
                           >
-                            <Globe className="w-2.5 h-2.5 text-blue-500" />
+                            <Globe className="w-3 h-3 text-blue-500" />
                             <span>공유됨</span>
                           </span>
                         )}
@@ -489,25 +509,25 @@ export default function HomePage() {
                         type="button"
                         onClick={(e) => handleCopyCode(e, board.code)}
                         title="클릭하여 학생 참여 핀코드 복사"
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold transition shrink-0 ${
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-bold transition shrink-0 ${
                           isBlackboard
                             ? 'bg-emerald-800 text-emerald-100 hover:bg-emerald-700'
-                            : 'bg-white hover:bg-blue-50 text-blue-600 border border-slate-200'
+                            : 'bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 shadow-2xs'
                         }`}
                       >
-                        <Hash className="w-2.5 h-2.5" />
+                        <Hash className="w-3 h-3" />
                         <span>{board.code}</span>
                         {copiedCode === board.code ? (
-                          <Check className="w-2.5 h-2.5 text-emerald-600" />
+                          <Check className="w-3 h-3 text-emerald-600" />
                         ) : (
-                          <Copy className="w-2.5 h-2.5 opacity-60" />
+                          <Copy className="w-3 h-3 opacity-60" />
                         )}
                       </button>
                     </div>
 
-                    {/* 메인 화면 보드 카드 대표 썸네일 이미지 (반으로 콤팩트화) */}
+                    {/* 메인 화면 보드 카드 대표 썸네일 이미지 (시원한 원래 크기) */}
                     {(board.coverImageUrl || board.customBgUrl) && (
-                      <div className="relative w-full h-24 rounded-xl overflow-hidden mb-2.5 border border-black/5 shadow-2xs bg-slate-100">
+                      <div className="relative w-full h-36 sm:h-40 rounded-2xl overflow-hidden mb-3.5 border border-black/5 shadow-2xs bg-slate-100">
                         <img
                           src={board.coverImageUrl || board.customBgUrl}
                           alt={board.title}
@@ -517,7 +537,7 @@ export default function HomePage() {
                     )}
 
                     <h3
-                      className={`text-sm font-bold line-clamp-1 leading-snug group-hover:text-blue-600 transition ${
+                      className={`text-base sm:text-lg font-black line-clamp-1 leading-snug group-hover:text-blue-600 transition ${
                         isBlackboard ? 'text-white' : 'text-slate-900'
                       }`}
                     >
@@ -525,7 +545,7 @@ export default function HomePage() {
                     </h3>
 
                     <p
-                      className={`mt-1 text-[11px] line-clamp-1 leading-relaxed ${
+                      className={`mt-1.5 text-xs line-clamp-2 leading-relaxed ${
                         isBlackboard ? 'text-emerald-200/80' : 'text-slate-500'
                       }`}
                     >
@@ -533,15 +553,15 @@ export default function HomePage() {
                     </p>
                   </div>
 
-                  {/* 하단 작성자 및 컴팩트 액션 버튼 바 */}
+                  {/* 하단 작성자 및 액션 버튼 바 */}
                   <div
-                    className={`mt-3.5 pt-2.5 border-t flex items-center justify-between text-xs gap-1.5 ${
+                    className={`mt-5 pt-3.5 border-t flex items-center justify-between text-xs gap-2 ${
                       isBlackboard ? 'border-emerald-800/60 text-emerald-300/80' : 'border-slate-200/70 text-slate-500'
                     }`}
                   >
                     {/* 작성자 이름 */}
                     <div
-                      className="flex items-center gap-1 font-medium text-[10px] min-w-0 flex-1"
+                      className="flex items-center gap-1 font-medium text-xs min-w-0 flex-1"
                       title={board.title === '내 테스트' ? 'minwan1 kim' : board.authorName}
                     >
                       <span className="truncate">
@@ -550,8 +570,8 @@ export default function HomePage() {
                     </div>
 
                     {/* 액션 버튼 그룹 */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* 보드 정보 수정 버튼 (교사/관리자/작성자 가능) */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* 보드 정보 수정 버튼 */}
                       {canEditBoard && (
                         <button
                           type="button"
@@ -559,14 +579,14 @@ export default function HomePage() {
                             e.stopPropagation();
                             setEditingBoard(board);
                           }}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
                             isBlackboard
                               ? 'bg-emerald-800 hover:bg-emerald-700 text-emerald-100'
                               : 'bg-white hover:bg-amber-50 text-amber-700 border border-slate-200 hover:border-amber-300'
                           }`}
                           title="보드 제목, 커버 사진, 설정 수정"
                         >
-                          <Pencil className="w-2.5 h-2.5 text-amber-600" />
+                          <Pencil className="w-3 h-3 text-amber-600" />
                           <span>수정</span>
                         </button>
                       )}
@@ -575,14 +595,14 @@ export default function HomePage() {
                       <button
                         type="button"
                         onClick={(e) => handleDuplicateBoard(e, board)}
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
                           isBlackboard
                             ? 'bg-emerald-800 hover:bg-emerald-700 text-white'
                             : 'bg-white hover:bg-blue-50 text-blue-700 border border-slate-200'
                         }`}
                         title="이 보드를 내 보드로 복제하기"
                       >
-                        <Copy className="w-2.5 h-2.5 text-blue-500" />
+                        <Copy className="w-3 h-3 text-blue-500" />
                         <span>복제</span>
                       </button>
 
@@ -590,13 +610,13 @@ export default function HomePage() {
                       <button
                         type="button"
                         onClick={(e) => handleCopyLink(e, board.code)}
-                        className="p-1 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition shrink-0"
+                        className="p-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition shrink-0"
                         title="학생 참여 링크 복사"
                       >
                         {copiedLink === board.code ? (
-                          <Check className="w-3 h-3 text-emerald-600" />
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
                         ) : (
-                          <Share2 className="w-3 h-3" />
+                          <Share2 className="w-3.5 h-3.5" />
                         )}
                       </button>
 
@@ -607,15 +627,15 @@ export default function HomePage() {
                           e.stopPropagation();
                           setQrBoard(board);
                         }}
-                        className="p-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition shrink-0"
+                        className="p-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition shrink-0"
                         title="스마트폰/태블릿 카메라 스캔용 QR코드"
                       >
-                        <QrCode className="w-3 h-3" />
+                        <QrCode className="w-3.5 h-3.5" />
                       </button>
 
-                      <div className="flex items-center gap-0.5 font-bold group-hover:translate-x-0.5 transition text-blue-600 ml-0.5 shrink-0 whitespace-nowrap text-[11px]">
+                      <div className="flex items-center gap-1 font-bold group-hover:translate-x-1 transition text-blue-600 ml-1 shrink-0 whitespace-nowrap text-xs">
                         <span>입장</span>
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </div>
                     </div>
                   </div>

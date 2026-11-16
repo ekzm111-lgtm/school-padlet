@@ -125,33 +125,10 @@ export default function Header({ extraRight }: HeaderProps = {}) {
             </Link>
           </div>
 
-          {/* 중앙: 6자리 학생 핀코드 빠른 참여 버튼 */}
-          <div className="hidden md:flex items-center gap-2">
-            <button
-              onClick={() => setShowPinModal(true)}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-xs font-semibold text-slate-700 hover:text-blue-600 transition-all shadow-inner"
-            >
-              <Hash className="w-3.5 h-3.5 text-blue-500" />
-              <span>보드 참여코드(PIN)</span>
-              <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] text-slate-500 font-mono shadow-xs">
-                #
-              </kbd>
-            </button>
-          </div>
-
           {/* 우측 유저 및 관리 버튼 (맨 오른쪽 배치) */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto">
             {/* 🔥 참여자 & 실시간 퀴즈 버튼 (관리자 버튼 바로 앞쪽 배치) */}
             {extraRight}
-
-            {/* 모바일 핀 입장 버튼 */}
-            <button
-              onClick={() => setShowPinModal(true)}
-              className="md:hidden p-2 rounded-lg bg-slate-100 text-slate-600"
-              title="참여코드 입장"
-            >
-              <Hash className="w-4 h-4" />
-            </button>
 
             {/* 관리자 링크 */}
             {currentUser?.role === 'admin' && (
