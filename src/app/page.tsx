@@ -29,6 +29,7 @@ import {
   Move,
 } from 'lucide-react';
 import Header from '@/components/Header';
+import StudentHomeView from '@/components/StudentHomeView';
 import CreateBoardModal from '@/components/CreateBoardModal';
 import EditBoardModal from '@/components/EditBoardModal';
 import QrModal from '@/components/QrModal';
@@ -291,6 +292,19 @@ export default function HomePage() {
 
   const isTeacherOrAdmin = currentUser?.role === 'teacher' || currentUser?.role === 'admin';
   const totalPostsCount = getStoreData().posts.length;
+
+  // 🌟 학생 전용 뷰: 패들렛·카훗 공식 스타일 (대형 6자리 PIN 입력 + 추천 수업 자료 열람)
+  // 학생은 보드 개설/수정 등의 관리 기능 없이 오직 6자리 코드로 수업 참여에 집중할 수 있도록 심플한 화면 제공!
+  if (!isTeacherOrAdmin) {
+    return (
+      <StudentHomeView
+        currentUser={currentUser}
+        boards={boards}
+        onCopyCode={handleCopyCode}
+        onCopyLink={handleCopyLink}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 selection:bg-blue-600 selection:text-white">
@@ -960,8 +974,8 @@ export default function HomePage() {
       {/* 🌟 페이지 최하단 푸터 */}
       <Footer />
 
-      {/* 새 보드 만들기 모달 */}
-      {currentUser && (
+      {/* 새 보드 만들기 모달 (선생님/관리자 전용) */}
+      {currentUser && isTeacherOrAdmin && (
         <CreateBoardModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
