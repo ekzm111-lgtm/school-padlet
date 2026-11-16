@@ -50,6 +50,8 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, saveAllRemotePosts, deleteRemotePost } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
+import { ENTRY_MIDDLE_SCHOOL_POSTS } from '@/data/entryMiddleSchoolBoard';
+import { USEFUL_SCHOOL_LINKS_POSTS } from '@/data/usefulSchoolLinksBoard';
 
 const DEFAULT_COLUMNS = ['모둠 1 (조사 및 계획)', '모둠 2 (의견 토론)', '모둠 3 (결과 정리)'];
 
@@ -534,13 +536,41 @@ export default function BoardDetailPage() {
               });
             }
 
-            const finalPosts = unsyncedLocal.length > 0 ? [...remote, ...unsyncedLocal] : remote;
+            let finalPosts = unsyncedLocal.length > 0 ? [...remote, ...unsyncedLocal] : remote;
+
+            // 🌟 복제본 보드인데 카드가 0개로 비어있는 경우, 원본 템플릿 카드 자동 복원 및 원격 저장!
+            if (
+              finalPosts.length === 0 &&
+              (foundBoard?.title?.includes('복제본') || foundBoard?.copiedFromTitle || targetId.startsWith('board-copy-'))
+            ) {
+              let templatePosts: Post[] = [];
+              if (foundBoard?.title?.includes('엔트리') || foundBoard?.copiedFromTitle?.includes('엔트리')) {
+                templatePosts = ENTRY_MIDDLE_SCHOOL_POSTS;
+              } else if (foundBoard?.title?.includes('유용한') || foundBoard?.copiedFromTitle?.includes('유용한')) {
+                templatePosts = USEFUL_SCHOOL_LINKS_POSTS;
+              }
+
+              if (templatePosts.length > 0) {
+                const recovered = templatePosts.map((tp) => ({
+                  ...tp,
+                  id: `post-copy-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                  boardId: targetId,
+                  authorId: foundBoard?.authorId || 'teacher',
+                  authorName: foundBoard?.authorName || '선생님',
+                  reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
+                  comments: [],
+                }));
+                finalPosts = recovered;
+                saveRemotePosts(recovered).catch(() => {});
+              }
+            }
+
             setPosts(finalPosts);
             const otherPosts = data.posts.filter((p) => p.boardId !== targetId);
             saveStoreData.posts([...finalPosts, ...otherPosts]);
 
             // 🔥 중요: 게시글이 속한 모든 열 이름을 빠짐없이 취합하여 화면에서 숨겨지는 일 100% 방지
-            const postCols = remote.map((p: Post) => {
+            const postCols = finalPosts.map((p: Post) => {
               let name = p.column;
               if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
               if (name === '💻 코딩 & 컴퓨팅 사고력') name = '💻 코딩 & AI 인공지능';
@@ -1980,10 +2010,10 @@ export default function BoardDetailPage() {
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-slate-100 text-slate-700 border-slate-300'
                 }`}
-                title="학교 전체 공개 / 나만 보기 전환"
+                title="학교 전체 공개 / 비공개 전환"
               >
                 {board.isPublic !== false ? <Globe className="w-3.5 h-3.5 text-emerald-600" /> : <Lock className="w-3.5 h-3.5 text-slate-600" />}
-                <span>{board.isPublic !== false ? '공개' : '나만보기'}</span>
+                <span>{board.isPublic !== false ? '공개' : '비공개'}</span>
               </button>
             )}
 

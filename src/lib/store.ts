@@ -6,6 +6,7 @@ import {
   fetchRemotePosts,
   saveRemoteBoard,
   saveRemotePost,
+  saveRemotePosts,
   saveAllRemotePosts,
   deleteRemoteBoard,
   deleteRemotePost,
@@ -36,17 +37,6 @@ const INITIAL_USERS: User[] = [
     name: '김관리 (정보부장)',
     email: 'admin@school.ac.kr',
     role: 'admin',
-    status: 'approved',
-    schoolName: '미래한국고등학교',
-    createdAt: '2026-10-01',
-  },
-  {
-    id: 'user-teacher-minwan',
-    username: 'minwan1',
-    password: 'google-auth-auto',
-    name: 'minwan1 kim (선생님)',
-    email: 'ekzm11133@gmail.com',
-    role: 'teacher',
     status: 'approved',
     schoolName: '미래한국고등학교',
     createdAt: '2026-10-01',
@@ -905,12 +895,22 @@ export const duplicateBoard = (sourceBoardId: string, currentUser: User): Board 
   };
 
   // 원본 보드의 게시글들도 복사하여 새 보드로 연결
-  const sourcePosts = data.posts.filter((p) => p.boardId === sourceBoardId);
+  let sourcePosts = data.posts.filter((p) => p.boardId === sourceBoardId);
+  if (sourcePosts.length === 0) {
+    if (sourceBoardId === ENTRY_MIDDLE_SCHOOL_BOARD.id || source.title.includes('엔트리')) {
+      sourcePosts = ENTRY_MIDDLE_SCHOOL_POSTS;
+    } else if (sourceBoardId === USEFUL_SCHOOL_LINKS_BOARD.id || source.title.includes('유용한')) {
+      sourcePosts = USEFUL_SCHOOL_LINKS_POSTS;
+    }
+  }
+
   const copiedPosts = sourcePosts.map((p) => ({
     ...p,
     id: `post-copy-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     boardId: newBoardId,
     authorId: currentUser.id,
+    authorName: currentUser.name,
+    authorRole: currentUser.role,
     reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
     comments: [],
   }));
@@ -924,12 +924,12 @@ export const duplicateBoard = (sourceBoardId: string, currentUser: User): Board 
   saveStoreData.boards([copiedBoard, ...data.boards]);
   saveStoreData.posts([...copiedPosts, ...data.posts]);
 
-  // 🔥 클라우드 원격 DB(Supabase)에도 복제된 보드와 게시글들을 즉시 백그라운드 저장!
+  // 🔥 클라우드 원격 DB(Supabase)에도 복제된 보드와 게시글들을 일괄 배치(saveRemotePosts)로 안전 영구 저장!
   if (isSupabaseConfigured) {
     saveRemoteBoard(copiedBoard).catch(() => {});
-    copiedPosts.forEach((p) => {
-      saveRemotePost(p).catch(() => {});
-    });
+    if (copiedPosts.length > 0) {
+      saveRemotePosts(copiedPosts).catch(() => {});
+    }
   }
 
   return copiedBoard;

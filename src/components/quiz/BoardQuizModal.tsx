@@ -853,7 +853,7 @@ export default function BoardQuizModal({
                               ) : (
                                 <>
                                   <Lock className="w-3 h-3 text-slate-400" />
-                                  <span>비공개 (나만 보기)</span>
+                                  <span>비공개</span>
                                 </>
                               )}
                             </button>

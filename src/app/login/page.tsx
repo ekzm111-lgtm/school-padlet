@@ -20,6 +20,8 @@ import {
   X,
   UserPlus,
   ChevronRight,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User, UserRole, UserStatus } from '@/lib/types';
@@ -32,6 +34,7 @@ export default function LoginPage() {
   // 로그인 상태
   const [loginId, setLoginId] = useState('');
   const [loginPw, setLoginPw] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // 회원가입 상태
   const [role, setRole] = useState<UserRole>('student');
@@ -213,50 +216,63 @@ export default function LoginPage() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    const data = getStoreData();
+    setIsLoggingIn(true);
 
-    let user = data.users.find(
-      (u) =>
-        (u.username === loginId.trim() || u.email === loginId.trim()) &&
-        (u.password === loginPw.trim() || (!u.password && loginPw.trim() === 'admin'))
-    );
-
-    if (!user) {
-      // 다른 PC나 스마트폰에서 가입한 사용자인지 원격 클라우드 실시간 확인
-      try {
-        const remoteUsers = await fetchRemoteUsers();
-        if (remoteUsers) {
-          user = remoteUsers.find(
-            (u) =>
-              (u.username === loginId.trim() || u.email === loginId.trim()) &&
-              (u.password === loginPw.trim() || (!u.password && loginPw.trim() === 'admin'))
-          );
-          if (user) {
-            const userMap = new Map<string, User>();
-            data.users.forEach((u) => userMap.set(u.id, u));
-            remoteUsers.forEach((u) => userMap.set(u.id, u));
-            saveStoreData.users(Array.from(userMap.values()));
-          }
-        }
-      } catch (err) {}
-    }
-
-    if (!user) {
-      setErrorMsg('아이디 또는 비밀번호가 일치하지 않습니다. (초기 관리자: admin / admin)');
-      return;
-    }
-
-    if (user.status === 'pending') {
-      setErrorMsg('현재 관리자 승인 대기 중인 계정입니다.');
-      return;
-    }
-
-    saveStoreData.currentUser(user);
     try {
-      localStorage.setItem('schoolpad_last_login_id', user.username || user.email || '');
-    } catch (e) {}
-    // 로그인 후에는 관리자라도 관리페이지 대신 메인페이지로 자동 이동!
-    router.push('/');
+      const trimmedId = loginId.trim();
+      const trimmedPw = loginPw.trim();
+      const data = getStoreData();
+
+      let user = data.users.find(
+        (u) =>
+          ((u.username && u.username.toLowerCase() === trimmedId.toLowerCase()) ||
+            (u.email && u.email.toLowerCase() === trimmedId.toLowerCase())) &&
+          (u.password === trimmedPw || (!u.password && trimmedPw === 'admin'))
+      );
+
+      if (!user) {
+        // 다른 PC나 스마트폰에서 가입한 사용자인지 원격 클라우드 실시간 확인 (최대 0.5초 초고속 타임아웃)
+        try {
+          const remoteUsers = await Promise.race([
+            fetchRemoteUsers(),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 500)),
+          ]);
+          if (remoteUsers) {
+            user = remoteUsers.find(
+              (u) =>
+                ((u.username && u.username.toLowerCase() === trimmedId.toLowerCase()) ||
+                  (u.email && u.email.toLowerCase() === trimmedId.toLowerCase())) &&
+                (u.password === trimmedPw || (!u.password && trimmedPw === 'admin'))
+            );
+            if (user) {
+              const userMap = new Map<string, User>();
+              data.users.forEach((u) => userMap.set(u.id, u));
+              remoteUsers.forEach((u) => userMap.set(u.id, u));
+              saveStoreData.users(Array.from(userMap.values()));
+            }
+          }
+        } catch (err) {}
+      }
+
+      if (!user) {
+        setErrorMsg('아이디 또는 비밀번호가 일치하지 않습니다.');
+        return;
+      }
+
+      if (user.status === 'pending') {
+        setErrorMsg('현재 관리자 승인 대기 중인 계정입니다.');
+        return;
+      }
+
+      saveStoreData.currentUser(user);
+      try {
+        localStorage.setItem('schoolpad_last_login_id', user.username || user.email || '');
+      } catch (e) {}
+      // 로그인 후에는 메인페이지로 자동 이동!
+      router.push('/');
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   // 관리자 admin/admin 자동 입력 버튼 (편의성 극대화)
@@ -517,9 +533,10 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              {errorMsg && (
-                <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl font-medium border border-red-100">
-                  {errorMsg}
+              {errorMsg && activeTab !== 'login' && (
+                <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl font-bold border border-red-200 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                  <span>{errorMsg}</span>
                 </div>
               )}
 
@@ -533,9 +550,12 @@ export default function LoginPage() {
                     <input
                       type="text"
                       required
-                      placeholder="admin 또는 아이디 입력"
+                      placeholder="아이디 또는 이메일 입력"
                       value={loginId}
-                      onChange={(e) => setLoginId(e.target.value)}
+                      onChange={(e) => {
+                        setLoginId(e.target.value);
+                        if (errorMsg) setErrorMsg('');
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
@@ -547,16 +567,34 @@ export default function LoginPage() {
                       required
                       placeholder="비밀번호 입력"
                       value={loginPw}
-                      onChange={(e) => setLoginPw(e.target.value)}
+                      onChange={(e) => {
+                        setLoginPw(e.target.value);
+                        if (errorMsg) setErrorMsg('');
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
 
+                  {errorMsg && (
+                    <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl font-bold border border-red-200 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition active:scale-95"
+                    disabled={isLoggingIn}
+                    className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-2"
                   >
-                    로그인하기
+                    {isLoggingIn ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>로그인 확인 중...</span>
+                      </>
+                    ) : (
+                      <span>로그인하기</span>
+                    )}
                   </button>
 
                   <div className="relative pt-2">

@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Lock,
   Pencil,
+  Globe,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -33,6 +34,7 @@ import {
   saveRemoteUser,
   fetchRemoteSettings,
   saveRemoteSettings,
+  saveRemoteBoard,
 } from '@/lib/supabaseStore';
 
 export default function AdminPage() {
@@ -226,6 +228,13 @@ export default function AdminPage() {
     );
     saveStoreData.users(updated);
     setUsers(updated);
+
+    // 🌟 원격 클라우드 DB에도 변경된 비밀번호 즉시 영구 저장!
+    const changedUser = updated.find((u) => u.id === targetUserForPw.id);
+    if (changedUser) {
+      saveRemoteUser(changedUser).catch(() => {});
+    }
+
     showToast(`${targetUserForPw.name}님의 비밀번호가 변경되었습니다.`);
     setTargetUserForPw(null);
     setResetPwInput('');
@@ -320,6 +329,19 @@ export default function AdminPage() {
       setBoards(updated);
       showToast('보드가 삭제되었습니다.');
     }
+  };
+
+  // 🌟 관리자 개설 보드 공개 / 비공개 즉시 전환
+  const handleToggleBoardPublic = async (board: Board) => {
+    const newStatus = !(board.isPublic !== false);
+    const updatedBoard: Board = { ...board, isPublic: newStatus };
+    const updatedBoards = boards.map((b) => (b.id === board.id ? updatedBoard : b));
+    setBoards(updatedBoards);
+    saveStoreData.boards(updatedBoards);
+    if (isSupabaseConfigured) {
+      await saveRemoteBoard(updatedBoard).catch(() => {});
+    }
+    showToast(`'${board.title}' 보드가 '${newStatus ? '공개' : '비공개'}'(으)로 변경되었습니다.`);
   };
 
   const pendingUsers = users.filter((u) => u.status === 'pending');
@@ -764,11 +786,23 @@ export default function AdminPage() {
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200"
                 >
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-sm text-slate-800">{b.title}</span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono font-bold">
                         PIN: {b.code}
                       </span>
+                      {/* 🌟 공개 / 비공개 뱃지 */}
+                      {b.isPublic !== false ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1 border border-emerald-200">
+                          <Globe className="w-3 h-3 text-emerald-600" />
+                          <span>공개 보드</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center gap-1 border border-slate-300">
+                          <Lock className="w-3 h-3 text-slate-500" />
+                          <span>비공개</span>
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-slate-400 mt-1">
                       개설자: {b.authorName} · 개설일: {b.createdAt}
@@ -776,6 +810,30 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* 공개 / 비공개 즉시 전환 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleBoardPublic(b)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 shadow-2xs ${
+                        b.isPublic !== false
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border-slate-300'
+                      }`}
+                      title="클릭하여 공개/비공개 상태 전환"
+                    >
+                      {b.isPublic !== false ? (
+                        <>
+                          <Globe className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>공개 중</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5 text-slate-600" />
+                          <span>비공개</span>
+                        </>
+                      )}
+                    </button>
+
                     <Link
                       href={`/board/${b.id}`}
                       className="px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 text-xs font-bold transition"

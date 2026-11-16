@@ -525,8 +525,21 @@ export default function HomePage() {
       return matchesSearch && matchesCategory && isAuthor;
     }
     if (activeTab === 'template') {
-      // 추천 템플릿
-      return matchesSearch && matchesCategory && (b.category === '수업자료' || b.category === '모둠활동');
+      // 🌟 추천 템플릿 명확한 기준:
+      // 1. 개인 복제본([복제본] 또는 copiedFromTitle) 제외
+      // 2. 비공개 보드(isPublic === false) 제외
+      // 3. 학교/관리자 공식 인증 보드 및 수업/모둠 활동에 바로 복제해 쓸 수 있는 표준 템플릿 원본만 선별
+      const isCopy = b.title.includes('복제본') || Boolean(b.copiedFromTitle) || b.id.startsWith('board-copy-');
+      const isPublic = b.isPublic !== false;
+      const isOfficial =
+        b.id === 'board-useful-school-links' ||
+        b.id === 'board-entry-middle-school' ||
+        b.id === 'board-vibecoding' ||
+        b.id === 'board-1' ||
+        b.authorRole === 'admin' ||
+        b.authorName?.includes('관리자');
+
+      return matchesSearch && matchesCategory && !isCopy && isPublic && (isOfficial || b.category === '수업자료' || b.category === '모둠활동');
     }
     return matchesSearch && matchesCategory;
   });
@@ -971,7 +984,7 @@ export default function HomePage() {
                         </span>
                       )}
 
-                      {/* 공개 / 나만보기 상태 배지 */}
+                      {/* 공개 / 비공개 상태 배지 */}
                       {canEditBoard && (
                         <button
                           type="button"
@@ -981,7 +994,7 @@ export default function HomePage() {
                               ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
                               : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                           }`}
-                          title="클릭하여 학교 전체 공개 / 나만 보기 전환"
+                          title="클릭하여 학교 전체 공개 / 비공개 전환"
                         >
                           {board.isPublic !== false ? (
                             <>
@@ -991,7 +1004,7 @@ export default function HomePage() {
                           ) : (
                             <>
                               <Lock className="w-2.5 h-2.5 text-slate-500" />
-                              <span>나만</span>
+                              <span>비공개</span>
                             </>
                           )}
                         </button>
@@ -1251,7 +1264,7 @@ export default function HomePage() {
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500">
-                        수업 및 모둠 활동에 바로 활용할 수 있는 추천 템플릿입니다. [복제]를 눌러 내 수업에 활용해 보세요!
+                        💡 <strong>선정 기준:</strong> 학교/관리자가 공식 검증하고 모둠·교과 수업에 바로 복제해 활용할 수 있는 표준 원본 템플릿입니다. (개인 복제본은 제외됩니다)
                       </p>
                     </div>
                   </div>
