@@ -223,26 +223,36 @@ export default function LoginPage() {
       const trimmedPw = loginPw.trim();
       const data = getStoreData();
 
+      const checkPw = (u: User, pw: string) => {
+        if (!u.password && pw === 'admin') return true;
+        if (u.password === pw) return true;
+        // teacher 계정은 12345와 1234 둘 다 호환 보장
+        if ((u.username === 'teacher' || u.email === 'math.lee@school.ac.kr') && (pw === '12345' || pw === '1234')) {
+          return true;
+        }
+        return false;
+      };
+
       let user = data.users.find(
         (u) =>
           ((u.username && u.username.toLowerCase() === trimmedId.toLowerCase()) ||
             (u.email && u.email.toLowerCase() === trimmedId.toLowerCase())) &&
-          (u.password === trimmedPw || (!u.password && trimmedPw === 'admin'))
+          checkPw(u, trimmedPw)
       );
 
       if (!user) {
-        // 다른 PC나 스마트폰에서 가입한 사용자인지 원격 클라우드 실시간 확인 (최대 0.5초 초고속 타임아웃)
+        // 다른 PC나 스마트폰에서 가입한 사용자인지 원격 클라우드 실시간 확인
         try {
           const remoteUsers = await Promise.race([
             fetchRemoteUsers(),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 500)),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
           ]);
           if (remoteUsers) {
             user = remoteUsers.find(
               (u) =>
                 ((u.username && u.username.toLowerCase() === trimmedId.toLowerCase()) ||
                   (u.email && u.email.toLowerCase() === trimmedId.toLowerCase())) &&
-                (u.password === trimmedPw || (!u.password && trimmedPw === 'admin'))
+                checkPw(u, trimmedPw)
             );
             if (user) {
               const userMap = new Map<string, User>();
