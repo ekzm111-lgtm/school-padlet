@@ -60,6 +60,106 @@ export default function HomePage() {
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [dismissedNoticeId, setDismissedNoticeId] = useState<string | null>(null);
 
+  // 🎛️ 메인 페이지 보드 카드 크기 유동 조절 상태: 'auto'(개수에 따라 유동 조절) | 'large'(크게) | 'medium'(보통) | 'compact'(작게)
+  const [cardDensity, setCardDensity] = useState<'auto' | 'large' | 'medium' | 'compact'>('auto');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('schoolpad_card_density');
+        if (saved && ['auto', 'large', 'medium', 'compact'].includes(saved)) {
+          setCardDensity(saved as any);
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  const handleChangeCardDensity = (density: 'auto' | 'large' | 'medium' | 'compact') => {
+    setCardDensity(density);
+    try {
+      localStorage.setItem('schoolpad_card_density', density);
+    } catch (e) {}
+  };
+
+  // 🔥 보드 개수에 따른 반응형 유동 사이즈 & 리미트 계산 헬퍼
+  const getDynamicGridConfig = (count: number) => {
+    if (cardDensity === 'large') {
+      return {
+        gridClass: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4',
+        thumbHeight: 'h-32 sm:h-36',
+        padding: 'p-4 sm:p-4.5',
+        titleSize: 'text-sm sm:text-base font-black',
+        descLineClamp: 'line-clamp-2',
+      };
+    }
+    if (cardDensity === 'medium') {
+      return {
+        gridClass: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3.5',
+        thumbHeight: 'h-24 sm:h-28',
+        padding: 'p-3.5',
+        titleSize: 'text-xs sm:text-sm font-black',
+        descLineClamp: 'line-clamp-1',
+      };
+    }
+    if (cardDensity === 'compact') {
+      return {
+        gridClass: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5',
+        thumbHeight: 'h-18 sm:h-20',
+        padding: 'p-2.5 sm:p-3',
+        titleSize: 'text-xs font-bold',
+        descLineClamp: 'line-clamp-1',
+      };
+    }
+
+    // cardDensity === 'auto': 카드 개수에 맞춰 자동으로 최적화 (적으면 키우고, 많으면 줄이되 리미트 적용)
+    if (count <= 2) {
+      return {
+        gridClass: 'grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl',
+        thumbHeight: 'h-32 sm:h-36',
+        padding: 'p-4 sm:p-5',
+        titleSize: 'text-sm sm:text-base font-black',
+        descLineClamp: 'line-clamp-2',
+      };
+    }
+    if (count <= 4) {
+      return {
+        gridClass: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 max-w-5xl',
+        thumbHeight: 'h-28 sm:h-32',
+        padding: 'p-3.5 sm:p-4',
+        titleSize: 'text-xs sm:text-sm font-black',
+        descLineClamp: 'line-clamp-2',
+      };
+    }
+    if (count <= 8) {
+      // 5~8개: 4열 리미트 (8개일 때 4개씩 2줄로 빈틈없는 대칭 균형)
+      return {
+        gridClass: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3.5',
+        thumbHeight: 'h-24 sm:h-28',
+        padding: 'p-3.5',
+        titleSize: 'text-xs sm:text-sm font-black',
+        descLineClamp: 'line-clamp-1',
+      };
+    }
+    if (count <= 14) {
+      // 9~14개: 5열 리미트
+      return {
+        gridClass: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3',
+        thumbHeight: 'h-20 sm:h-24',
+        padding: 'p-3',
+        titleSize: 'text-xs font-black',
+        descLineClamp: 'line-clamp-1',
+      };
+    }
+    // 15개 이상으로 매우 많을 때: 콤팩트 6열 리미트 (7열 이상 억지 축소 방지)
+    return {
+      gridClass: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5',
+      thumbHeight: 'h-18 sm:h-20',
+      padding: 'p-2.5 sm:p-3',
+      titleSize: 'text-xs font-bold',
+      descLineClamp: 'line-clamp-1',
+    };
+  };
+
   // 탭: 'all'(전체 섹터 분리 보기) / 'my'(내가 만든 자료) / 'public'(다른 사람이 공유한 자료) / 'template'(추천 템플릿)
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'public' | 'template'>('all');
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
@@ -622,21 +722,69 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 카테고리 필터 뱃지들 */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-4 text-xs font-bold">
-          {['전체', '수업자료', '모둠활동', '학급회의', '자유나눔', '프로젝트'].map((cat) => (
+        {/* 카테고리 필터 뱃지 & 카드 크기 유동 조절 버튼 */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 text-xs font-bold">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {['전체', '수업자료', '모둠활동', '학급회의', '자유나눔', '프로젝트'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3.5 py-1.5 rounded-full transition shrink-0 ${
+                  selectedCategory === cat
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-400'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* 카드 크기 유동 조절 버튼 그룹 (스마트 자동 / 크게 / 보통 / 작게) */}
+          <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl text-[11px] font-bold text-slate-600 shrink-0 ml-auto">
+            <span className="px-1 text-slate-400 text-[10px] hidden sm:inline">카드 크기:</span>
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-full transition shrink-0 ${
-                selectedCategory === cat
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-400'
+              onClick={() => handleChangeCardDensity('auto')}
+              className={`px-2.5 py-1 rounded-lg transition ${
+                cardDensity === 'auto'
+                  ? 'bg-white text-blue-700 font-black shadow-2xs'
+                  : 'hover:text-slate-900'
+              }`}
+              title="보드 개수에 맞춰 크기와 열 수를 유동적으로 자동 조절 (스마트 리미트)"
+            >
+              자동 (유동)
+            </button>
+            <button
+              onClick={() => handleChangeCardDensity('large')}
+              className={`px-2 py-1 rounded-lg transition ${
+                cardDensity === 'large'
+                  ? 'bg-white text-blue-700 font-black shadow-2xs'
+                  : 'hover:text-slate-900'
               }`}
             >
-              {cat}
+              크게
             </button>
-          ))}
+            <button
+              onClick={() => handleChangeCardDensity('medium')}
+              className={`px-2 py-1 rounded-lg transition ${
+                cardDensity === 'medium'
+                  ? 'bg-white text-blue-700 font-black shadow-2xs'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              보통
+            </button>
+            <button
+              onClick={() => handleChangeCardDensity('compact')}
+              className={`px-2 py-1 rounded-lg transition ${
+                cardDensity === 'compact'
+                  ? 'bg-white text-blue-700 font-black shadow-2xs'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              작게
+            </button>
+          </div>
         </div>
 
         {/* 보드 카드 그리드 & 섹터 분리 (내가 만든 자료 vs 다른 사람 자료) */}
@@ -658,6 +806,7 @@ export default function HomePage() {
 
           // 개별 보드 카드 렌더러 (순서 이동 버튼 & 드래그 앤 드롭 내장)
           const renderBoardCard = (board: Board, idx: number, list: Board[]) => {
+            const cfg = getDynamicGridConfig(list.length);
             const themeStyles = {
               blue: 'from-blue-50 to-indigo-50/70 border-blue-200/80',
               cork: 'from-amber-50 to-orange-50/70 border-amber-200/80',
@@ -699,7 +848,7 @@ export default function HomePage() {
                   setDragOverBoardId(null);
                 }}
                 onClick={() => router.push(`/board/${board.id}`)}
-                className={`group relative rounded-2xl p-3 sm:p-3.5 border transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer bg-gradient-to-br flex flex-col justify-between select-none ${
+                className={`group relative rounded-2xl ${cfg.padding} border transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer bg-gradient-to-br flex flex-col justify-between select-none ${
                   themeStyles[board.theme] || 'from-white to-slate-50 border-slate-200'
                 } ${isDragging ? 'opacity-40 scale-95' : 'opacity-100'} ${
                   isDragOver ? 'ring-2 ring-blue-500 ring-offset-2 scale-[1.02] shadow-lg' : ''
@@ -794,7 +943,7 @@ export default function HomePage() {
 
                   {/* 메인 화면 보드 카드 대표 썸네일 이미지 */}
                   {(board.coverImageUrl || board.customBgUrl) && (
-                    <div className="relative w-full h-20 sm:h-22 rounded-xl overflow-hidden mb-2 border border-black/5 shadow-2xs bg-slate-100">
+                    <div className={`relative w-full ${cfg.thumbHeight} rounded-xl overflow-hidden mb-2 border border-black/5 shadow-2xs bg-slate-100`}>
                       <img
                         src={board.coverImageUrl || board.customBgUrl}
                         alt={board.title}
@@ -804,7 +953,7 @@ export default function HomePage() {
                   )}
 
                   <h3
-                    className={`text-xs sm:text-sm font-black line-clamp-1 leading-snug group-hover:text-blue-600 transition ${
+                    className={`${cfg.titleSize} line-clamp-1 leading-snug group-hover:text-blue-600 transition ${
                       isBlackboard ? 'text-white' : 'text-slate-900'
                     }`}
                   >
@@ -812,7 +961,7 @@ export default function HomePage() {
                   </h3>
 
                   <p
-                    className={`mt-0.5 text-[10px] sm:text-[11px] line-clamp-1 leading-relaxed ${
+                    className={`mt-0.5 text-[10px] sm:text-[11px] ${cfg.descLineClamp} leading-relaxed ${
                       isBlackboard ? 'text-emerald-200/80' : 'text-slate-500'
                     }`}
                   >
@@ -951,7 +1100,7 @@ export default function HomePage() {
                     <p className="text-xs text-slate-400 mt-1">[+ 새 보드 만들기] 또는 다른 사람의 보드를 [복제]해 보세요!</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                  <div className={getDynamicGridConfig(myBoards.length).gridClass}>
                     {myBoards.map((b, idx) => renderBoardCard(b, idx, myBoards))}
                   </div>
                 )}
@@ -988,7 +1137,7 @@ export default function HomePage() {
                     <p className="text-sm font-bold text-slate-700">공유된 다른 사람의 보드가 없습니다.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                  <div className={getDynamicGridConfig(sharedBoards.length).gridClass}>
                     {sharedBoards.map((b, idx) => renderBoardCard(b, idx, sharedBoards))}
                   </div>
                 )}
@@ -1020,7 +1169,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                <div className={getDynamicGridConfig(templateBoards.length).gridClass}>
                   {templateBoards.map((b, idx) => renderBoardCard(b, idx, templateBoards))}
                 </div>
               </section>
@@ -1070,7 +1219,7 @@ export default function HomePage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                  <div className={getDynamicGridConfig(myBoards.length).gridClass}>
                     {myBoards.map((b, idx) => renderBoardCard(b, idx, myBoards))}
                   </div>
                 )}
@@ -1105,7 +1254,7 @@ export default function HomePage() {
                     <p className="text-xs sm:text-sm font-bold text-slate-700">공유된 다른 자료가 없습니다.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                  <div className={getDynamicGridConfig(sharedBoards.length).gridClass}>
                     {sharedBoards.map((b, idx) => renderBoardCard(b, idx, sharedBoards))}
                   </div>
                 )}

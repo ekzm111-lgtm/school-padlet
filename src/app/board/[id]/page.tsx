@@ -116,6 +116,32 @@ export default function BoardDetailPage() {
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // 📋 다른 보드에서 복사해 온 모둠 클립보드 복원 (보드 간 이동 시 100% 영구 복원)
+  useEffect(() => {
+    const restoreCopiedColumn = () => {
+      if (typeof window === 'undefined') return;
+      try {
+        const saved = localStorage.getItem('schoolpad_copied_column');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.columnName && Array.isArray(parsed.posts)) {
+            setCopiedColumn(parsed);
+          } else {
+            setCopiedColumn(null);
+          }
+        } else {
+          setCopiedColumn(null);
+        }
+      } catch (e) {
+        setCopiedColumn(null);
+      }
+    };
+
+    restoreCopiedColumn();
+    window.addEventListener('storage', restoreCopiedColumn);
+    return () => window.removeEventListener('storage', restoreCopiedColumn);
+  }, [boardId]);
+
   // 그리드 드래그 앤 드롭 순서 변경
   const dragItemIdx = useRef<number | null>(null);
   const dragOverItemIdx = useRef<number | null>(null);
@@ -2419,9 +2445,24 @@ export default function BoardDetailPage() {
                       <ClipboardPaste className="w-4 h-4 text-indigo-600 shrink-0" />
                       <span className="truncate">복사된 모둠 대기 중</span>
                     </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold shrink-0">
-                      {copiedColumn.posts.length}개 카드
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold">
+                        {copiedColumn.posts.length}개 카드
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            localStorage.removeItem('schoolpad_copied_column');
+                          } catch (e) {}
+                          setCopiedColumn(null);
+                        }}
+                        className="p-1 hover:bg-indigo-200/50 rounded-lg text-slate-400 hover:text-slate-700 transition"
+                        title="클립보드 비우기"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <div className="text-xs font-bold text-slate-800 truncate" title={copiedColumn.columnName}>
                     '{copiedColumn.columnName}'
