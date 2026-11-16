@@ -44,7 +44,7 @@ const INITIAL_USERS: User[] = [
   {
     id: 'user-teacher-1',
     username: 'teacher',
-    password: '12345',
+    password: '1234',
     name: '이수학 선생님',
     email: 'math.lee@school.ac.kr',
     role: 'teacher',
@@ -728,15 +728,6 @@ export const getStoreData = (): StoreData => {
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
       } catch (e) {}
     }
-  }
-
-  // 🌟 teacher 계정의 비밀번호를 12345로 최신화 보장
-  const teacherUser = usersList.find((u) => u.username === 'teacher' || u.email === 'math.lee@school.ac.kr');
-  if (teacherUser && (!teacherUser.password || teacherUser.password === '1234')) {
-    teacherUser.password = '12345';
-    try {
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
-    } catch (e) {}
   }
 
   let parsedUser: User | null = storedCurrentUser ? JSON.parse(storedCurrentUser) : null;

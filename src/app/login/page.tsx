@@ -212,7 +212,7 @@ export default function LoginPage() {
     }
   };
 
-  // 1) 아이디/비밀번호 로그인 처리
+  // 1) 아이디/비밀번호 로그인 처리 (원격 DB 실시간 직접 조회 및 엄격 검증)
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -221,64 +221,60 @@ export default function LoginPage() {
     try {
       const trimmedId = loginId.trim();
       const trimmedPw = loginPw.trim();
-      const data = getStoreData();
 
-      const checkPw = (u: User, pw: string) => {
-        if (!u.password && pw === 'admin') return true;
-        if (u.password === pw) return true;
-        // teacher 계정은 12345와 1234 둘 다 호환 보장
-        if ((u.username === 'teacher' || u.email === 'math.lee@school.ac.kr') && (pw === '12345' || pw === '1234')) {
-          return true;
-        }
-        return false;
-      };
-
-      let user = data.users.find(
-        (u) =>
-          ((u.username && u.username.toLowerCase() === trimmedId.toLowerCase()) ||
-            (u.email && u.email.toLowerCase() === trimmedId.toLowerCase())) &&
-          checkPw(u, trimmedPw)
-      );
-
-      if (!user) {
-        // 다른 PC나 스마트폰에서 가입한 사용자인지 원격 클라우드 실시간 확인
-        try {
-          const remoteUsers = await Promise.race([
-            fetchRemoteUsers(),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
-          ]);
-          if (remoteUsers) {
-            user = remoteUsers.find(
-              (u) =>
-                ((u.username && u.username.toLowerCase() === trimmedId.toLowerCase()) ||
-                  (u.email && u.email.toLowerCase() === trimmedId.toLowerCase())) &&
-                checkPw(u, trimmedPw)
-            );
-            if (user) {
-              const userMap = new Map<string, User>();
-              data.users.forEach((u) => userMap.set(u.id, u));
-              remoteUsers.forEach((u) => userMap.set(u.id, u));
-              saveStoreData.users(Array.from(userMap.values()));
-            }
-          }
-        } catch (err) {}
+      // 🌟 1순위: 클라우드 원격 DB(Supabase)에서 실시간 최신 사용자 목록을 직접 읽어옴!
+      let remoteUsers: User[] | null = null;
+      try {
+        remoteUsers = await Promise.race([
+          fetchRemoteUsers(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+        ]);
+      } catch (err) {
+        console.warn('Remote user fetch error during login:', err);
       }
 
-      if (!user) {
+      // 원격 DB에서 읽어온 사용자 목록을 단일 진실 원천(Single Source of Truth)으로 사용
+      let userListToVerify: User[] = [];
+      if (remoteUsers && remoteUsers.length > 0) {
+        userListToVerify = remoteUsers;
+        // 로컬 스토어 캐시도 DB의 최신 데이터로 동기화
+        const userMap = new Map<string, User>();
+        getStoreData().users.forEach((u) => userMap.set(u.id, u));
+        remoteUsers.forEach((u) => userMap.set(u.id, u));
+        saveStoreData.users(Array.from(userMap.values()));
+      } else {
+        // 네트워크 오프라인 시 로컬 캐시 폴백
+        userListToVerify = getStoreData().users;
+      }
+
+      // 🌟 2단계: DB에 저장된 아이디/이메일과 비밀번호를 1:1 엄격하게 정확히 대조!
+      const matchedUser = userListToVerify.find(
+        (u) =>
+          (u.username && u.username.toLowerCase() === trimmedId.toLowerCase()) ||
+          (u.email && u.email.toLowerCase() === trimmedId.toLowerCase())
+      );
+
+      // 계정이 없거나 DB 비밀번호와 다를 때
+      if (!matchedUser || matchedUser.password !== trimmedPw) {
         setErrorMsg('아이디 또는 비밀번호가 일치하지 않습니다.');
         return;
       }
 
-      if (user.status === 'pending') {
+      if (matchedUser.status === 'pending') {
         setErrorMsg('현재 관리자 승인 대기 중인 계정입니다.');
         return;
       }
 
-      saveStoreData.currentUser(user);
+      if (matchedUser.status === 'rejected') {
+        setErrorMsg('관리자에 의해 이용이 제한된 계정입니다.');
+        return;
+      }
+
+      // 🌟 3단계: DB 비밀번호와 정확히 일치할 때만 로그인 세션 발급 및 이동
+      saveStoreData.currentUser(matchedUser);
       try {
-        localStorage.setItem('schoolpad_last_login_id', user.username || user.email || '');
+        localStorage.setItem('schoolpad_last_login_id', matchedUser.username || matchedUser.email || '');
       } catch (e) {}
-      // 로그인 후에는 메인페이지로 자동 이동!
       router.push('/');
     } finally {
       setIsLoggingIn(false);
