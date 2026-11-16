@@ -138,6 +138,8 @@ export default function EditBoardModal({
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, [isOpen]);
 
+  if (!isOpen) return null;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {

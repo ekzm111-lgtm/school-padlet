@@ -70,8 +70,6 @@ export default function CreateBoardModal({
   const [allowComments, setAllowComments] = useState(true);
   const [allowReactions, setAllowReactions] = useState(true);
 
-  if (!isOpen) return null;
-
   // 이미지 파일 처리 (10MB 제한 및 Base64 인코딩)
   const processImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -117,6 +115,8 @@ export default function CreateBoardModal({
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

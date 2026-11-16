@@ -91,8 +91,6 @@ export default function BackgroundModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pasteNotice, setPasteNotice] = useState(false);
 
-  if (!isOpen) return null;
-
   // 프리셋 선택
   const handleSelectPreset = (preset: typeof PRESET_BACKGROUNDS[0]) => {
     let updated: Board;

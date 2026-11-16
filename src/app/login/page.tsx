@@ -60,7 +60,22 @@ export default function LoginPage() {
   const [savedName, setSavedName] = useState('');
 
   useEffect(() => {
-    setSettings(getStoreData().settings);
+    const currentStore = getStoreData();
+    setSettings(currentStore.settings);
+
+    // 🌟 1. 이미 로그인된 기록(세션)이 있으면 로그인창에 머물지 않고 메인페이지로 자동 입장!
+    if (currentStore.currentUser) {
+      router.push('/');
+      return;
+    }
+
+    // 🌟 2. 기존 로그인 기록이 있으면 아이디 자동 불러오기
+    if (typeof window !== 'undefined') {
+      const savedLoginId = localStorage.getItem('schoolpad_last_login_id');
+      if (savedLoginId) {
+        setLoginId(savedLoginId);
+      }
+    }
     if (typeof window !== 'undefined') {
       const g = localStorage.getItem('schoolpad_last_gmail') || 'ekzm11133@gmail.com';
       const n = localStorage.getItem('schoolpad_last_name') || 'minwan1 kim';
@@ -238,11 +253,11 @@ export default function LoginPage() {
     }
 
     saveStoreData.currentUser(user);
-    if (user.role === 'admin') {
-      router.push('/admin');
-    } else {
-      router.push('/');
-    }
+    try {
+      localStorage.setItem('schoolpad_last_login_id', user.username || user.email || '');
+    } catch (e) {}
+    // 로그인 후에는 관리자라도 관리페이지 대신 메인페이지로 자동 이동!
+    router.push('/');
   };
 
   // 관리자 admin/admin 자동 입력 버튼 (편의성 극대화)
@@ -298,7 +313,7 @@ export default function LoginPage() {
         return;
       }
       saveStoreData.currentUser(existing);
-      router.push(existing.role === 'admin' ? '/admin' : '/');
+      router.push('/');
       return;
     }
 
@@ -322,7 +337,7 @@ export default function LoginPage() {
     if (isAutoApprove) {
       saveStoreData.currentUser(newUser);
       alert(`🎉 [Gmail 자동 가입 완료] ${finalName}님 환영합니다!`);
-      router.push(finalRole === 'admin' ? '/admin' : '/');
+      router.push('/');
     } else {
       setShowGoogleModal(false);
       setPendingMessage(true);
@@ -482,25 +497,7 @@ export default function LoginPage() {
               {/* [탭 1] 로그인 */}
               {activeTab === 'login' && (
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
-                  {/* 관리자 원클릭 자동완성 편의 배너 */}
-                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between">
-                    <div>
-                      <div className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
-                        <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-                        <span>초기 관리자 계정</span>
-                      </div>
-                      <div className="text-[10px] text-amber-700 mt-0.5">
-                        아이디: <code className="font-bold">admin</code> / 비번: <code className="font-bold">admin</code>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleQuickAdmin}
-                      className="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-900 text-[11px] font-bold transition shadow-xs"
-                    >
-                      자동 채우기
-                    </button>
-                  </div>
+
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">아이디 또는 이메일</label>
