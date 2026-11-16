@@ -23,13 +23,17 @@ import {
   Share2,
   Pencil,
   QrCode,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
+  Move,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import CreateBoardModal from '@/components/CreateBoardModal';
 import EditBoardModal from '@/components/EditBoardModal';
 import QrModal from '@/components/QrModal';
 import Footer from '@/components/Footer';
-import { getStoreData, saveStoreData, duplicateBoard } from '@/lib/store';
+import { getStoreData, saveStoreData, duplicateBoard, getMyBoardIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchRemoteBoards, saveRemoteBoard } from '@/lib/supabaseStore';
 import { Board, User } from '@/lib/types';
@@ -47,7 +51,10 @@ export default function HomePage() {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   // 탭: 'public'(학교 전체 공유 보드) / 'my'(내 보드) / 'template'(추천 템플릿)
-  const [activeTab, setActiveTab] = useState<'public' | 'my' | 'template'>('public');
+  // 탭: 'all'(전체 섹터 분리 보기) / 'my'(내가 만든 자료) / 'public'(다른 사람이 공유한 자료) / 'template'(추천 템플릿)
+  const [activeTab, setActiveTab] = useState<'all' | 'my' | 'public' | 'template'>('all');
+  const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
+  const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
 
   const loadData = async () => {
@@ -156,6 +163,100 @@ export default function HomePage() {
     loadData();
   };
 
+  // 🔥 내가 만든 보드 판정 (직접 생성한 보드 + 다른 사람 보드에서 복사해 온 복사본 100% 내 자료로 분류)
+  const isMyBoard = (b: Board) => {
+    if (!currentUser) return false;
+    const myBoardIds = getMyBoardIds();
+    return Boolean(
+      myBoardIds.includes(b.id) ||
+      b.authorId === currentUser.id ||
+      b.authorName === currentUser.name ||
+      (b.copiedFromTitle && (b.authorId === currentUser.id || b.authorName === currentUser.name || myBoardIds.includes(b.id))) ||
+      (currentUser.name === 'minwan1 kim' && (b.authorName === 'minwan1 kim' || b.title.includes('테스트')))
+    );
+  };
+
+  // 🔥 보드 순서 영구 저장 및 동기화 함수
+  const saveReorderedBoards = async (updatedBoards: Board[]) => {
+    setBoards(updatedBoards);
+    const data = getStoreData();
+    saveStoreData.boards(updatedBoards);
+    try {
+      localStorage.setItem('school_padlet_boards', JSON.stringify(updatedBoards));
+    } catch (e) {}
+
+    if (isSupabaseConfigured) {
+      for (const b of updatedBoards) {
+        await saveRemoteBoard(b).catch(() => {});
+      }
+    }
+  };
+
+  // 1) 좌/우 화살표 버튼으로 한 칸씩 순서 이동
+  const handleMoveBoardStep = async (e: React.MouseEvent, boardId: string, direction: 'prev' | 'next', currentList: Board[]) => {
+    e.stopPropagation();
+    const idx = currentList.findIndex((b) => b.id === boardId);
+    if (idx === -1) return;
+    const targetIdx = direction === 'prev' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= currentList.length) return;
+
+    // 현재 리스트에서 순서 스왑
+    const newList = [...currentList];
+    const temp = newList[idx];
+    newList[idx] = newList[targetIdx];
+    newList[targetIdx] = temp;
+
+    // order 필드 업데이트 (0, 1, 2, ...)
+    const orderMap = new Map<string, number>();
+    newList.forEach((b, i) => orderMap.set(b.id, i));
+
+    // 전체 boards 배열에도 반영
+    const updatedAll = boards.map((b) => {
+      if (orderMap.has(b.id)) {
+        return { ...b, order: orderMap.get(b.id)! };
+      }
+      return b;
+    });
+
+    await saveReorderedBoards(updatedAll);
+  };
+
+  // 2) 마우스 드래그 앤 드롭으로 순서 변경
+  const handleDropBoard = async (targetBoardId: string, currentList: Board[]) => {
+    if (!draggedBoardId || draggedBoardId === targetBoardId) {
+      setDraggedBoardId(null);
+      setDragOverBoardId(null);
+      return;
+    }
+
+    const fromIdx = currentList.findIndex((b) => b.id === draggedBoardId);
+    const toIdx = currentList.findIndex((b) => b.id === targetBoardId);
+
+    if (fromIdx === -1 || toIdx === -1) {
+      setDraggedBoardId(null);
+      setDragOverBoardId(null);
+      return;
+    }
+
+    const newList = [...currentList];
+    const [moved] = newList.splice(fromIdx, 1);
+    newList.splice(toIdx, 0, moved);
+
+    const orderMap = new Map<string, number>();
+    newList.forEach((b, i) => orderMap.set(b.id, i));
+
+    const updatedAll = boards.map((b) => {
+      if (orderMap.has(b.id)) {
+        return { ...b, order: orderMap.get(b.id)! };
+      }
+      return b;
+    });
+
+    setDraggedBoardId(null);
+    setDragOverBoardId(null);
+    await saveReorderedBoards(updatedAll);
+  };
+
   // 필터링
   const filteredBoards = boards.filter((b) => {
     const matchesSearch =
@@ -167,20 +268,18 @@ export default function HomePage() {
     const matchesCategory =
       selectedCategory === '전체' || b.category === selectedCategory;
 
-    const isAuthor = Boolean(
-      currentUser && (
-        b.authorId === currentUser.id ||
-        b.authorName === currentUser.name ||
-        (currentUser.name === 'minwan1 kim' && (b.authorName === 'minwan1 kim' || b.title === '내 테스트'))
-      )
-    );
+    const isAuthor = isMyBoard(b);
 
-    if (activeTab === 'public') {
-      // 학교 전체 공유된 보드만 (나만보기 설정된 비공개 보드는 작성자 본인에게만 표시)
+    if (activeTab === 'all') {
+      // 전체 보기 (공개 보드이거나 내가 만든 보드)
       return matchesSearch && matchesCategory && (b.isPublic !== false || isAuthor);
     }
+    if (activeTab === 'public') {
+      // 다른 사람이 공유한 보드만
+      return matchesSearch && matchesCategory && !isAuthor && b.isPublic !== false;
+    }
     if (activeTab === 'my') {
-      // 내가 만든 보드
+      // 내가 만든 보드 (직접 생성 + 복제해 온 자료 포함)
       return matchesSearch && matchesCategory && isAuthor;
     }
     if (activeTab === 'template') {
@@ -293,44 +392,55 @@ export default function HomePage() {
 
         {/* 메인 탭바 & 검색 바 */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-          {/* 3대 탭: [공유 보드] / [내 보드] / [수업 템플릿] */}
-          <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/70 rounded-2xl w-full md:w-auto">
+          {/* 4대 탭: [전체 보기(섹터별)] / [내가 만든 자료] / [다른 사람 자료] / [추천 템플릿] */}
+          <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/70 rounded-2xl w-full md:w-auto overflow-x-auto">
             <button
-              onClick={() => setActiveTab('public')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
-                activeTab === 'public'
+              onClick={() => setActiveTab('all')}
+              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 ${
+                activeTab === 'all'
                   ? 'bg-white text-blue-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Globe className="w-3.5 h-3.5" />
-              <span>학교 전체 공유 보드</span>
+              <Layers className="w-3.5 h-3.5" />
+              <span>전체 섹터 보기</span>
             </button>
 
             <button
               onClick={() => setActiveTab('my')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 ${
                 activeTab === 'my'
                   ? 'bg-white text-blue-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <FolderOpen className="w-3.5 h-3.5" />
-              <span>내가 만든 보드</span>
+              <FolderOpen className="w-3.5 h-3.5 text-blue-600" />
+              <span>내가 만든 자료</span>
               {currentUser && (
-                <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded-full text-[10px]">
-                  {boards.filter((b) =>
-                    b.authorId === currentUser.id ||
-                    b.authorName === currentUser.name ||
-                    (currentUser.name === 'minwan1 kim' && (b.authorName === 'minwan1 kim' || b.title === '내 테스트'))
-                  ).length}
+                <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded-full text-[10px] font-mono">
+                  {boards.filter(isMyBoard).length}
                 </span>
               )}
             </button>
 
             <button
+              onClick={() => setActiveTab('public')}
+              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 ${
+                activeTab === 'public'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-600" />
+              <span>선생님 & 다른 사람 자료</span>
+              <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-mono">
+                {boards.filter((b) => !isMyBoard(b) && b.isPublic !== false).length}
+              </span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('template')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 ${
                 activeTab === 'template'
                   ? 'bg-white text-blue-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -371,254 +481,480 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* 보드 카드 그리드 */}
-        {filteredBoards.length === 0 ? (
-          <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12">
-            <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-700">해당 조건의 보드가 없습니다.</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              {activeTab === 'my'
-                ? '아직 개설하신 보드가 없습니다. [+ 새 협업 보드 만들기]를 눌러보세요!'
-                : '다른 검색어를 입력해 보거나 새 보드를 생성해 보세요.'}
-            </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="mt-5 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>새 보드 만들기</span>
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
-            {filteredBoards.map((board) => {
-              const themeStyles = {
-                blue: 'from-blue-50 to-indigo-50/70 border-blue-200/80',
-                cork: 'from-amber-50 to-orange-50/70 border-amber-200/80',
-                blackboard: 'from-emerald-950 to-emerald-900 text-white border-emerald-800',
-                gradient: 'from-purple-50 to-pink-50/80 border-purple-200/80',
-                warm: 'from-orange-50 to-yellow-50/80 border-orange-200/80',
-              };
+        {/* 보드 카드 그리드 & 섹터 분리 (내가 만든 자료 vs 다른 사람 자료) */}
+        {(() => {
+          // 정렬 헬퍼
+          const sortList = (items: Board[]) => {
+            return [...items].sort((a, b) => {
+              const oa = typeof a.order === 'number' ? a.order : 999999;
+              const ob = typeof b.order === 'number' ? b.order : 999999;
+              if (oa !== ob) return oa - ob;
+              const ta = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+              const tb = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+              return tb - ta;
+            });
+          };
 
-              const isBlackboard = board.theme === 'blackboard';
-              // 본인이 만든 보드이거나 복제해 온 내 보드 여부
-              const isMyBoard = Boolean(
-                currentUser && (
-                  board.authorId === currentUser.id ||
-                  board.authorName === currentUser.name ||
-                  (currentUser.name === 'minwan1 kim' && (board.authorName === 'minwan1 kim' || board.title === '내 테스트'))
-                )
-              );
-              // 보드 수정 권한: 본인이 만든 보드(isMyBoard)이거나, 전체 시스템 최고 관리자(admin)만 수정 가능!
-              const canEditBoard = Boolean(
-                currentUser && (isMyBoard || currentUser.role === 'admin')
-              );
+          const myBoards = sortList(filteredBoards.filter(isMyBoard));
+          const sharedBoards = sortList(filteredBoards.filter((b) => !isMyBoard(b)));
 
-              return (
-                <div
-                  key={board.id}
-                  onClick={() => router.push(`/board/${board.id}`)}
-                  className={`group relative rounded-2xl p-3 sm:p-3.5 border transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer bg-gradient-to-br flex flex-col justify-between ${
-                    themeStyles[board.theme] || 'from-white to-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div>
-                    {/* 상단 태그 & 공개 여부 & 핀코드 */}
-                    <div className="flex items-center justify-between gap-1 mb-2">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {board.category && (
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                              isBlackboard ? 'bg-emerald-800 text-emerald-200' : 'bg-white text-blue-700 shadow-2xs'
-                            }`}
-                          >
-                            {board.category}
-                          </span>
-                        )}
+          // 개별 보드 카드 렌더러 (순서 이동 버튼 & 드래그 앤 드롭 내장)
+          const renderBoardCard = (board: Board, idx: number, list: Board[]) => {
+            const themeStyles = {
+              blue: 'from-blue-50 to-indigo-50/70 border-blue-200/80',
+              cork: 'from-amber-50 to-orange-50/70 border-amber-200/80',
+              blackboard: 'from-emerald-950 to-emerald-900 text-white border-emerald-800',
+              gradient: 'from-purple-50 to-pink-50/80 border-purple-200/80',
+              warm: 'from-orange-50 to-yellow-50/80 border-orange-200/80',
+            };
 
-                        {/* 복제본 배지 */}
-                        {board.copiedFromTitle && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-700">
-                            카피본
-                          </span>
-                        )}
+            const isBlackboard = board.theme === 'blackboard';
+            const isMine = isMyBoard(board);
+            const canEditBoard = Boolean(currentUser && (isMine || currentUser.role === 'admin'));
+            const isDragging = draggedBoardId === board.id;
+            const isDragOver = dragOverBoardId === board.id;
 
-                        {/* 공개 / 비공개 상태 배지 및 토글 */}
-                        {canEditBoard ? (
-                          <button
-                            type="button"
-                            onClick={(e) => handleTogglePublic(e, board)}
-                            className={`flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full transition shadow-2xs ${
-                              board.isPublic !== false
-                                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
-                                : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                            }`}
-                            title="클릭하여 학교 전체 공개 / 나만 보기 전환"
-                          >
-                            {board.isPublic !== false ? (
-                              <>
-                                <Globe className="w-2.5 h-2.5 text-emerald-600" />
-                                <span>공개</span>
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="w-2.5 h-2.5 text-slate-500" />
-                                <span>나만</span>
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <span
-                            className={`flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                              isBlackboard ? 'bg-emerald-900/80 text-emerald-300' : 'bg-white/80 text-slate-600'
-                            }`}
-                          >
-                            <Globe className="w-2.5 h-2.5 text-blue-500" />
-                            <span>공유</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* 6자리 참여 핀코드 복사 뱃지 */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleCopyCode(e, board.code)}
-                        title="클릭하여 학생 참여 핀코드 복사"
-                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold transition shrink-0 ${
-                          isBlackboard
-                            ? 'bg-emerald-800 text-emerald-100 hover:bg-emerald-700'
-                            : 'bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 shadow-2xs'
-                        }`}
+            return (
+              <div
+                key={board.id}
+                draggable
+                onDragStart={(e) => {
+                  setDraggedBoardId(board.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverBoardId !== board.id) {
+                    setDragOverBoardId(board.id);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverBoardId === board.id) setDragOverBoardId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDropBoard(board.id, list);
+                }}
+                onDragEnd={() => {
+                  setDraggedBoardId(null);
+                  setDragOverBoardId(null);
+                }}
+                onClick={() => router.push(`/board/${board.id}`)}
+                className={`group relative rounded-2xl p-3 sm:p-3.5 border transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer bg-gradient-to-br flex flex-col justify-between select-none ${
+                  themeStyles[board.theme] || 'from-white to-slate-50 border-slate-200'
+                } ${isDragging ? 'opacity-40 scale-95' : 'opacity-100'} ${
+                  isDragOver ? 'ring-2 ring-blue-500 ring-offset-2 scale-[1.02] shadow-lg' : ''
+                }`}
+              >
+                <div>
+                  {/* 상단 태그 & 순서 변경 컨트롤 바 */}
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <div className="flex items-center gap-1 flex-wrap min-w-0">
+                      {/* 드래그 핸들 */}
+                      <span
+                        className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 p-0.5 rounded transition shrink-0"
+                        title="카드를 마우스로 끌어서 순서를 변경하세요"
                       >
-                        <Hash className="w-2.5 h-2.5" />
-                        <span>{board.code}</span>
-                        {copiedCode === board.code ? (
-                          <Check className="w-2.5 h-2.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-2.5 h-2.5 opacity-60" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* 메인 화면 보드 카드 대표 썸네일 이미지 (7열에 맞춤) */}
-                    {(board.coverImageUrl || board.customBgUrl) && (
-                      <div className="relative w-full h-20 sm:h-22 rounded-xl overflow-hidden mb-2 border border-black/5 shadow-2xs bg-slate-100">
-                        <img
-                          src={board.coverImageUrl || board.customBgUrl}
-                          alt={board.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                    )}
-
-                    <h3
-                      className={`text-xs sm:text-sm font-black line-clamp-1 leading-snug group-hover:text-blue-600 transition ${
-                        isBlackboard ? 'text-white' : 'text-slate-900'
-                      }`}
-                    >
-                      {board.title}
-                    </h3>
-
-                    <p
-                      className={`mt-0.5 text-[10px] sm:text-[11px] line-clamp-1 leading-relaxed ${
-                        isBlackboard ? 'text-emerald-200/80' : 'text-slate-500'
-                      }`}
-                    >
-                      {board.description || '선생님과 학생들이 실시간으로 생각을 나누는 보드입니다.'}
-                    </p>
-                  </div>
-
-                  {/* 하단 작성자 및 액션 버튼 바 (컴팩트 정렬) */}
-                  <div
-                    className={`mt-2.5 pt-2 border-t flex items-center justify-between text-[10px] gap-1 ${
-                      isBlackboard ? 'border-emerald-800/60 text-emerald-300/80' : 'border-slate-200/70 text-slate-500'
-                    }`}
-                  >
-                    {/* 작성자 이름 */}
-                    <div
-                      className="flex items-center gap-1 font-medium text-[9px] min-w-0 flex-1"
-                      title={board.title === '내 테스트' ? 'minwan1 kim' : board.authorName}
-                    >
-                      <span className="truncate">
-                        {board.title === '내 테스트' ? 'minwan1 kim' : board.authorName}
+                        <GripVertical className="w-3 h-3" />
                       </span>
-                    </div>
 
-                    {/* 액션 버튼 그룹 */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      {/* 보드 정보 수정 버튼 */}
+                      {board.category && (
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full truncate ${
+                            isBlackboard ? 'bg-emerald-800 text-emerald-200' : 'bg-white text-blue-700 shadow-2xs'
+                          }`}
+                        >
+                          {board.category}
+                        </span>
+                      )}
+
+                      {/* 복제본 배지 */}
+                      {board.copiedFromTitle && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-700 shrink-0">
+                          내 복사본
+                        </span>
+                      )}
+
+                      {/* 공개 / 나만보기 상태 배지 */}
                       {canEditBoard && (
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingBoard(board);
-                          }}
-                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
-                            isBlackboard
-                              ? 'bg-emerald-800 hover:bg-emerald-700 text-emerald-100'
-                              : 'bg-white hover:bg-amber-50 text-amber-700 border border-slate-200'
+                          onClick={(e) => handleTogglePublic(e, board)}
+                          className={`flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full transition shadow-2xs shrink-0 ${
+                            board.isPublic !== false
+                              ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                              : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                           }`}
-                          title="보드 제목, 커버 사진, 설정 수정"
+                          title="클릭하여 학교 전체 공개 / 나만 보기 전환"
                         >
-                          <Pencil className="w-2.5 h-2.5 text-amber-600" />
-                          <span>수정</span>
+                          {board.isPublic !== false ? (
+                            <>
+                              <Globe className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>공개</span>
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="w-2.5 h-2.5 text-slate-500" />
+                              <span>나만</span>
+                            </>
+                          )}
                         </button>
                       )}
+                    </div>
 
-                      {/* 보드 복제 버튼 */}
+                    {/* 순서 이동 화살표 (◀ / ▶) */}
+                    <div className="flex items-center gap-0.5 shrink-0 bg-black/5 rounded-lg p-0.5" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        onClick={(e) => handleDuplicateBoard(e, board)}
-                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
-                          isBlackboard
-                            ? 'bg-emerald-800 hover:bg-emerald-700 text-white'
-                            : 'bg-white hover:bg-blue-50 text-blue-700 border border-slate-200'
+                        disabled={idx === 0}
+                        onClick={(e) => handleMoveBoardStep(e, board.id, 'prev', list)}
+                        className={`p-0.5 rounded transition ${
+                          idx === 0
+                            ? 'text-slate-300 cursor-not-allowed'
+                            : 'text-slate-600 hover:bg-white hover:text-blue-600 shadow-2xs'
                         }`}
-                        title="이 보드를 내 보드로 복제하기"
+                        title="앞으로 순서 이동 (◀)"
                       >
-                        <Copy className="w-2.5 h-2.5 text-blue-500" />
-                        <span>복제</span>
+                        <ChevronLeft className="w-3 h-3" />
                       </button>
-
-                      {/* 링크 복사 버튼 */}
                       <button
                         type="button"
-                        onClick={(e) => handleCopyLink(e, board.code)}
-                        className="p-1 rounded-md bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition shrink-0"
-                        title="학생 참여 링크 복사"
+                        disabled={idx === list.length - 1}
+                        onClick={(e) => handleMoveBoardStep(e, board.id, 'next', list)}
+                        className={`p-0.5 rounded transition ${
+                          idx === list.length - 1
+                            ? 'text-slate-300 cursor-not-allowed'
+                            : 'text-slate-600 hover:bg-white hover:text-blue-600 shadow-2xs'
+                        }`}
+                        title="뒤로 순서 이동 (▶)"
                       >
-                        {copiedLink === board.code ? (
-                          <Check className="w-2.5 h-2.5 text-emerald-600" />
-                        ) : (
-                          <Share2 className="w-2.5 h-2.5" />
-                        )}
+                        <ChevronRight className="w-3 h-3" />
                       </button>
+                    </div>
+                  </div>
 
-                      {/* QR 코드 초대 버튼 */}
+                  {/* 메인 화면 보드 카드 대표 썸네일 이미지 */}
+                  {(board.coverImageUrl || board.customBgUrl) && (
+                    <div className="relative w-full h-20 sm:h-22 rounded-xl overflow-hidden mb-2 border border-black/5 shadow-2xs bg-slate-100">
+                      <img
+                        src={board.coverImageUrl || board.customBgUrl}
+                        alt={board.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                  )}
+
+                  <h3
+                    className={`text-xs sm:text-sm font-black line-clamp-1 leading-snug group-hover:text-blue-600 transition ${
+                      isBlackboard ? 'text-white' : 'text-slate-900'
+                    }`}
+                  >
+                    {board.title}
+                  </h3>
+
+                  <p
+                    className={`mt-0.5 text-[10px] sm:text-[11px] line-clamp-1 leading-relaxed ${
+                      isBlackboard ? 'text-emerald-200/80' : 'text-slate-500'
+                    }`}
+                  >
+                    {board.description || '선생님과 학생들이 실시간으로 생각을 나누는 보드입니다.'}
+                  </p>
+                </div>
+
+                {/* 하단 작성자 및 액션 버튼 바 */}
+                <div
+                  className={`mt-2.5 pt-2 border-t flex items-center justify-between text-[10px] gap-1 ${
+                    isBlackboard ? 'border-emerald-800/60 text-emerald-300/80' : 'border-slate-200/70 text-slate-500'
+                  }`}
+                >
+                  {/* 작성자 이름 */}
+                  <div
+                    className="flex items-center gap-1 font-medium text-[9px] min-w-0 flex-1"
+                    title={board.title === '내 테스트' ? 'minwan1 kim' : board.authorName}
+                  >
+                    <span className="truncate">
+                      {board.title === '내 테스트' ? 'minwan1 kim' : board.authorName}
+                    </span>
+                  </div>
+
+                  {/* 액션 버튼 그룹 */}
+                  <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {/* 보드 정보 수정 버튼 */}
+                    {canEditBoard && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setQrBoard(board);
+                          setEditingBoard(board);
                         }}
-                        className="p-1 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition shrink-0"
-                        title="스마트폰/태블릿 카메라 스캔용 QR코드"
+                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
+                          isBlackboard
+                            ? 'bg-emerald-800 hover:bg-emerald-700 text-emerald-100'
+                            : 'bg-white hover:bg-amber-50 text-amber-700 border border-slate-200'
+                        }`}
+                        title="보드 제목, 커버 사진, 설정 수정"
                       >
-                        <QrCode className="w-2.5 h-2.5" />
+                        <Pencil className="w-2.5 h-2.5 text-amber-600" />
+                        <span>수정</span>
                       </button>
+                    )}
 
-                      <div className="flex items-center gap-0.5 font-bold group-hover:translate-x-0.5 transition text-blue-600 ml-0.5 shrink-0 whitespace-nowrap text-[10px]">
-                        <span>입장</span>
-                        <ArrowRight className="w-2.5 h-2.5" />
+                    {/* 보드 복제 버튼 */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDuplicateBoard(e, board)}
+                      className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition shadow-2xs whitespace-nowrap shrink-0 ${
+                        isBlackboard
+                          ? 'bg-emerald-800 hover:bg-emerald-700 text-white'
+                          : 'bg-white hover:bg-blue-50 text-blue-700 border border-slate-200'
+                      }`}
+                      title="이 보드를 내 보드로 복제하여 가져오기"
+                    >
+                      <Copy className="w-2.5 h-2.5 text-blue-500" />
+                      <span>복제</span>
+                    </button>
+
+                    {/* 링크 복사 버튼 */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyLink(e, board.code)}
+                      className="p-1 rounded-md bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition shrink-0"
+                      title="학생 참여 링크 복사"
+                    >
+                      {copiedLink === board.code ? (
+                        <Check className="w-2.5 h-2.5 text-emerald-600" />
+                      ) : (
+                        <Share2 className="w-2.5 h-2.5" />
+                      )}
+                    </button>
+
+                    {/* QR 코드 초대 버튼 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQrBoard(board);
+                      }}
+                      className="p-1 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition shrink-0"
+                      title="스마트폰/태블릿 카메라 스캔용 QR코드"
+                    >
+                      <QrCode className="w-2.5 h-2.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/board/${board.id}`)}
+                      className="flex items-center gap-0.5 font-bold hover:translate-x-0.5 transition text-blue-600 ml-0.5 shrink-0 whitespace-nowrap text-[10px]"
+                    >
+                      <span>입장</span>
+                      <ArrowRight className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          // 1) 내가 만든 자료 섹터 단독 보기
+          if (activeTab === 'my') {
+            return (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+                      <FolderOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-lg font-black text-slate-900">내가 만든 자료</h2>
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          {myBoards.length}개
+                        </span>
                       </div>
+                      <p className="text-[11px] text-slate-500">
+                        직접 만들거나 다른 사람의 보드에서 복제해 온 내 수업 자료입니다. (◀ ▶ 또는 드래그로 순서 변경 가능)
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>새 보드 만들기</span>
+                  </button>
+                </div>
+
+                {myBoards.length === 0 ? (
+                  <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm max-w-md mx-auto my-6">
+                    <FolderOpen className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-slate-700">아직 만든 보드가 없습니다.</p>
+                    <p className="text-xs text-slate-400 mt-1">[+ 새 보드 만들기] 또는 다른 사람의 보드를 [복제]해 보세요!</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                    {myBoards.map((b, idx) => renderBoardCard(b, idx, myBoards))}
+                  </div>
+                )}
+              </section>
+            );
+          }
+
+          // 2) 다른 사람 공유 자료 섹터 단독 보기
+          if (activeTab === 'public') {
+            return (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-lg font-black text-slate-900">선생님 & 다른 사람이 공유한 자료</h2>
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          {sharedBoards.length}개
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        학교 구성원들이 공유한 보드입니다. 카드의 [복제]를 누르면 내 자료로 바로 가져올 수 있습니다.
+                      </p>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                {sharedBoards.length === 0 ? (
+                  <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm max-w-md mx-auto my-6">
+                    <Globe className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-slate-700">공유된 다른 사람의 보드가 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                    {sharedBoards.map((b, idx) => renderBoardCard(b, idx, sharedBoards))}
+                  </div>
+                )}
+              </section>
+            );
+          }
+
+          // 3) 추천 템플릿 탭
+          if (activeTab === 'template') {
+            const templateBoards = sortList(filteredBoards);
+            return (
+              <section className="space-y-4">
+                <div className="border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-lg font-black text-slate-900">추천 템플릿 모음</h2>
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          {templateBoards.length}개
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        수업 및 모둠 활동에 바로 활용할 수 있는 추천 템플릿입니다. [복제]를 눌러 내 수업에 활용해 보세요!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                  {templateBoards.map((b, idx) => renderBoardCard(b, idx, templateBoards))}
+                </div>
+              </section>
+            );
+          }
+
+          // 4) 기본: '전체 섹터 보기' (내가 만든 자료 + 다른 사람 자료를 위아래 2개 섹터로 분리)
+          return (
+            <div className="space-y-10">
+              {/* 섹터 1: 내가 만든 자료 (보드) */}
+              <section className="space-y-3.5">
+                <div className="flex items-center justify-between gap-3 border-b-2 border-blue-500/30 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black shadow-xs">
+                      <FolderOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                          📁 내가 만든 자료 (보드)
+                        </h2>
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 shadow-2xs">
+                          {myBoards.length}개
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        직접 개설하거나 다른 보드에서 복제해 온 내 자료입니다. <strong>◀ ▶ 버튼이나 드래그</strong>로 원하는 순서대로 자유롭게 배치하세요.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs shrink-0 active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>새 보드 만들기</span>
+                  </button>
+                </div>
+
+                {myBoards.length === 0 ? (
+                  <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 text-center border-2 border-dashed border-slate-200 shadow-2xs my-3">
+                    <FolderOpen className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs sm:text-sm font-bold text-slate-700">아직 내가 만든 보드가 없습니다.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      우측 상단의 [+ 새 보드 만들기]를 누르거나, 아래 공유 자료에서 [복제]를 눌러 가져와 보세요!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                    {myBoards.map((b, idx) => renderBoardCard(b, idx, myBoards))}
+                  </div>
+                )}
+              </section>
+
+              {/* 섹터 2: 선생님 & 다른 사람이 공유한 자료 */}
+              <section className="space-y-3.5 pt-4">
+                <div className="flex items-center justify-between gap-3 border-b-2 border-emerald-500/30 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white flex items-center justify-center font-black shadow-xs">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                          🌐 선생님 & 다른 사람이 공유한 자료
+                        </h2>
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shadow-2xs">
+                          {sharedBoards.length}개
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        다른 선생님과 학생들이 공유한 보드입니다. 카드의 <strong>[복제]</strong> 버튼을 누르면 즉시 내 자료로 복사되어 자유롭게 수정할 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {sharedBoards.length === 0 ? (
+                  <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 text-center border-2 border-dashed border-slate-200 shadow-2xs my-3">
+                    <Globe className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs sm:text-sm font-bold text-slate-700">공유된 다른 자료가 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3">
+                    {sharedBoards.map((b, idx) => renderBoardCard(b, idx, sharedBoards))}
+                  </div>
+                )}
+              </section>
+            </div>
+          );
+        })()}
       </main>
 
       {/* 🌟 페이지 최하단 푸터 */}

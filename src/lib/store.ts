@@ -387,6 +387,7 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'school_padlet_current_user',
   MY_POST_IDS: 'school_padlet_my_post_ids',
   MY_COMMENT_IDS: 'school_padlet_my_comment_ids',
+  MY_BOARD_IDS: 'school_padlet_my_board_ids',
 };
 
 export const getMyPostIds = (): string[] => {
@@ -414,6 +415,20 @@ export const addMyCommentId = (commentId: string) => {
   const list = getMyCommentIds();
   if (!list.includes(commentId)) {
     localStorage.setItem(STORAGE_KEYS.MY_COMMENT_IDS, JSON.stringify([...list, commentId]));
+  }
+};
+
+export const getMyBoardIds = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(STORAGE_KEYS.MY_BOARD_IDS);
+  return stored ? JSON.parse(stored) : [];
+};
+
+export const addMyBoardId = (boardId: string) => {
+  if (typeof window === 'undefined') return;
+  const list = getMyBoardIds();
+  if (!list.includes(boardId)) {
+    localStorage.setItem(STORAGE_KEYS.MY_BOARD_IDS, JSON.stringify([...list, boardId]));
   }
 };
 
@@ -825,6 +840,7 @@ export const duplicateBoard = (sourceBoardId: string, currentUser: User): Board 
   }));
 
   // 🔥 내 글 목록에 복제된 카드 ID들을 모두 등록 (원격 동기화 시 로컬 카드 유실 방지)
+  addMyBoardId(newBoardId);
   copiedPosts.forEach((p) => {
     addMyPostId(p.id);
   });

@@ -39,6 +39,7 @@ export interface Board {
   customBgUrl?: string;   // 보드 내부 전체 배경화면 이미지
   category?: '수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트';
   copiedFromTitle?: string;
+  order?: number; // 메인 페이지 보드 순서 정렬용
   createdAt: string;
   updatedAt?: string | number;
   postCount?: number;

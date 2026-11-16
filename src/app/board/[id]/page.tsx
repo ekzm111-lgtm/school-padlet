@@ -14,6 +14,8 @@ import {
   Columns,
   Hash,
   Copy,
+  ClipboardCopy,
+  ClipboardPaste,
   Check,
   MousePointer2,
   Move,
@@ -33,6 +35,7 @@ import {
   Play,
 } from 'lucide-react';
 import Header from '@/components/Header';
+import confetti from 'canvas-confetti';
 import PostCard from '@/components/PostCard';
 import PostModal from '@/components/PostModal';
 import ShareModal from '@/components/ShareModal';
@@ -102,6 +105,16 @@ export default function BoardDetailPage() {
   const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
   const [dragOverColIdx, setDragOverColIdx] = useState<number | null>(null);
   const [isSyncingToCloud, setIsSyncingToCloud] = useState(false);
+  // 📋 다른 보드로 모둠 복사 & 붙여넣기 관련 상태
+  const [activeCopyMenuCol, setActiveCopyMenuCol] = useState<string | null>(null);
+  const [copiedColumn, setCopiedColumn] = useState<{
+    columnName: string;
+    sourceBoardTitle?: string;
+    sourceBoardId: string;
+    posts: Post[];
+    copiedAt: number;
+  } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // 그리드 드래그 앤 드롭 순서 변경
   const dragItemIdx = useRef<number | null>(null);
@@ -1027,6 +1040,116 @@ export default function BoardDetailPage() {
     }
   };
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 5000);
+  };
+
+  // 📋 1. 다른 보드로 가져가기 위한 모둠 복사 (클립보드 및 로컬스토리지 저장)
+  const handleCopyColumnToClipboard = (colName: string) => {
+    const colPosts = posts.filter((p) => p.column === colName);
+    const copyData = {
+      columnName: colName,
+      sourceBoardTitle: board?.title || '원본 보드',
+      sourceBoardId: board?.id || '',
+      posts: colPosts,
+      copiedAt: Date.now(),
+    };
+
+    try {
+      localStorage.setItem('schoolpad_copied_column', JSON.stringify(copyData));
+      setCopiedColumn(copyData);
+      showToast(`📋 '${colName}' 모둠(카드 ${colPosts.length}개)이 복사되었습니다!\n원하는 내 보드로 이동한 후 [모둠 붙여넣기]를 눌러보세요.`);
+    } catch (err) {
+      console.error('Failed to copy column:', err);
+    }
+  };
+
+  // 📋 2. 복사한 모둠을 현재 내 보드에 붙여넣기
+  const handlePasteCopiedColumn = async () => {
+    if (!board) return;
+
+    let copyData = copiedColumn;
+    if (!copyData) {
+      try {
+        const saved = localStorage.getItem('schoolpad_copied_column');
+        if (saved) copyData = JSON.parse(saved);
+      } catch (e) {}
+    }
+
+    if (!copyData || !copyData.columnName) {
+      alert('복사된 모둠이 없습니다. 먼저 가져오고 싶은 모둠에서 [복사]를 눌러주세요.');
+      return;
+    }
+
+    lastUserActionTimeRef.current = Date.now();
+
+    // 1. 중복되지 않는 모둠 이름 결정
+    let targetColName = copyData.columnName;
+    if (columns.includes(targetColName)) {
+      targetColName = `${copyData.columnName} (가져옴)`;
+      let counter = 2;
+      while (columns.includes(targetColName)) {
+        targetColName = `${copyData.columnName} (가져옴 ${counter})`;
+        counter++;
+      }
+    }
+
+    // 2. 컬럼 목록에 추가
+    const updatedCols = [...columns, targetColName];
+    const cleanCols = Array.from(new Set(updatedCols.map((c) => String(c || '').trim()).filter(Boolean)));
+
+    // 3. 카드 복제 (새 고유 UUID 발급 및 현재 board.id로 매핑)
+    const nowTs = Date.now();
+    const clonedCards: Post[] = copyData.posts.map((p, idx) => ({
+      ...p,
+      id: `post-${nowTs}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+      boardId: board.id,
+      column: targetColName,
+      createdAt: '방금 전',
+      reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
+      comments: [],
+    }));
+
+    const updatedPosts = [...posts, ...clonedCards];
+
+    // 4. 로컬 및 메모리 캐시 갱신
+    setColumns(cleanCols);
+    setPosts(updatedPosts);
+
+    if (typeof window !== 'undefined') {
+      const g = window as any;
+      if (!g.__BOARD_COLUMNS_CACHE__) g.__BOARD_COLUMNS_CACHE__ = {};
+      g.__BOARD_COLUMNS_CACHE__[board.id] = cleanCols;
+    }
+
+    const data = getStoreData();
+    const updatedBoard = { ...board, columns: cleanCols, updatedAt: nowTs };
+    saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+    saveStoreData.posts([...data.posts, ...clonedCards]);
+    setBoard(updatedBoard);
+
+    // 5. Supabase 원격 저장
+    if (isSupabaseConfigured) {
+      await saveRemoteBoard(updatedBoard);
+      for (const card of clonedCards) {
+        await saveRemotePost(card);
+      }
+    }
+
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    } catch (e) {}
+
+    showToast(`🎉 '${targetColName}' 모둠과 카드 ${clonedCards.length}개를 내 보드에 성공적으로 붙여넣었습니다!`);
+  };
+
   // 모둠(열) 및 내부 카드 전체 복제
   const handleDuplicateColumn = async (colName: string) => {
     lastUserActionTimeRef.current = Date.now();
@@ -1735,6 +1858,19 @@ export default function BoardDetailPage() {
               <span>{board.code}</span>
             </button>
 
+            {/* 📋 복사된 모둠 붙여넣기 버튼 (상단 툴바 빠른 실행) */}
+            {copiedColumn && (!board.isLocked || isTeacherOrAdmin) && (
+              <button
+                type="button"
+                onClick={handlePasteCopiedColumn}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold transition shadow-xs hover:shadow shrink-0 whitespace-nowrap animate-pulse"
+                title={`클립보드에 복사된 '${copiedColumn.columnName}' 모둠(카드 ${copiedColumn.posts.length}개)을 이 보드에 붙여넣기`}
+              >
+                <ClipboardPaste className="w-3.5 h-3.5" />
+                <span>모둠 붙여넣기 ({copiedColumn.posts.length}개)</span>
+              </button>
+            )}
+
             {/* 이 보드 복제하기 버튼 */}
             <button
               onClick={() => {
@@ -2072,14 +2208,56 @@ export default function BoardDetailPage() {
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
                             {colPosts.length}개
                           </span>
-                          {/* 📋 모둠(열) 및 내부 카드 전체 복제 버튼 */}
-                          <button
-                            onClick={() => handleDuplicateColumn(colName)}
-                            className="p-1 text-slate-400 hover:text-blue-600 rounded-md transition"
-                            title="이 모둠(열)과 카드를 전체 복사"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
+                          {/* 📋 모둠(열) 및 내부 카드 복사 드롭다운 메뉴 */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveCopyMenuCol(activeCopyMenuCol === colName ? null : colName);
+                              }}
+                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md transition"
+                              title="모둠 복사 메뉴 (다른 보드로 복사 / 현재 보드 복제)"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+
+                            {activeCopyMenuCol === colName && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 top-7 z-50 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs animate-in fade-in zoom-in-95 duration-150"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveCopyMenuCol(null);
+                                    handleCopyColumnToClipboard(colName);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:bg-blue-50 text-slate-800 flex items-start gap-2.5 transition group"
+                                >
+                                  <ClipboardCopy className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                                  <div>
+                                    <div className="font-bold group-hover:text-blue-600">다른 보드로 복사하기</div>
+                                    <div className="text-[10px] text-slate-400">내 보드로 가서 붙여넣기 할 수 있어요</div>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveCopyMenuCol(null);
+                                    handleDuplicateColumn(colName);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:bg-slate-50 text-slate-700 flex items-start gap-2.5 transition border-t border-slate-100"
+                                >
+                                  <Copy className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                                  <div>
+                                    <div className="font-bold">현재 보드에 바로 복제</div>
+                                    <div className="text-[10px] text-slate-400">이 보드 바로 옆에 복사본 추가</div>
+                                  </div>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           {columns.length > 1 && (
                             <button
                               onClick={() => handleDeleteColumn(colName)}
@@ -2186,6 +2364,37 @@ export default function BoardDetailPage() {
                 </div>
               );
             })}
+
+            {/* 📋 클립보드에 복사된 모둠이 있을 때: 눈에 띄는 전용 붙여넣기 카드 */}
+            {copiedColumn && (!board.isLocked || isTeacherOrAdmin) && (
+              <div className="${columns.length >= 8 ? 'w-[68vw] sm:w-[215px]' : columns.length <= 2 ? 'w-full sm:w-[260px] max-w-[280px]' : 'w-[75vw] sm:w-[240px]'} shrink-0">
+                <div className="p-3.5 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border-2 border-dashed border-indigo-300 shadow-sm space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-indigo-950">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <ClipboardPaste className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span className="truncate">복사된 모둠 대기 중</span>
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold shrink-0">
+                      {copiedColumn.posts.length}개 카드
+                    </span>
+                  </div>
+                  <div className="text-xs font-bold text-slate-800 truncate" title={copiedColumn.columnName}>
+                    '{copiedColumn.columnName}'
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">
+                    출처: {copiedColumn.sourceBoardTitle || '다른 보드'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePasteCopiedColumn}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>내 보드에 붙여넣기</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 새 모둠 추가 카드 */}
             {(!board.isLocked || isTeacherOrAdmin) && (
