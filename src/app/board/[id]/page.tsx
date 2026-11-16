@@ -577,24 +577,33 @@ export default function BoardDetailPage() {
             const remoteSig = buildSig(remote);
             if (prevSig === remoteSig) return prevPosts;
 
-            // 🔥 로컬 중복 방지 및 원격-로컬 스마트 병합
+            // 🔥 로컬 중복 방지 및 원격-로컬 스마트 병합 (보드 수정이나 폴링 시 카드 증발 원천 차단)
             const myPostIds = getMyPostIds();
             const remoteMap = new Map(remote.map((p) => [p.id, p]));
             
             const localPending: Post[] = [];
             for (const p of prevPosts) {
               if (remoteMap.has(p.id)) continue;
-              if (!myPostIds.includes(p.id)) continue;
 
-              // 원격에 동일한 제목과 열을 가진 카드가 이미 있다면(예: 단축키 카드) 원격 ID로 자동 통합하여 중복 및 하단 밀림 방지!
+              // 원격에 동일한 제목과 열을 가진 카드가 이미 있다면(예: 단축키 카드) 원격 ID로 자동 통합하여 중복 방지
               const sameRemote = remote.find(
                 (r) => r.column === p.column && r.title.trim() && r.title.trim() === p.title.trim()
               );
               if (sameRemote) {
                 continue; // 원격 데이터 우선 채택
               }
+
+              // 🔥 핵심: 원격이 비어있거나(remote.length === 0), 현재 보드에 속한 로컬 카드인 경우 절대 삭제하지 않고 보존
+              const isMineOrValidLocal =
+                myPostIds.includes(p.id) ||
+                (currentUser && (p.authorId === currentUser.id || p.authorName === currentUser.name)) ||
+                remote.length === 0 ||
+                p.boardId === targetBoardId;
+
+              if (!isMineOrValidLocal) continue;
+
               localPending.push(p);
-              // 원격에 진짜 없는 로컬 새 글이면 백그라운드로 즉시 upsert
+              // 원격에 아직 없는 로컬 새 글이면 백그라운드로 즉시 upsert
               if (isSupabaseConfigured) {
                 saveRemotePost(p).catch(() => {});
               }

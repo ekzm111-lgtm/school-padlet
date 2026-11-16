@@ -282,7 +282,8 @@ export function saveQuizPackage(
   subject: 'music' | 'entry' | string,
   examInfo: ExamInfo,
   questions: Question[],
-  description?: string
+  description?: string,
+  meta?: { boardId?: string; authorName?: string; lastPin?: string }
 ): SavedQuizPackage {
   const list = getAllSavedQuizPackages();
   const now = new Date();
@@ -297,6 +298,9 @@ export function saveQuizPackage(
     savedAt,
     questionCount: questions.length,
     description: description || `${examInfo.schoolName} ${examInfo.grade} ${examInfo.term}`,
+    boardId: meta?.boardId,
+    authorName: meta?.authorName,
+    lastPin: meta?.lastPin,
   };
 
   const updated = [newPkg, ...list];
@@ -325,6 +329,36 @@ export function deleteSavedQuizPackage(id: string): void {
   try {
     fetch(`${getApiBaseUrl()}/api/quiz/package?id=${id}`, { method: 'DELETE' }).catch(() => {});
   } catch {}
+}
+
+export function updateSavedQuizPackage(
+  id: string,
+  updates: Partial<SavedQuizPackage>
+): SavedQuizPackage | null {
+  const list = getAllSavedQuizPackages();
+  const idx = list.findIndex((p) => p.id === id);
+  if (idx === -1) return null;
+
+  const updated: SavedQuizPackage = {
+    ...list[idx],
+    ...updates,
+    questionCount: updates.questions ? updates.questions.length : list[idx].questionCount,
+  };
+
+  list[idx] = updated;
+  localStorage.setItem(PACKAGES_KEY, JSON.stringify(list));
+  notifyChannel({ type: 'PACKAGE_SAVED', package: updated });
+
+  // 🔥 Supabase DB 동기화
+  try {
+    fetch(`${getApiBaseUrl()}/api/quiz/package`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
+  } catch {}
+
+  return updated;
 }
 
 // ==========================================

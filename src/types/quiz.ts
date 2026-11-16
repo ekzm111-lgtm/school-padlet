@@ -609,6 +609,9 @@ export interface SavedQuizPackage {
   savedAt: string;
   questionCount: number;
   description?: string;
+  boardId?: string;
+  authorName?: string;
+  lastPin?: string;
 }
 
 export interface LiveQuizState {

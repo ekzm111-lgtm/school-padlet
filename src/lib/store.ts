@@ -651,15 +651,28 @@ export const duplicateBoard = (sourceBoardId: string, currentUser: User): Board 
   const sourcePosts = data.posts.filter((p) => p.boardId === sourceBoardId);
   const copiedPosts = sourcePosts.map((p) => ({
     ...p,
-    id: `post-copy-${Date.now()}-${Math.random()}`,
+    id: `post-copy-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     boardId: newBoardId,
     authorId: currentUser.id,
     reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
     comments: [],
   }));
 
+  // 🔥 내 글 목록에 복제된 카드 ID들을 모두 등록 (원격 동기화 시 로컬 카드 유실 방지)
+  copiedPosts.forEach((p) => {
+    addMyPostId(p.id);
+  });
+
   saveStoreData.boards([copiedBoard, ...data.boards]);
   saveStoreData.posts([...copiedPosts, ...data.posts]);
+
+  // 🔥 클라우드 원격 DB(Supabase)에도 복제된 보드와 게시글들을 즉시 백그라운드 저장!
+  if (isSupabaseConfigured) {
+    saveRemoteBoard(copiedBoard).catch(() => {});
+    copiedPosts.forEach((p) => {
+      saveRemotePost(p).catch(() => {});
+    });
+  }
 
   return copiedBoard;
 };

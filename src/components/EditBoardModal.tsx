@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Board, BoardLayout, BoardTheme } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
-import { saveRemoteBoard, deleteRemoteBoard } from '@/lib/supabaseStore';
+import { saveRemoteBoard, deleteRemoteBoard, saveRemotePost } from '@/lib/supabaseStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface EditBoardModalProps {
@@ -170,6 +170,12 @@ export default function EditBoardModal({
     if (isSupabaseConfigured) {
       try {
         await saveRemoteBoard(updatedBoard);
+        const boardPosts = currentData.posts.filter((p) => p.boardId === board.id);
+        if (boardPosts.length > 0) {
+          boardPosts.forEach((p) => {
+            saveRemotePost(p).catch(() => {});
+          });
+        }
       } catch (err) {
         console.error('Remote board update error:', err);
       }
