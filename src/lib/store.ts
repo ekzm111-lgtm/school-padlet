@@ -12,6 +12,10 @@ import {
   saveRemoteUser,
   saveRemoteSettings,
 } from './supabaseStore';
+import {
+  USEFUL_SCHOOL_LINKS_BOARD,
+  USEFUL_SCHOOL_LINKS_POSTS,
+} from '@/data/usefulSchoolLinksBoard';
 
 const INITIAL_SETTINGS: SystemSettings = {
   autoApproveUsers: true,
@@ -72,6 +76,7 @@ const INITIAL_USERS: User[] = [
 ];
 
 const INITIAL_BOARDS: Board[] = [
+  USEFUL_SCHOOL_LINKS_BOARD,
   {
     id: 'board-1792975588752',
     code: '105207',
@@ -173,6 +178,7 @@ const INITIAL_BOARDS: Board[] = [
 ];
 
 const INITIAL_POSTS: Post[] = [
+  ...USEFUL_SCHOOL_LINKS_POSTS,
   {
     id: 'post-util-her',
     authorId: 'user-admin',
@@ -510,10 +516,34 @@ export const getStoreData = (): StoreData => {
     } catch (e) {}
   }
 
+  // '🌟 초·중·고 유용한 학습 사이트 & 에듀테크 링크 모음' (778899) 보드 및 15개 카드 자동 동기화
+  if (!boardsList.some((b) => b.id === USEFUL_SCHOOL_LINKS_BOARD.id || b.code === USEFUL_SCHOOL_LINKS_BOARD.code)) {
+    boardsList = [USEFUL_SCHOOL_LINKS_BOARD, ...boardsList];
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
+    } catch (e) {}
+    if (isSupabaseConfigured) {
+      saveRemoteBoard(USEFUL_SCHOOL_LINKS_BOARD).catch(() => {});
+    }
+  }
+
   // 삭제된 디지털튜터 보드(202501)가 로컬에 남아있다면 영구 제거 필터링
   boardsList = boardsList.filter((b) => b.id !== 'board-digital-tutor-2025' && b.code !== '202501');
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
+
+  const hasUsefulLinksPost = postsList.some((p) => p.boardId === USEFUL_SCHOOL_LINKS_BOARD.id);
+  if (!hasUsefulLinksPost) {
+    postsList = [...USEFUL_SCHOOL_LINKS_POSTS, ...postsList];
+    try {
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(postsList));
+    } catch (e) {}
+    if (isSupabaseConfigured) {
+      USEFUL_SCHOOL_LINKS_POSTS.forEach((p) => {
+        saveRemotePost(p).catch(() => {});
+      });
+    }
+  }
 
   const hasVibePost = postsList.some((p) => p.boardId === 'board-vibecoding');
   if (!hasVibePost) {
