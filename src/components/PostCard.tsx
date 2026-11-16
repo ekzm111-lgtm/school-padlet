@@ -639,7 +639,7 @@ export default function PostCard({
             </div>
           )}
 
-          {/* 첨부 이미지 (또는 링크로부터 자동 추출된 썸네일) */}
+          {/* 첨부 이미지 (또는 링크로부터 자동 추출된 썸네일) - 카드/열 크기에 맞춰 유동적으로 16:9 비율로 확대/축소 */}
           {cardImage && (
             <div
               onClick={(e) => {
@@ -654,7 +654,7 @@ export default function PostCard({
                   setShowImageModal(true);
                 }
               }}
-              className="mt-2 relative overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group"
+              className="mt-2 relative w-full overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group bg-black/5"
               title={
                 currentPost.linkUrl
                   ? `클릭하여 새 탭에서 링크 열기: ${currentPost.linkUrl}`
@@ -664,7 +664,7 @@ export default function PostCard({
               <img
                 src={cardImage}
                 alt="대표 이미지"
-                className="w-full h-32 sm:h-36 object-cover group-hover:scale-105 transition duration-300"
+                className="w-full aspect-video object-cover group-hover:scale-105 transition-all duration-300 block"
               />
             </div>
           )}
