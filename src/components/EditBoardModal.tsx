@@ -90,8 +90,6 @@ export default function EditBoardModal({
     setAllowReactions(board.allowReactions ?? true);
   }, [board]);
 
-  if (!isOpen) return null;
-
   // 이미지 파일 처리 (10MB 제한 및 Base64 인코딩)
   const processImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {

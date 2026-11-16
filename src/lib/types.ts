@@ -99,3 +99,14 @@ export interface SystemSettings {
   allowGuestStudentCode: boolean;
   schoolName: string;
 }
+
+export interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  category: 'urgent' | 'general' | 'event';
+  authorName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: number;
+}

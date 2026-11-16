@@ -27,17 +27,21 @@ import {
   ChevronRight,
   GripVertical,
   Move,
+  Megaphone,
+  X,
+  Bell,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import StudentHomeView from '@/components/StudentHomeView';
 import CreateBoardModal from '@/components/CreateBoardModal';
 import EditBoardModal from '@/components/EditBoardModal';
 import QrModal from '@/components/QrModal';
+import NoticeModal from '@/components/NoticeModal';
 import Footer from '@/components/Footer';
 import { getStoreData, saveStoreData, duplicateBoard, getMyBoardIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchRemoteBoards, saveRemoteBoard } from '@/lib/supabaseStore';
-import { Board, User } from '@/lib/types';
+import { fetchRemoteBoards, saveRemoteBoard, fetchRemoteNotice, saveRemoteNotice } from '@/lib/supabaseStore';
+import { Board, User, Notice } from '@/lib/types';
 import confetti from 'canvas-confetti';
 
 export default function HomePage() {
@@ -51,20 +55,66 @@ export default function HomePage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  // 탭: 'public'(학교 전체 공유 보드) / 'my'(내 보드) / 'template'(추천 템플릿)
+  // 📢 관리자 공지사항 상태
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [dismissedNoticeId, setDismissedNoticeId] = useState<string | null>(null);
+
   // 탭: 'all'(전체 섹터 분리 보기) / 'my'(내가 만든 자료) / 'public'(다른 사람이 공유한 자료) / 'template'(추천 템플릿)
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'public' | 'template'>('all');
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
 
+  // 🔥 보드 순서 맵 로컬 캐시 조회 및 적용 헬퍼 (새로고침/재진입 시 순서 100% 영구 보존)
+  const getSavedOrderMap = (): Record<string, number> => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const saved = localStorage.getItem('schoolpad_board_orders');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const applySavedOrders = (boardList: Board[]): Board[] => {
+    const savedOrders = getSavedOrderMap();
+    return boardList.map((b) => {
+      if (savedOrders[b.id] !== undefined) {
+        return { ...b, order: savedOrders[b.id] };
+      }
+      return b;
+    });
+  };
+
   const loadData = async () => {
     const data = getStoreData();
     setCurrentUser(data.currentUser);
-    setBoards(data.boards);
+    const initialBoards = applySavedOrders(data.boards);
+    setBoards(initialBoards);
+
+    // 로컬 공지사항 로드
+    try {
+      const cachedNotice = localStorage.getItem('schoolpad_global_notice');
+      if (cachedNotice) {
+        setNotice(JSON.parse(cachedNotice));
+      }
+    } catch (e) {}
 
     if (isSupabaseConfigured && supabase) {
       try {
+        // 원격 공지사항 비동기 조회
+        fetchRemoteNotice()
+          .then((remNotice) => {
+            if (remNotice !== null) {
+              setNotice(remNotice);
+              try {
+                localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
+              } catch (e) {}
+            }
+          })
+          .catch(() => {});
+
         const remote = await fetchRemoteBoards();
         if (remote && remote.length > 0) {
           const currentLocal = getStoreData().boards;
@@ -87,8 +137,9 @@ export default function HomePage() {
               merged.push(rem);
             }
           }
-          setBoards(merged);
-          localStorage.setItem('school_padlet_boards', JSON.stringify(merged));
+          const finalBoards = applySavedOrders(merged);
+          setBoards(finalBoards);
+          localStorage.setItem('school_padlet_boards', JSON.stringify(finalBoards));
         }
       } catch (e) {
         console.error('Remote board fetch error', e);
@@ -99,10 +150,10 @@ export default function HomePage() {
   useEffect(() => {
     loadData();
     const handleUpdate = () => {
-      // 로컬 스토어 변경 시에는 원격 fetch 없이 로컬 상태만 즉각 반응 (경합으로 인한 덮어쓰기 방어)
+      // 로컬 스토어 변경 시 로컬 순서 유지하며 반영
       const data = getStoreData();
       setCurrentUser(data.currentUser);
-      setBoards(data.boards);
+      setBoards(applySavedOrders(data.boards));
     };
     window.addEventListener('store_updated', handleUpdate);
     return () => window.removeEventListener('store_updated', handleUpdate);
@@ -179,17 +230,45 @@ export default function HomePage() {
 
   // 🔥 보드 순서 영구 저장 및 동기화 함수
   const saveReorderedBoards = async (updatedBoards: Board[]) => {
-    setBoards(updatedBoards);
-    const data = getStoreData();
-    saveStoreData.boards(updatedBoards);
+    const savedOrders = getSavedOrderMap();
+    const now = Date.now();
+    const finalBoards = updatedBoards.map((b) => {
+      if (typeof b.order === 'number') {
+        savedOrders[b.id] = b.order;
+        return { ...b, updatedAt: now };
+      }
+      return b;
+    });
+
     try {
-      localStorage.setItem('school_padlet_boards', JSON.stringify(updatedBoards));
+      localStorage.setItem('schoolpad_board_orders', JSON.stringify(savedOrders));
+      localStorage.setItem('school_padlet_boards', JSON.stringify(finalBoards));
+    } catch (e) {}
+
+    setBoards(finalBoards);
+    const data = getStoreData();
+    saveStoreData.boards(finalBoards);
+
+    if (isSupabaseConfigured) {
+      for (const b of finalBoards) {
+        await saveRemoteBoard(b).catch(() => {});
+      }
+    }
+  };
+
+  // 📢 관리자 공지사항 저장 및 동기화
+  const handleSaveNotice = async (newNotice: Notice | null) => {
+    setNotice(newNotice);
+    try {
+      if (newNotice) {
+        localStorage.setItem('schoolpad_global_notice', JSON.stringify(newNotice));
+      } else {
+        localStorage.removeItem('schoolpad_global_notice');
+      }
     } catch (e) {}
 
     if (isSupabaseConfigured) {
-      for (const b of updatedBoards) {
-        await saveRemoteBoard(b).catch(() => {});
-      }
+      await saveRemoteNotice(newNotice).catch(() => {});
     }
   };
 
@@ -302,6 +381,8 @@ export default function HomePage() {
         boards={boards}
         onCopyCode={handleCopyCode}
         onCopyLink={handleCopyLink}
+        notice={notice}
+        onOpenNotice={() => setShowNoticeModal(true)}
       />
     );
   }
@@ -311,6 +392,58 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1 w-full px-4 sm:px-8 lg:px-12 py-6 sm:py-8">
+        {/* 📢 전역 공지사항 배너 (활성화되어 있고 dismiss되지 않은 경우) */}
+        {notice && notice.isActive && dismissedNoticeId !== notice.id && (
+          <div
+            onClick={() => setShowNoticeModal(true)}
+            className={`cursor-pointer mb-6 rounded-2xl p-3.5 sm:p-4 border shadow-sm transition-all hover:shadow-md flex items-center justify-between gap-3 ${
+              notice.category === 'urgent'
+                ? 'bg-rose-50/95 border-rose-200 text-rose-900'
+                : notice.category === 'event'
+                ? 'bg-amber-50/95 border-amber-200 text-amber-900'
+                : 'bg-blue-50/95 border-blue-200 text-blue-900'
+            }`}
+          >
+            <div className="flex items-center gap-3 overflow-hidden">
+              <span
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-black shrink-0 ${
+                  notice.category === 'urgent'
+                    ? 'bg-rose-600 text-white animate-pulse'
+                    : notice.category === 'event'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-blue-600 text-white'
+                }`}
+              >
+                {notice.category === 'urgent' ? '🚨 긴급 공지' : notice.category === 'event' ? '🎉 이벤트·새소식' : '📢 안내 공지'}
+              </span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5 overflow-hidden">
+                <span className="font-bold text-xs sm:text-sm truncate">{notice.title}</span>
+                {notice.content && (
+                  <span className="text-[11px] sm:text-xs opacity-75 truncate max-w-md hidden sm:inline">
+                    - {notice.content}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold underline underline-offset-2 opacity-80 hover:opacity-100 hidden sm:inline">
+                자세히 보기
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDismissedNoticeId(notice.id);
+                }}
+                className="p-1 hover:bg-black/5 rounded-lg transition text-slate-400 hover:text-slate-700"
+                title="공지 닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 학교/교실 실사진 배경의 단정하고 깔끔한 프리미엄 배너 */}
         <div className="relative overflow-hidden rounded-[2rem] text-white p-7 sm:p-10 shadow-xl mb-8 border border-white/20 min-h-[300px] flex items-center">
           {/* 한국 교실 실사진 배경 */}
@@ -357,6 +490,17 @@ export default function HomePage() {
                 >
                   <Layers className="w-4 h-4 text-amber-300" />
                   <span>추천 템플릿 복제하기</span>
+                </button>
+
+                <button
+                  onClick={() => setShowNoticeModal(true)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition-all active:scale-95"
+                >
+                  <Megaphone className="w-4 h-4 text-amber-900" />
+                  <span>{notice ? '공지사항 관리' : '공지사항 작성'}</span>
+                  {notice && notice.isActive && (
+                    <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -1012,6 +1156,15 @@ export default function HomePage() {
           board={qrBoard}
         />
       )}
+
+      {/* 📢 관리자 공지사항 작성/수정/열람 모달 */}
+      <NoticeModal
+        isOpen={showNoticeModal}
+        onClose={() => setShowNoticeModal(false)}
+        notice={notice}
+        onSave={handleSaveNotice}
+        isTeacherOrAdmin={isTeacherOrAdmin}
+      />
     </div>
   );
 }

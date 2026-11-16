@@ -97,7 +97,7 @@ export default function BackgroundModal({
     if (preset.type === 'image' && preset.url) {
       updated = { ...board, customBgUrl: preset.url };
     } else {
-      updated = { ...board, theme: preset.theme as BoardTheme, customBgUrl: undefined };
+      updated = { ...board, theme: preset.theme as BoardTheme, customBgUrl: '' };
     }
 
     const data = getStoreData();
@@ -112,6 +112,8 @@ export default function BackgroundModal({
   
   // 🔥 클립보드 이미지 바로 붙여넣기 (Ctrl + V) 지원
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleGlobalPaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -128,6 +130,9 @@ export default function BackgroundModal({
                 const updated: Board = { ...board, customBgUrl: bgDataUrl };
                 const data = getStoreData();
                 saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updated : b)));
+                if (isSupabaseConfigured) {
+                  saveRemoteBoard(updated).catch(() => {});
+                }
                 onUpdated(updated);
                 setPasteNotice(true);
                 setTimeout(() => {
@@ -145,7 +150,7 @@ export default function BackgroundModal({
 
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
-  }, [board, onUpdated, onClose]);
+  }, [isOpen, board, onUpdated, onClose]);
 
   // 내 컴퓨터 사진 업로드
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,6 +163,9 @@ export default function BackgroundModal({
           const updated: Board = { ...board, customBgUrl: bgDataUrl };
           const data = getStoreData();
           saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updated : b)));
+          if (isSupabaseConfigured) {
+            saveRemoteBoard(updated).catch(() => {});
+          }
           onUpdated(updated);
           onClose();
         }
@@ -173,9 +181,14 @@ export default function BackgroundModal({
     const updated: Board = { ...board, customBgUrl: customUrl.trim() };
     const data = getStoreData();
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updated : b)));
+    if (isSupabaseConfigured) {
+      saveRemoteBoard(updated).catch(() => {});
+    }
     onUpdated(updated);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">

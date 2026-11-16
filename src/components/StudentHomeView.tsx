@@ -16,14 +16,18 @@ import {
   Share2,
   Check,
   Search,
+  Megaphone,
+  X,
 } from 'lucide-react';
-import { Board, User } from '@/lib/types';
+import { Board, User, Notice } from '@/lib/types';
 
 interface StudentHomeViewProps {
   currentUser: User | null;
   boards: Board[];
   onCopyCode: (e: React.MouseEvent, code: string) => void;
   onCopyLink: (e: React.MouseEvent, code: string) => void;
+  notice?: Notice | null;
+  onOpenNotice?: () => void;
 }
 
 export default function StudentHomeView({
@@ -31,12 +35,15 @@ export default function StudentHomeView({
   boards,
   onCopyCode,
   onCopyLink,
+  notice,
+  onOpenNotice,
 }: StudentHomeViewProps) {
   const router = useRouter();
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [dismissedNotice, setDismissedNotice] = useState(false);
 
   // 6자리 참여 PIN 코드 제출
   const handlePinSubmit = (e: React.FormEvent) => {
@@ -79,6 +86,58 @@ export default function StudentHomeView({
       <Header />
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
+        {/* 📢 선생님 전체 공지사항 배너 (학생 뷰) */}
+        {notice && notice.isActive && !dismissedNotice && (
+          <div
+            onClick={onOpenNotice}
+            className={`cursor-pointer rounded-2xl p-3.5 sm:p-4 border shadow-sm transition-all hover:shadow-md flex items-center justify-between gap-3 ${
+              notice.category === 'urgent'
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : notice.category === 'event'
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-blue-50 border-blue-200 text-blue-900'
+            }`}
+          >
+            <div className="flex items-center gap-3 overflow-hidden">
+              <span
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-black shrink-0 ${
+                  notice.category === 'urgent'
+                    ? 'bg-rose-600 text-white animate-pulse'
+                    : notice.category === 'event'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-blue-600 text-white'
+                }`}
+              >
+                {notice.category === 'urgent' ? '🚨 긴급 공지' : notice.category === 'event' ? '🎉 이벤트·새소식' : '📢 선생님 공지'}
+              </span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5 overflow-hidden">
+                <span className="font-bold text-xs sm:text-sm truncate">{notice.title}</span>
+                {notice.content && (
+                  <span className="text-[11px] sm:text-xs opacity-75 truncate max-w-md hidden sm:inline">
+                    - {notice.content}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold underline underline-offset-2 opacity-80 hover:opacity-100 hidden sm:inline">
+                공지 전체보기
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDismissedNotice(true);
+                }}
+                className="p-1 hover:bg-black/5 rounded-lg transition text-slate-400 hover:text-slate-700"
+                title="공지 닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 1. 카훗 & 패들렛 공식 스타일: 대형 6자리 수업 참여 PIN 입력 히어로 섹션 */}
         <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white p-7 sm:p-12 shadow-xl border border-white/20">
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />

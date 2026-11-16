@@ -361,6 +361,18 @@ export default function BoardDetailPage() {
 
   const [isLoading, setIsLoading] = useState(true);
 
+  // 보드 진입 즉시 로컬 캐시에서 마지막 레이아웃 복원
+  useEffect(() => {
+    if (typeof window !== 'undefined' && boardId) {
+      try {
+        const cached = localStorage.getItem(`schoolpad_last_layout_${boardId}`);
+        if (cached && (cached === 'kanban' || cached === 'grid' || cached === 'canvas')) {
+          setCurrentLayout(cached as BoardLayout);
+        }
+      } catch (e) {}
+    }
+  }, [boardId]);
+
   const loadData = async () => {
     if (!boardId) return;
     try {
@@ -377,9 +389,18 @@ export default function BoardDetailPage() {
             ? foundBoard.columns
             : DEFAULT_COLUMNS;
         setColumns(cols);
-        if (foundBoard.layout) {
-          setCurrentLayout(foundBoard.layout);
-        }
+        let activeLayout: BoardLayout = (foundBoard.layout as BoardLayout) || 'kanban';
+        try {
+          const cached =
+            localStorage.getItem(`schoolpad_last_layout_${foundBoard.id}`) ||
+            (foundBoard.code ? localStorage.getItem(`schoolpad_last_layout_${foundBoard.code}`) : null) ||
+            localStorage.getItem(`schoolpad_last_layout_${boardId}`);
+          if (cached && (cached === 'kanban' || cached === 'grid' || cached === 'canvas')) {
+            activeLayout = cached as BoardLayout;
+          }
+        } catch (e) {}
+        setCurrentLayout(activeLayout);
+        foundBoard.layout = activeLayout;
         localBoardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
         setPosts(localBoardPosts);
         setIsLoading(false);
@@ -523,6 +544,18 @@ export default function BoardDetailPage() {
 
           if (foundBoard) {
             foundBoard.columns = activeCols;
+            let activeLayout: BoardLayout = (foundBoard.layout as BoardLayout) || 'kanban';
+            try {
+              const cached =
+                localStorage.getItem(`schoolpad_last_layout_${foundBoard.id}`) ||
+                (foundBoard.code ? localStorage.getItem(`schoolpad_last_layout_${foundBoard.code}`) : null) ||
+                localStorage.getItem(`schoolpad_last_layout_${boardId}`);
+              if (cached && (cached === 'kanban' || cached === 'grid' || cached === 'canvas')) {
+                activeLayout = cached as BoardLayout;
+              }
+            } catch (e) {}
+            foundBoard.layout = activeLayout;
+            setCurrentLayout(activeLayout);
             setBoard(foundBoard);
             setColumns(activeCols);
             saveStoreData.boards([foundBoard, ...data.boards.filter((b) => b.id !== foundBoard!.id)]);
@@ -875,14 +908,26 @@ export default function BoardDetailPage() {
   // 최고 관리자이거나 해당 보드의 소유자(본인/복제자)만 보드 설정(잠금/배경/모둠수정 등) 가능
   const isTeacherOrAdmin = currentUser?.role === 'admin' || isBoardOwner;
 
-  // 레이아웃 변경 시 보드 설정에 즉시 저장
+  // 레이아웃 변경 시 보드 설정 및 브라우저 캐시에 즉시 저장하고 클라우드 동기화
   const handleChangeLayout = (newLayout: BoardLayout) => {
     setCurrentLayout(newLayout);
     if (board) {
-      const updatedBoard = { ...board, layout: newLayout };
+      try {
+        localStorage.setItem(`schoolpad_last_layout_${board.id}`, newLayout);
+        if (board.code) {
+          localStorage.setItem(`schoolpad_last_layout_${board.code}`, newLayout);
+        }
+        if (boardId) {
+          localStorage.setItem(`schoolpad_last_layout_${boardId}`, newLayout);
+        }
+      } catch (e) {}
+      const updatedBoard = { ...board, layout: newLayout, updatedAt: Date.now() };
       setBoard(updatedBoard);
       const data = getStoreData();
       saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+      if (isSupabaseConfigured) {
+        saveRemoteBoard(updatedBoard).catch(() => {});
+      }
     }
   };
 

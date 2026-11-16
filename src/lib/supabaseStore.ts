@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Board, Post, User, FileAttachment, UserRole, SystemSettings } from './types';
+import { Board, Post, User, FileAttachment, UserRole, SystemSettings, Notice } from './types';
 
 // Supabase 테이블 데이터 <-> SchoolPad 로컬 타입 상호 변환기
 
@@ -26,6 +26,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
       let metaAuthorName: string | undefined = undefined;
       let metaAuthorRole: string | undefined = undefined;
       let metaIsPublic: boolean | undefined = undefined;
+      let metaOrder: number | undefined = undefined;
 
       if (rawDesc.includes('<!--SCHOOLPAD_BOARD_META:')) {
         const match = rawDesc.match(/<!--SCHOOLPAD_BOARD_META:([\s\S]*?)-->/);
@@ -43,6 +44,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
             if (parsed.authorName) metaAuthorName = parsed.authorName;
             if (parsed.authorRole) metaAuthorRole = parsed.authorRole;
             if (parsed.isPublic !== undefined) metaIsPublic = parsed.isPublic;
+            if (typeof parsed.order === 'number') metaOrder = parsed.order;
           } catch (e) {}
         }
         rawDesc = rawDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
@@ -57,6 +59,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
         description: rawDesc,
         layout: metaLayout || b.layout || 'kanban',
         theme: metaTheme || b.theme || 'blue',
+        order: metaOrder !== undefined ? metaOrder : undefined,
         coverImageUrl:
           metaCover ||
           b.cover_image_url ||
@@ -101,6 +104,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       authorId: board.authorId,
       authorName: board.authorName,
       authorRole: board.authorRole || 'teacher',
+      order: board.order,
       updatedAt: board.updatedAt || Date.now(),
     });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
@@ -691,6 +695,46 @@ export async function fetchRemoteSettings(): Promise<SystemSettings | null> {
 
     if (error || !data?.content) return null;
     return JSON.parse(data.content) as SystemSettings;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 📢 전역 관리자 공지사항 Supabase 동기화
+export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    if (!notice) {
+      await supabase.from('posts').delete().eq('id', 'schoolpad_global_notice');
+      return true;
+    }
+    const { error } = await supabase.from('posts').upsert({
+      id: 'schoolpad_global_notice',
+      board_id: '__SYSTEM_USERS__',
+      title: notice.title,
+      content: JSON.stringify(notice),
+      author_id: 'admin',
+      author_name: notice.authorName || '관리자',
+      column_name: '__notice__',
+    });
+    return !error;
+  } catch (e) {
+    console.error('saveRemoteNotice error', e);
+    return false;
+  }
+}
+
+export async function fetchRemoteNotice(): Promise<Notice | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('content')
+      .eq('id', 'schoolpad_global_notice')
+      .maybeSingle();
+
+    if (error || !data?.content) return null;
+    return JSON.parse(data.content) as Notice;
   } catch (e) {
     return null;
   }
