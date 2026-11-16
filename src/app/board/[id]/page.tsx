@@ -483,11 +483,17 @@ export default function BoardDetailPage() {
             const postCols = remote.map((p: Post) => {
               let name = p.column;
               if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+              if (name === '💻 코딩 & 컴퓨팅 사고력') name = '💻 코딩 & AI 인공지능';
+              if (name === '📐 수학 탐구 & AI 학습') name = '📐 수학 탐구 & 그래프 도구';
+              if (name === '📚 교과 종합 & 디자인 협업') name = '📚 교과 종합 & 디자인 학습도구';
               return name;
             }).filter(Boolean) as string[];
             activeCols = Array.from(new Set([...activeCols, ...postCols].map((c) => {
               let name = String(c || '').trim();
               if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+              if (name === '💻 코딩 & 컴퓨팅 사고력') name = '💻 코딩 & AI 인공지능';
+              if (name === '📐 수학 탐구 & AI 학습') name = '📐 수학 탐구 & 그래프 도구';
+              if (name === '📚 교과 종합 & 디자인 협업') name = '📚 교과 종합 & 디자인 학습도구';
               return name;
             })));
           }
@@ -625,7 +631,7 @@ export default function BoardDetailPage() {
         }
 
         // 2. 최신 모둠(열) 실시간 동기화
-        if (Date.now() - lastUserActionTimeRef.current >= 8000) {
+        if (Date.now() - lastUserActionTimeRef.current >= 15000) {
           let latestCols: string[] | null = null;
 
           // 2-1. posts 시스템 메타데이터로부터 실시간 열 목록 확인
@@ -666,25 +672,35 @@ export default function BoardDetailPage() {
               new Set([...latestCols, ...postCols].map((c: any) => {
                 let name = String(c || '').trim();
                 if (name === '몸플기 예제' || name === '몸풀기') name = '몸풀기 예제';
+                if (name === '💻 코딩 & 컴퓨팅 사고력') name = '💻 코딩 & AI 인공지능';
+                if (name === '📐 수학 탐구 & AI 학습') name = '📐 수학 탐구 & 그래프 도구';
+                if (name === '📚 교과 종합 & 디자인 협업') name = '📚 교과 종합 & 디자인 학습도구';
                 return name;
               }).filter(Boolean))
             ) as string[];
 
             if (cleanCols.length > 0) {
-              // 로컬에 새로 생성된 열이 아직 원격에 미처 반영되기 전이면 로컬 열 보존 (모둠 사라짐 방어)
-              const hasMissingLocal = columns.some((c) => !cleanCols.includes(c));
-              if (hasMissingLocal && Date.now() - lastUserActionTimeRef.current < 12000) {
-                return;
-              }
-
+              // 🔥 사용자가 배치한 순서를 최우선 보존 (원격이나 다른 참여자가 새로 생성한 열만 끝에 덧붙임)
               setColumns((prevCols) => {
-                if (prevCols.join('|') === cleanCols.join('|')) return prevCols;
-                return cleanCols;
+                const currentOrder = prevCols && prevCols.length > 0 ? prevCols : cleanCols;
+                const currentSet = new Set(currentOrder);
+                const newlyAddedCols = cleanCols.filter((c) => !currentSet.has(c));
+
+                if (newlyAddedCols.length === 0) {
+                  return currentOrder; // 신규 열이 없으면 사용자가 드래그해서 배치한 순서 100% 영구 유지!
+                }
+                return [...currentOrder, ...newlyAddedCols];
               });
+
               setBoard((prev) => {
                 if (!prev) return prev;
-                if ((prev.columns || []).join('|') === cleanCols.join('|')) return prev;
-                const updatedBoard = { ...prev, columns: cleanCols };
+                const currentCols = prev.columns && prev.columns.length > 0 ? prev.columns : cleanCols;
+                const currentSet = new Set(currentCols);
+                const newlyAddedCols = cleanCols.filter((c) => !currentSet.has(c));
+                const finalBoardCols = newlyAddedCols.length === 0 ? currentCols : [...currentCols, ...newlyAddedCols];
+
+                if (prev.columns && prev.columns.join('|') === finalBoardCols.join('|')) return prev;
+                const updatedBoard = { ...prev, columns: finalBoardCols };
                 try {
                   const data = getStoreData();
                   saveStoreData.boards(data.boards.map((b) => (b.id === updatedBoard.id ? updatedBoard : b)));
@@ -1026,7 +1042,7 @@ export default function BoardDetailPage() {
       return;
     }
 
-    lastUserActionTimeRef.current = Date.now(); // 5초간 원격 동기화 간섭 차단
+    lastUserActionTimeRef.current = Date.now(); // 15초간 원격 동기화 간섭 차단
 
     const updatedCols = [...columns];
     const [movedCol] = updatedCols.splice(sourceIdx, 1);
@@ -1038,8 +1054,14 @@ export default function BoardDetailPage() {
     setDraggedColIdx(null);
     setDragOverColIdx(null);
 
+    // 🔥 즉시 브라우저 메모리에 최신 열 순서 기록 (백그라운드 동기화 루프가 이전 순서로 되돌리지 못하도록 방어)
+    if (typeof window !== 'undefined') {
+      (window as any).__LATEST_BOARD_COLUMNS__ = cleanCols;
+    }
+
+    const now = Date.now();
     const data = getStoreData();
-    const updatedBoard = { ...board, columns: cleanCols };
+    const updatedBoard = { ...board, columns: cleanCols, updatedAt: now };
     saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
     setBoard(updatedBoard);
 

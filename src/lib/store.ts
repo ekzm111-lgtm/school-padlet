@@ -527,11 +527,25 @@ export const getStoreData = (): StoreData => {
       saveRemoteBoard(USEFUL_SCHOOL_LINKS_BOARD).catch(() => {});
     }
   } else {
-    // 컬럼 목록이 업데이트된 경우 최신 컬럼 구조로 자동 동기화
-    if (boardsList[usefulBoardIdx].columns?.length !== USEFUL_SCHOOL_LINKS_BOARD.columns?.length) {
+    // 컬럼 정규화 (중복 및 구버전 컬럼명 자동 정리)
+    const rawCols = boardsList[usefulBoardIdx].columns || [];
+    const normalizedCols = Array.from(new Set(rawCols.map((c: string) => {
+      if (c === '💻 코딩 & 컴퓨팅 사고력') return '💻 코딩 & AI 인공지능';
+      if (c === '📐 수학 탐구 & AI 학습') return '📐 수학 탐구 & 그래프 도구';
+      if (c === '📚 교과 종합 & 디자인 협업') return '📚 교과 종합 & 디자인 학습도구';
+      return c;
+    }))).filter(Boolean);
+
+    // 최신 기본 컬럼 중 누락된 컬럼 보강
+    const curSet = new Set(normalizedCols);
+    (USEFUL_SCHOOL_LINKS_BOARD.columns || []).forEach((c) => {
+      if (!curSet.has(c)) normalizedCols.push(c);
+    });
+
+    if (JSON.stringify(rawCols) !== JSON.stringify(normalizedCols)) {
       boardsList[usefulBoardIdx] = {
         ...boardsList[usefulBoardIdx],
-        columns: USEFUL_SCHOOL_LINKS_BOARD.columns,
+        columns: normalizedCols,
         description: USEFUL_SCHOOL_LINKS_BOARD.description,
       };
       try {
@@ -547,6 +561,31 @@ export const getStoreData = (): StoreData => {
   boardsList = boardsList.filter((b) => b.id !== 'board-digital-tutor-2025' && b.code !== '202501');
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
+
+  // 유용한 학습 사이트 보드의 중복/구버전 컬럼명 정규화
+  let postsMigrated = false;
+  postsList = postsList.map((p) => {
+    if (p.boardId === USEFUL_SCHOOL_LINKS_BOARD.id) {
+      if (p.column === '💻 코딩 & 컴퓨팅 사고력') {
+        postsMigrated = true;
+        return { ...p, column: '💻 코딩 & AI 인공지능' };
+      }
+      if (p.column === '📐 수학 탐구 & AI 학습') {
+        postsMigrated = true;
+        return { ...p, column: '📐 수학 탐구 & 그래프 도구' };
+      }
+      if (p.column === '📚 교과 종합 & 디자인 협업') {
+        postsMigrated = true;
+        return { ...p, column: '📚 교과 종합 & 디자인 학습도구' };
+      }
+    }
+    return p;
+  });
+  if (postsMigrated) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(postsList));
+    } catch (e) {}
+  }
 
   // 유용한 학습 사이트 링크 중 누락된 포스트 자동 보강
   const existingPostIds = new Set(postsList.map((p) => p.id));

@@ -21,11 +21,11 @@ export const USEFUL_SCHOOL_LINKS_BOARD: Board = {
   category: '수업자료',
   columns: [
     '🎯 실시간 퀴즈 & 게임학습',
-    '💻 코딩 & 컴퓨팅 사고력',
-    '📐 수학 탐구 & AI 학습',
+    '💻 코딩 & AI 인공지능',
+    '📐 수학 탐구 & 그래프 도구',
     '🔬 과학 시뮬레이션 & 가상실험',
     '🏫 스마트 교실 & LMS 플랫폼',
-    '📚 교과 종합 & 디자인 협업',
+    '📚 교과 종합 & 디자인 학습도구',
     '🛡️ 디지털 리터러시 & 탐구',
   ],
   createdAt: '2026-11-16',
@@ -123,7 +123,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-entry',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '💻 코딩 & 컴퓨팅 사고력',
+    column: '💻 코딩 & AI 인공지능',
     order: 1,
     title: '엔트리 (PlayEntry)',
     linkUrl: 'https://playentry.org',
@@ -140,7 +140,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-scratch',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '💻 코딩 & 컴퓨팅 사고력',
+    column: '💻 코딩 & AI 인공지능',
     order: 2,
     title: '스크래치 (MIT Scratch)',
     linkUrl: 'https://scratch.mit.edu',
@@ -157,7 +157,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-hourofcode',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '💻 코딩 & 컴퓨팅 사고력',
+    column: '💻 코딩 & AI 인공지능',
     order: 3,
     title: '아워 오브 코드 (Hour of Code)',
     linkUrl: 'https://hourofcode.com',
@@ -174,7 +174,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-lightbot',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '💻 코딩 & 컴퓨팅 사고력',
+    column: '💻 코딩 & AI 인공지능',
     order: 4,
     title: '라이트봇 (Lightbot)',
     linkUrl: 'https://lightbot.com',
@@ -191,7 +191,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-rodocodo',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '💻 코딩 & 컴퓨팅 사고력',
+    column: '💻 코딩 & AI 인공지능',
     order: 5,
     title: '로도코도 (Rodocodo)',
     linkUrl: 'https://www.rodocodo.com',
@@ -208,7 +208,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-teachable-machine',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '💻 코딩 & 컴퓨팅 사고력',
+    column: '💻 코딩 & AI 인공지능',
     order: 6,
     title: '티처블 머신 (Google Teachable Machine)',
     linkUrl: 'https://teachablemachine.withgoogle.com',
@@ -227,7 +227,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-toctocmath',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📐 수학 탐구 & AI 학습',
+    column: '📐 수학 탐구 & 그래프 도구',
     order: 1,
     title: '똑똑! 수학탐험대 (ToctocMath)',
     linkUrl: 'https://www.toctocmath.kr',
@@ -244,7 +244,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-algeomath',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📐 수학 탐구 & AI 학습',
+    column: '📐 수학 탐구 & 그래프 도구',
     order: 2,
     title: '알지오매스 (AlgeoMath)',
     linkUrl: 'https://www.algeomath.kr',
@@ -261,7 +261,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-polysmath',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📐 수학 탐구 & AI 학습',
+    column: '📐 수학 탐구 & 그래프 도구',
     order: 3,
     title: '폴리수학 (PolysMath)',
     linkUrl: 'https://teacher.polysmath.com',
@@ -278,7 +278,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-geogebra',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📐 수학 탐구 & AI 학습',
+    column: '📐 수학 탐구 & 그래프 도구',
     order: 4,
     title: '지오지브라 (GeoGebra)',
     linkUrl: 'https://www.geogebra.org',
@@ -295,7 +295,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-desmos',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📐 수학 탐구 & AI 학습',
+    column: '📐 수학 탐구 & 그래프 도구',
     order: 5,
     title: '데스모스 그래프 계산기 (Desmos)',
     linkUrl: 'https://www.desmos.com/calculator?lang=ko',
@@ -312,7 +312,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-ebsmath',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📐 수학 탐구 & AI 학습',
+    column: '📐 수학 탐구 & 그래프 도구',
     order: 6,
     title: 'EBSMath (수학 자기주도학습)',
     linkUrl: 'https://www.ebsmath.co.kr',
@@ -454,7 +454,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-digital-textbook',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📚 교과 종합 & 디자인 협업',
+    column: '📚 교과 종합 & 디자인 학습도구',
     order: 1,
     title: '디지털교과서 웹뷰어 (에듀넷 티-클리어)',
     linkUrl: 'https://webdt.edunet.net',
@@ -471,7 +471,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-miricanvas',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📚 교과 종합 & 디자인 협업',
+    column: '📚 교과 종합 & 디자인 학습도구',
     order: 2,
     title: '미리캔버스 (MiriCanvas)',
     linkUrl: 'https://www.miricanvas.com',
@@ -488,7 +488,7 @@ export const USEFUL_SCHOOL_LINKS_POSTS: Post[] = [
   {
     id: 'link-padlet',
     boardId: USEFUL_SCHOOL_LINKS_BOARD_ID,
-    column: '📚 교과 종합 & 디자인 협업',
+    column: '📚 교과 종합 & 디자인 학습도구',
     order: 3,
     title: '패들렛 (Padlet)',
     linkUrl: 'https://padlet.com',
