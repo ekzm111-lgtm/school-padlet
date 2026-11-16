@@ -9,7 +9,8 @@ interface NoticeModalProps {
   onClose: () => void;
   notice: Notice | null;
   onSave: (notice: Notice | null) => void;
-  isTeacherOrAdmin: boolean;
+  isAdmin?: boolean;
+  isTeacherOrAdmin?: boolean;
 }
 
 export default function NoticeModal({
@@ -17,8 +18,10 @@ export default function NoticeModal({
   onClose,
   notice,
   onSave,
+  isAdmin,
   isTeacherOrAdmin,
 }: NoticeModalProps) {
+  const canManageNotice = isAdmin !== undefined ? isAdmin : false;
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState<'urgent' | 'general' | 'event'>('general');
@@ -101,10 +104,10 @@ export default function NoticeModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                {isTeacherOrAdmin ? '📢 관리자 공지사항 설정' : '📢 전체 공지사항'}
+                {canManageNotice ? '📢 관리자 공지사항 설정' : '📢 전체 공지사항'}
               </h3>
               <p className="text-[11px] text-slate-500">
-                {isTeacherOrAdmin
+                {canManageNotice
                   ? '모든 학생과 교사가 볼 수 있는 전역 공지를 작성하고 관리합니다.'
                   : notice?.createdAt ? `등록일: ${notice.createdAt}` : '공지사항 안내'}
               </p>
@@ -119,7 +122,7 @@ export default function NoticeModal({
         </div>
 
         {/* 관리자 작성 폼 */}
-        {isTeacherOrAdmin ? (
+        {canManageNotice ? (
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             {/* 공지 카테고리 선택 */}
             <div>

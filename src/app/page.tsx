@@ -414,8 +414,12 @@ export default function HomePage() {
     }
   };
 
-  // 📢 관리자 공지사항 저장 및 동기화
+  // 📢 관리자 공지사항 저장 및 동기화 (오직 관리자 admin 전용)
   const handleSaveNotice = async (newNotice: Notice | null) => {
+    if (currentUser?.role !== 'admin') {
+      alert('공지사항 관리는 관리자(admin) 권한에서만 가능합니다.');
+      return;
+    }
     setNotice(newNotice);
     try {
       if (newNotice) {
@@ -650,16 +654,18 @@ export default function HomePage() {
                   <span>추천 템플릿 복제하기</span>
                 </button>
 
-                <button
-                  onClick={() => setShowNoticeModal(true)}
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition-all active:scale-95"
-                >
-                  <Megaphone className="w-4 h-4 text-amber-900" />
-                  <span>{notice ? '공지사항 관리' : '공지사항 작성'}</span>
-                  {notice && notice.isActive && (
-                    <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
-                  )}
-                </button>
+                {currentUser?.role === 'admin' && (
+                  <button
+                    onClick={() => setShowNoticeModal(true)}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition-all active:scale-95"
+                  >
+                    <Megaphone className="w-4 h-4 text-amber-900" />
+                    <span>{notice ? '공지사항 관리' : '공지사항 작성'}</span>
+                    {notice && notice.isActive && (
+                      <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1394,7 +1400,7 @@ export default function HomePage() {
         onClose={() => setShowNoticeModal(false)}
         notice={notice}
         onSave={handleSaveNotice}
-        isTeacherOrAdmin={isTeacherOrAdmin}
+        isAdmin={currentUser?.role === 'admin'}
       />
     </div>
   );
