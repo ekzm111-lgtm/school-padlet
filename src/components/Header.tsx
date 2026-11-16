@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User } from '@/lib/types';
+import { saveRemoteUser } from '@/lib/supabaseStore';
 
 interface HeaderProps {
   extraRight?: React.ReactNode;
@@ -52,6 +53,9 @@ export default function Header({ extraRight }: HeaderProps = {}) {
 
     // 2. 현재 로그인 세션 갱신
     saveStoreData.currentUser(updatedUser);
+
+    // 🌟 원격 클라우드에도 수정된 이름 영구 저장
+    saveRemoteUser(updatedUser).catch(() => {});
 
     // 3. 내가 작성한 보드 및 포스트의 작성자명 동기화
     const updatedBoards = data.boards.map((b) =>

@@ -753,21 +753,30 @@ export const getStoreData = (): StoreData => {
     const matched = usersList.find(
       (u) =>
         u.id === parsedUser!.id ||
-        (u.username && u.username === parsedUser!.username) ||
-        (u.name && u.name === parsedUser!.name)
+        (u.username && u.username === parsedUser!.username)
     );
     if (matched) {
-      if (
-        parsedUser.role !== matched.role ||
-        parsedUser.status !== matched.status ||
-        parsedUser.name !== matched.name
-      ) {
+      let userUpdated = false;
+      // 🌟 권한(role) 및 승인상태(status)는 users 목록의 최신 상태와 동기화
+      if (parsedUser.role !== matched.role || parsedUser.status !== matched.status) {
         parsedUser = {
           ...parsedUser,
           role: matched.role,
           status: matched.status,
-          name: matched.name,
         };
+        userUpdated = true;
+      }
+
+      // 🌟 사용자가 직접 변경한 본인 이름(parsedUser.name)이 있으면
+      // 과거 하드코딩된 이름(INITIAL_USERS)으로 덮어쓰지 않고 users 목록에도 최신 이름 전파!
+      if (parsedUser.name && parsedUser.name !== matched.name) {
+        matched.name = parsedUser.name;
+        try {
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
+        } catch (e) {}
+      }
+
+      if (userUpdated) {
         try {
           localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(parsedUser));
         } catch (e) {}

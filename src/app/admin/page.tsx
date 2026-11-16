@@ -208,6 +208,11 @@ export default function AdminPage() {
     ) {
       saveStoreData.currentUser({ ...currentData.currentUser, role: newRole });
     }
+    const changedUser = updated.find((u) => u.id === userId);
+    if (changedUser) {
+      saveRemoteUser(changedUser).catch(() => {});
+    }
+
     showToast(`권한이 '${newRole === 'admin' ? '관리자' : newRole === 'teacher' ? '교사' : '학생'}'(으)로 변경되었습니다.`);
   };
 
@@ -243,6 +248,11 @@ export default function AdminPage() {
     // 본인 계정이면 currentUser도 즉시 동기화
     if (currentUser?.id === editingUserForName.id) {
       saveStoreData.currentUser({ ...currentUser, name: trimmedName });
+    }
+
+    const changedUser = updated.find((u) => u.id === editingUserForName.id);
+    if (changedUser) {
+      saveRemoteUser(changedUser).catch(() => {});
     }
 
     // 해당 사용자가 작성한 보드 및 포스트의 작성자명도 일괄 동기화
