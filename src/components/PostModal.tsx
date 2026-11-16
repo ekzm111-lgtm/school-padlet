@@ -17,6 +17,8 @@ import {
   Save,
   Trash2,
   ExternalLink,
+  MessageSquarePlus,
+  FileCode,
   Loader2,
 } from 'lucide-react';
 import { Post, User, FileAttachment } from '@/lib/types';
@@ -102,6 +104,9 @@ export default function PostModal({
   const [linkUrl, setLinkUrl] = useState('');
   const [customAuthor, setCustomAuthor] = useState('');
   
+  // 🌟 작성 모드: 'note'(간단 쪽지/의견) | 'link'(동영상/웹링크) | 'full'(상세 보고서/파일첨부)
+  const [cardType, setCardType] = useState<'note' | 'link' | 'full'>('note');
+  
   // 🔥 복수 파일 첨부 상태
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
 
@@ -141,6 +146,8 @@ export default function PostModal({
     prevIsOpenRef.current = true;
 
     if (mode === 'edit' && post) {
+      // 수정 모드일 때는 모든 내용을 온전히 볼 수 있도록 full 모드로 설정
+      setCardType('full');
       setTitle(post.title || '');
       let cleanContent = post.content || '';
       const existingFiles: FileAttachment[] = [];
@@ -655,6 +662,50 @@ export default function PostModal({
           </button>
         </div>
 
+        {/* 🌟 글쓰기 유형 선택 3대 탭 (간단 쪽지 vs 동영상/링크 vs 상세 작성) */}
+        {mode === 'create' && (
+          <div className="mt-4 grid grid-cols-3 gap-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => setCardType('note')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-black transition active:scale-95 ${
+                cardType === 'note'
+                  ? 'bg-white text-blue-600 shadow-sm border border-blue-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <MessageSquarePlus className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="truncate">📝 간단 쪽지</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCardType('link')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-black transition active:scale-95 ${
+                cardType === 'link'
+                  ? 'bg-white text-indigo-600 shadow-sm border border-indigo-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <LinkIcon className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="truncate">🔗 동영상·링크</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCardType('full')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-black transition active:scale-95 ${
+                cardType === 'full'
+                  ? 'bg-white text-purple-600 shadow-sm border border-purple-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <FileText className="w-4 h-4 text-purple-600 shrink-0" />
+              <span className="truncate">📁 상세 보고서</span>
+            </button>
+          </div>
+        )}
+
         {pasteNotice && (
           <div className="mt-3 p-2.5 bg-emerald-50 text-emerald-700 text-xs rounded-xl flex items-center gap-2 font-bold animate-in fade-in">
             <ClipboardCheck className="w-4 h-4 text-emerald-600" />
@@ -722,296 +773,225 @@ export default function PostModal({
             />
           </div>
 
-          {/* 제목 */}
-          <div>
-            <input
-              type="text"
-              placeholder="제목을 입력하세요 (예: 3단원 수업 요약 활동지)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3.5 py-3 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
+{/* 1. [간단 쪽지 모드 (📝)] : 제목과 링크 없이 말풍선 메모 하나만 1초 만에 작성 */}
+          {cardType === 'note' && (
+            <div className="space-y-3 animate-in fade-in duration-150">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-blue-700">
+                    <MessageSquarePlus className="w-4 h-4 text-blue-600" />
+                    <span>한줄 쪽지 / 질문 / 의견</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    엔터 키로 줄바꿈 가능
+                  </span>
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="질문이나 생각, 의견을 자유롭게 적어보세요...&#10;(예: 오늘 배운 3단계 블록 코드가 잘 이해되지 않아요!)"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="w-full p-4 rounded-2xl border-2 border-blue-200/80 bg-blue-50/20 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none leading-relaxed font-medium transition shadow-inner placeholder:text-slate-400"
+                  autoFocus
+                />
+              </div>
 
-          {/* 본문 */}
-          <div>
-            <textarea
-              required={!imageUrl && attachments.length === 0}
-              rows={3}
-              placeholder="내용을 적어보세요... (화면 캡처 후 Ctrl+V 또는 파일을 화면으로 끌어다 놓으세요)"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
-            />
-          </div>
-
-          {/* 🔗 참고 링크(URL) 및 웹사이트 주소 입력 (항상 열림) */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <LinkIcon className="w-4 h-4 text-blue-600" />
-                <span>참고 링크(URL) / 웹사이트 주소</span>
-              </label>
-              {linkUrl && (
-                <button
-                  type="button"
-                  onClick={() => setLinkUrl('')}
-                  className="text-[11px] text-slate-400 hover:text-red-500 font-medium transition"
-                >
-                  지우기
-                </button>
+              {/* 쪽지 모드에서도 캡처 이미지 붙여넣기는 바로 가능 */}
+              {imageUrl && (
+                <div className="relative rounded-xl overflow-hidden border border-slate-200 max-h-48 bg-slate-50">
+                  <img src={imageUrl} alt="첨부 이미지" className="w-full max-h-48 object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl('')}
+                    className="absolute top-2 right-2 px-2 py-1 bg-red-600 text-white rounded-lg text-xs font-bold"
+                  >
+                    삭제
+                  </button>
+                </div>
               )}
             </div>
+          )}
 
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+          {/* 2. [동영상·링크 공유 모드 (🔗)] : 유튜브/웹 링크 중심 입력 */}
+          {cardType === 'link' && (
+            <div className="space-y-3.5 animate-in fade-in duration-150">
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border-2 border-indigo-200/80 space-y-2">
+                <label className="block text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                  <LinkIcon className="w-4 h-4 text-indigo-600" />
+                  <span>동영상 / 웹사이트 링크 (URL)</span>
+                </label>
                 <input
                   type="url"
-                  placeholder="https://... (웹사이트, 유튜브, 노션, 구글 드라이브 등 모든 링크 가능)"
+                  required
+                  placeholder="https://... (유튜브 주소나 웹사이트 링크를 붙여넣으세요)"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs outline-none bg-white font-medium transition ${
-                    linkUrl.includes('drive.google.com') || linkUrl.includes('docs.google.com')
-                      ? 'border-emerald-500 ring-2 ring-emerald-200 text-emerald-950 font-bold'
-                      : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
-                  }`}
+                  className="w-full px-3.5 py-3 rounded-xl border border-indigo-300 text-xs sm:text-sm outline-none bg-white font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 shadow-xs"
+                  autoFocus
                 />
-                {(linkUrl.includes('drive.google.com') || linkUrl.includes('docs.google.com')) && (
-                  <span className="absolute right-3 top-2.5 text-[11px] font-bold text-emerald-600 flex items-center gap-1 bg-white/90 px-1.5 rounded-md">
-                    <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>구글 드라이브 인식됨</span>
-                  </span>
+                <p className="text-[11px] text-indigo-700/80">
+                  💡 유튜브 주소를 넣으면 썸네일과 동영상 플레이어가 모달에 자동으로 연결됩니다.
+                </p>
+
+                {/* 실시간 링크 대표 이미지 추출 안내 */}
+                {isFetchingPreview && (
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-700 bg-white/80 px-3 py-2 rounded-xl animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>링크 썸네일 분석 중...</span>
+                  </div>
+                )}
+
+                {imageUrl && (
+                  <div className="relative rounded-xl overflow-hidden border border-indigo-200 max-h-40 bg-black/5 mt-2">
+                    <img src={imageUrl} alt="링크 대표 썸네일" className="w-full max-h-40 object-cover" />
+                  </div>
                 )}
               </div>
-              {linkUrl && (
-                <button
-                  type="button"
-                  onClick={() => setLinkUrl('')}
-                  className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shrink-0"
-                >
-                  비우기
-                </button>
-              )}
-            </div>
 
-            {/* 링크 대표 이미지 자동 추출 상태 안내 */}
-            {isFetchingPreview && (
-              <div className="flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-100/70 px-3 py-2 rounded-xl border border-blue-200 animate-pulse">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
-                <span>링크의 대표 이미지(미리보기)를 자동으로 가져오는 중입니다...</span>
-              </div>
-            )}
-
-            {!isFetchingPreview && autoPreviewLoaded && imageUrl && (
-              <div className="flex items-center justify-between text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>링크의 대표 이미지가 자동으로 적용되었습니다!</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageUrl('');
-                    setAutoPreviewLoaded(false);
-                  }}
-                  className="text-slate-500 hover:text-red-600 underline text-[11px] font-semibold"
-                >
-                  이미지 취소
-                </button>
-              </div>
-            )}
-
-            {/* 📁 구글 드라이브 자료 안내 & 원클릭 버튼 배너 */}
-            <div className="mt-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2 text-xs text-slate-700">
-                <span className="text-base">📁</span>
-                <div className="text-[11px] text-slate-600 leading-snug">
-                  <strong>대용량 한글(HWP), PPT, 동영상 자료</strong>는 본인 구글 드라이브에 올린 뒤 공유 링크를 위 링크창에 넣어보세요!
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => window.open('https://drive.google.com', '_blank')}
-                className="px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 text-xs font-bold transition flex items-center gap-1 shadow-xs shrink-0"
-                title="새 창에서 내 구글 드라이브 열기"
-              >
-                <span>내 구글 드라이브 열기</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* 🔥 드래그 앤 드롭 파일 첨부 존 (여러 파일 지원) */}
-          <div
-            onClick={() => docFileInputRef.current?.click()}
-            onDragEnter={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-              setIsDragOver(true);
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-              setIsDragOver(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragOver(false);
-            }}
-            onDrop={handleDrop}
-            className={`p-5 rounded-2xl border-2 border-dashed transition-all duration-150 cursor-pointer text-center select-none ${
-              isDragOver
-                ? 'border-blue-600 bg-blue-100/80 ring-4 ring-blue-200 scale-[1.01]'
-                : 'border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40'
-            }`}
-          >
-            <input
-              ref={docFileInputRef}
-              type="file"
-              multiple
-              accept=".hwp,.hwpx,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.txt,.png,.jpg,.jpeg"
-              onChange={handleDocFileSelect}
-              className="hidden"
-            />
-            <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
-              <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition shadow-xs ${
-                  isDragOver ? 'bg-blue-600 text-white scale-110' : 'bg-indigo-100 text-indigo-600'
-                }`}
-              >
-                <Upload className="w-6 h-6" />
-              </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-800">
-                  {isDragOver
-                    ? '📂 마우스를 놓으면 파일이 바로 첨부됩니다!'
-                    : '컴퓨터 파일을 이곳에 끌어다 놓으세요 (드래그 앤 드롭)'}
-                </span>
-                <span className="ml-1.5 text-xs font-bold text-blue-600 underline">
-                  또는 클릭하여 파일 찾기
-                </span>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  자료 제목 <span className="text-[10px] text-slate-400 font-normal">(비워두면 링크 제목으로 자동 설정)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="예: 꼭 알아야 할 엔트리 변수 개념 영상"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
               </div>
-              <p className="text-[11px] text-slate-400">
-                한글(HWP), PDF, 워드, PPT, 엑셀, 이미지 등 모든 파일 지원 (개당 최대 10MB)
-              </p>
-            </div>
-          </div>
 
-          {/* 첨부된 파일 목록 (리스트 형태로 다중 노출) */}
-          {attachments.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
-                <span>첨부된 파일 목록 ({attachments.length}개)</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {attachments.map((file, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between gap-2 text-xs truncate"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
-                      <div className="truncate text-left">
-                        <div className="font-bold text-indigo-950 truncate">{file.name}</div>
-                        <div className="text-[10px] text-indigo-600 font-mono">{file.size}</div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAttachment(idx)}
-                      className="p-1 text-indigo-400 hover:text-red-600 rounded-lg transition shrink-0"
-                      title="삭제"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">간단 코멘트 / 소개 한줄</label>
+                <textarea
+                  rows={2}
+                  placeholder="이 영상이나 자료에 대해 남길 간단한 한마디를 적어보세요."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed"
+                />
               </div>
             </div>
           )}
 
-          {/* 대표 이미지 (웹 이미지 링크 주소 입력 + 수업 테마 선택) */}
-          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-blue-600" />
-                <span>대표 이미지 (이미지 링크 주소 넣기 또는 테마)</span>
-              </span>
-              <span className="text-[10px] text-slate-400">화면 캡처 후 Ctrl+V 가능</span>
-            </div>
-
-            {/* 이미지 링크 주소 직접 입력 */}
-            <div className="flex items-center gap-2">
-              <input
-                type="url"
-                placeholder="이미지 링크(URL) 주소 직접 입력 (예: https://.../image.png)"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-xs outline-none bg-white focus:ring-2 focus:ring-blue-500 font-medium"
-              />
-              {imageUrl && (
-                <button
-                  type="button"
-                  onClick={() => setImageUrl('')}
-                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shrink-0"
-                >
-                  지우기
-                </button>
-              )}
-            </div>
-
-            {/* 첨부된 대표 이미지 미리보기 */}
-            {imageUrl && (
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200 group max-h-56 bg-slate-100">
-                <img
-                  src={imageUrl}
-                  alt="대표 이미지 미리보기"
-                  className="w-full h-44 object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.opacity = '0.5';
-                  }}
+          {/* 3. [상세 보고서 모드 (📁)] : 제목 + 긴 본문 + 다중 첨부파일 풀 에디터 */}
+          {cardType === 'full' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              {/* 제목 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">제목</label>
+                <input
+                  type="text"
+                  placeholder="제목을 입력하세요 (예: 3단원 수업 요약 활동지)"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3.5 py-3 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                 />
-                <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-white text-[10px] rounded-md font-bold">
-                  이미지 미리보기
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setImageUrl('')}
-                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full transition shadow-md"
-                  title="이미지 삭제"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
-            )}
 
-            {/* 학교 수업 테마 이미지 선택 (원클릭) */}
-            <div>
-              <div className="text-[11px] font-bold text-slate-500 mb-1.5">학교 수업 테마 이미지 선택:</div>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                {themePresets.map((t) => (
-                  <button
-                    key={t.label}
-                    type="button"
-                    onClick={() => setImageUrl(t.url)}
-                    className={`p-1.5 rounded-lg border text-[10px] font-medium text-center truncate transition ${
-                      imageUrl === t.url
-                        ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold ring-1 ring-blue-500'
-                        : 'bg-white border-slate-200 hover:border-blue-400 text-slate-700'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+              {/* 본문 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">본문 내용</label>
+                <textarea
+                  required={!imageUrl && attachments.length === 0}
+                  rows={4}
+                  placeholder="내용을 적어보세요... (화면 캡처 후 Ctrl+V 또는 파일을 화면으로 끌어다 놓으세요)"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
+                />
+              </div>
+
+              {/* 🔗 참고 링크(URL) 및 웹사이트 주소 입력 */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <LinkIcon className="w-4 h-4 text-blue-600" />
+                    <span>참고 링크(URL)</span>
+                  </label>
+                  {linkUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setLinkUrl('')}
+                      className="text-[11px] text-slate-400 hover:text-red-500 font-medium transition"
+                    >
+                      지우기
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://... (웹사이트, 유튜브 등)"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs outline-none bg-white font-medium focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* 대표 이미지 & 파일 첨부 섹션 */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Paperclip className="w-4 h-4 text-indigo-600" />
+                    <span>사진 및 학습지 파일 첨부</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => imageFileInputRef.current?.click()}
+                      className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>사진</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => docFileInputRef.current?.click()}
+                      className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>문서 파일</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 첨부된 파일 목록 */}
+                {attachments.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    {attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 text-xs">
+                        <span className="font-bold text-slate-700 truncate">{file.name} ({file.size})</span>
+                        <button
+                          type="button"
+                          onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                          className="text-slate-400 hover:text-red-500 p-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {imageUrl && (
+                  <div className="relative rounded-xl overflow-hidden border border-slate-200 max-h-36 bg-black/5 mt-1">
+                    <img src={imageUrl} alt="첨부 이미지" className="w-full max-h-36 object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl('')}
+                      className="absolute top-1.5 right-1.5 px-2 py-1 bg-red-600 text-white rounded-lg text-xs font-bold"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-
-
+          )}
 
           {/* 색상 선택 */}
           <div>
