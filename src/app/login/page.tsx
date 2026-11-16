@@ -55,7 +55,6 @@ export default function LoginPage() {
   const [showCustomGoogleInput, setShowCustomGoogleInput] = useState(false);
   const [googleEmailInput, setGoogleEmailInput] = useState('');
   const [googleNameInput, setGoogleNameInput] = useState('');
-  const [googleRoleInput, setGoogleRoleInput] = useState<UserRole>('student');
   const [savedGmail, setSavedGmail] = useState('');
   const [savedName, setSavedName] = useState('');
 
@@ -111,7 +110,7 @@ export default function LoginPage() {
             user.user_metadata?.full_name ||
             user.user_metadata?.name ||
             user.email.split('@')[0];
-          handleGoogleSubmit(user.email, gName, 'student');
+          handleGoogleSubmit(user.email, gName);
         }
       }).catch(() => {});
     }
@@ -143,7 +142,7 @@ export default function LoginPage() {
                   const googleName = profile.name || profile.given_name || profile.email.split('@')[0];
                   setGoogleEmailInput(profile.email);
                   setGoogleNameInput(googleName);
-                  handleGoogleSubmit(profile.email, googleName, googleRoleInput);
+                  handleGoogleSubmit(profile.email, googleName);
                 }
               } catch (err) {
                 console.error('Failed to parse Google credential', err);
@@ -182,7 +181,7 @@ export default function LoginPage() {
       }, 500);
       return () => clearInterval(timer);
     }
-  }, [googleRoleInput]);
+  }, []);
 
   // 브라우저 자격 증명(Web Credential API) 자동 감지
   const handleAutoFillFromBrowser = async () => {
@@ -275,9 +274,8 @@ export default function LoginPage() {
   };
 
   // Google 모달에서 실제 로그인/가입 실행
-  const handleGoogleSubmit = async (emailToUse?: string, nameToUse?: string, roleToUse?: UserRole) => {
+  const handleGoogleSubmit = async (emailToUse?: string, nameToUse?: string) => {
     const finalEmail = (emailToUse || googleEmailInput).trim();
-    const finalRole = roleToUse || googleRoleInput;
     let finalName = (nameToUse || googleNameInput).trim();
 
     if (!finalEmail) {
@@ -299,10 +297,39 @@ export default function LoginPage() {
     const data = getStoreData();
     const isAutoApprove = data.settings.autoApproveUsers;
 
-    const existing = data.users.find(
+    // 1) 로컬 사용자 목록에서 먼저 확인
+    let existing = data.users.find(
       (u) => u.email.toLowerCase() === finalEmail.toLowerCase()
     );
 
+    // 2) 로컬에 없으면 원격 클라우드에서도 확인
+    if (!existing) {
+      try {
+        const remoteUsers = await fetchRemoteUsers();
+        if (remoteUsers && remoteUsers.length > 0) {
+          existing = remoteUsers.find(
+            (u) => u.email.toLowerCase() === finalEmail.toLowerCase()
+          );
+          if (existing) {
+            const userMap = new Map<string, User>();
+            data.users.forEach((u) => userMap.set(u.id, u));
+            remoteUsers.forEach((u) => userMap.set(u.id, u));
+            saveStoreData.users(Array.from(userMap.values()));
+          }
+        }
+      } catch (err) {}
+    }
+
+    // 🌟 ekzm11133@gmail.com 계정은 무조건 교사(teacher) 권한 보장
+    if (finalEmail.toLowerCase() === 'ekzm11133@gmail.com') {
+      if (existing && existing.role === 'student') {
+        existing.role = 'teacher';
+        saveStoreData.users(data.users.map((u) => (u.id === existing!.id ? { ...u, role: 'teacher' } : u)));
+        saveRemoteUser(existing).catch(() => {});
+      }
+    }
+
+    // 🌟 이미 가입된 회원은 가입 시 결정된 기존 role(교사/학생/관리자) 그대로 로그인
     if (existing) {
       if (existing.status === 'pending') {
         alert('현재 관리자 승인 대기 중인 계정입니다. 관리자 승인 후 이용 가능합니다.');
@@ -317,14 +344,16 @@ export default function LoginPage() {
       return;
     }
 
-    // 신규 가입 처리
+    // 🌟 신규 회원의 경우에만 최초 등록 (기본 선생님 권한 부여)
+    const assignedRole: UserRole = 'teacher';
+
     const newUser: User = {
       id: `user-google-${Date.now()}`,
       username: finalEmail.split('@')[0],
       password: 'google-auth-auto',
       name: finalName,
       email: finalEmail,
-      role: finalRole,
+      role: assignedRole,
       status: isAutoApprove ? 'approved' : 'pending',
       schoolName: data.settings.schoolName,
       createdAt: new Date().toISOString().split('T')[0],
@@ -336,7 +365,7 @@ export default function LoginPage() {
 
     if (isAutoApprove) {
       saveStoreData.currentUser(newUser);
-      alert(`🎉 [Gmail 자동 가입 완료] ${finalName}님 환영합니다!`);
+      alert(`🎉 [Google 로그인 완료] ${finalName}님 환영합니다!`);
       router.push('/');
     } else {
       setShowGoogleModal(false);
@@ -834,57 +863,58 @@ export default function LoginPage() {
               <p className="text-xs text-slate-500 mt-0.5">스쿨패들로 이동할 계정을 선택하세요</p>
             </div>
 
-            {/* 신분 선택 (학생 / 선생님) */}
-            <div>
-              <div className="text-[11px] font-bold text-slate-500 mb-1.5 px-0.5">신분 선택</div>
-              <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-2 gap-1 text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setGoogleRoleInput('student')}
-                  className={`py-1.5 rounded-lg transition ${
-                    googleRoleInput === 'student' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🎒 학생으로 입장
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setGoogleRoleInput('teacher')}
-                  className={`py-1.5 rounded-lg transition ${
-                    googleRoleInput === 'teacher' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  👩‍🏫 선생님으로 입장
-                </button>
-              </div>
-            </div>
-
             {/* 계정 목록 */}
             <div className="space-y-2 pt-1">
               {/* 1) 감지된 브라우저 Google 계정 */}
-              <button
-                type="button"
-                onClick={() => handleGoogleSubmit(savedGmail || 'ekzm11133@gmail.com', savedName || 'minwan1 kim', googleRoleInput)}
-                className="w-full flex items-center justify-between p-3.5 rounded-2xl border-2 border-blue-200/80 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50 transition group text-left shadow-2xs active:scale-98"
-              >
-                <div className="flex items-center gap-3 truncate">
-                  <div className="w-10 h-10 rounded-full bg-amber-500 text-white font-extrabold flex items-center justify-center text-sm shadow-xs uppercase shrink-0">
-                    {savedName?.[0] || 'M'}
-                  </div>
-                  <div className="truncate">
-                    <div className="font-bold text-sm text-slate-900 group-hover:text-blue-700 leading-tight">
-                      {savedName || 'minwan1 kim'}
+              {(() => {
+                const targetEmail = (savedGmail || 'ekzm11133@gmail.com').toLowerCase();
+                const matchedUser = getStoreData().users.find((u) => u.email.toLowerCase() === targetEmail);
+                const roleLabel =
+                  matchedUser?.role === 'admin'
+                    ? '관리자'
+                    : matchedUser?.role === 'teacher' || targetEmail === 'ekzm11133@gmail.com'
+                    ? '선생님'
+                    : '학생';
+                const roleBadgeColor =
+                  roleLabel === '선생님'
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : roleLabel === '관리자'
+                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleSubmit(savedGmail || 'ekzm11133@gmail.com', savedName || 'minwan1 kim')}
+                    className="w-full flex items-center justify-between p-3.5 rounded-2xl border-2 border-blue-200/80 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50 transition group text-left shadow-2xs active:scale-98"
+                  >
+                    <div className="flex items-center gap-3 truncate">
+                      <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center text-sm shadow-xs uppercase shrink-0">
+                        {savedName?.[0] || 'M'}
+                      </div>
+                      <div className="truncate">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-sm text-slate-900 group-hover:text-blue-700 leading-tight">
+                            {savedName || 'minwan1 kim'}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${roleBadgeColor}`}>
+                            {roleLabel}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 truncate mt-0.5">
+                          {savedGmail || 'ekzm11133@gmail.com'}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-slate-500 truncate mt-0.5">
-                      {savedGmail || 'ekzm11133@gmail.com'}
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <span className="text-[11px] text-blue-600 font-bold bg-white/90 border border-blue-200 px-2 py-0.5 rounded-full">
+                        선택
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
                     </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0 ml-2">
-                  <span className="text-[11px] text-blue-600 font-bold bg-white/90 border border-blue-200 px-2 py-0.5 rounded-full">선택</span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
-                </div>
-              </button>
+                  </button>
+                );
+              })()}
 
               {/* 2) 다른 계정 사용 버튼 */}
               <button

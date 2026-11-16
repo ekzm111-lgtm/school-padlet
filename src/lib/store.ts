@@ -41,6 +41,17 @@ const INITIAL_USERS: User[] = [
     createdAt: '2026-10-01',
   },
   {
+    id: 'user-teacher-minwan',
+    username: 'minwan1',
+    password: 'google-auth-auto',
+    name: 'minwan1 kim (선생님)',
+    email: 'ekzm11133@gmail.com',
+    role: 'teacher',
+    status: 'approved',
+    schoolName: '미래한국고등학교',
+    createdAt: '2026-10-01',
+  },
+  {
     id: 'user-teacher-1',
     username: 'teacher',
     password: '1234',
@@ -708,11 +719,37 @@ export const getStoreData = (): StoreData => {
     postsList = [...dtPosts, ...postsList];
   }
 
-  const usersList: User[] = storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS;
+  let usersList: User[] = storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS;
+
+  // 🌟 ekzm11133@gmail.com 계정은 무조건 교사(teacher) 권한 보장 및 복구
+  const minwanInList = usersList.find((u) => u.email?.toLowerCase() === 'ekzm11133@gmail.com');
+  if (minwanInList) {
+    if (minwanInList.role === 'student') {
+      minwanInList.role = 'teacher';
+      try {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
+      } catch (e) {}
+    }
+  } else {
+    const minwanDefault = INITIAL_USERS.find((u) => u.email === 'ekzm11133@gmail.com');
+    if (minwanDefault) {
+      usersList = [minwanDefault, ...usersList];
+      try {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
+      } catch (e) {}
+    }
+  }
+
   let parsedUser: User | null = storedCurrentUser ? JSON.parse(storedCurrentUser) : null;
 
   // 🔥 현재 로그인한 사용자의 최신 권한(role)과 승인 상태를 users 목록과 100% 실시간 동기화
   if (parsedUser) {
+    if (parsedUser.email?.toLowerCase() === 'ekzm11133@gmail.com' && parsedUser.role === 'student') {
+      parsedUser.role = 'teacher';
+      try {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(parsedUser));
+      } catch (e) {}
+    }
     const matched = usersList.find(
       (u) =>
         u.id === parsedUser!.id ||
