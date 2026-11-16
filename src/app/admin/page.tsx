@@ -136,6 +136,13 @@ export default function AdminPage() {
           const mergedBoards = Array.from(boardMap.values());
           setBoards(mergedBoards);
           saveStoreData.boards(mergedBoards);
+
+          // 로컬에만 있는 보드가 있다면 원격 DB로 안전 동기화
+          for (const b of data.boards) {
+            if (!remoteBoards.some((rb) => rb.id === b.id)) {
+              saveRemoteBoard(b).catch(() => {});
+            }
+          }
         }
       } catch (err) {
         console.error('Admin cloud load error:', err);

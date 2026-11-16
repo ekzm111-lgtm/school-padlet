@@ -132,7 +132,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
 
     if (error) {
       console.warn('saveRemoteBoard full upsert failed, retrying with core columns:', error);
-      // 필수 핵심 컬럼들로 재시도 (기존 DB 스키마에 일부 부가 컬럼이 없더라도 100% 저장 성공)
+      // 필수 핵심 컬럼들로 2차 재시도 (일부 부가 컬럼이 없더라도 안전 저장)
       const coreRetry = await supabase.from('boards').upsert({
         id: board.id,
         code: board.code,
@@ -143,16 +143,26 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
         category: board.category || '수업자료',
       });
       if (coreRetry.error) {
-        console.error('saveRemoteBoard core retry failed:', coreRetry.error);
+        console.warn('saveRemoteBoard core retry failed, retrying with minimal columns:', coreRetry.error);
+        // 기본 4대 필수 컬럼으로 3차 최종 재시도 (metaPayload가 description에 100% 보존되므로 모든 데이터 유지)
+        const minimalRetry = await supabase.from('boards').upsert({
+          id: board.id,
+          code: board.code,
+          title: board.title,
+          description: finalDesc,
+        });
+        if (minimalRetry.error) {
+          console.error('saveRemoteBoard minimal retry failed:', minimalRetry.error);
+        }
       }
     }
 
-    // 2. 🔥 학생-교사 실시간 동기화 100% 보장: posts 테이블의 시스템 메타 레코드에 동시 저장
+    // 2. 🔥 학생-교사 실시간 동기화 보장: posts 테이블의 시스템 메타 레코드에 동시 저장
     try {
       await supabase.from('posts').upsert({
         id: `board_columns_${board.id}`,
         board_id: board.id,
-        column_id: '__system_meta__',
+        column_name: '__system_meta__',
         title: '__BOARD_COLUMNS_META__',
         content: JSON.stringify({
           columns: board.columns,

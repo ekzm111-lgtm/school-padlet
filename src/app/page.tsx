@@ -297,6 +297,17 @@ export default function HomePage() {
               merged.push(rem);
             }
           }
+
+          // 🔥 내 로컬 보드 중 원격 DB에 아직 업로드되지 않았거나 공개 상태가 다른 보드 즉시 자동 동기화 업로드!
+          for (const b of currentLocal) {
+            if (isMyBoard(b)) {
+              const rem = remoteMap.get(b.id);
+              if (!rem || rem.isPublic !== b.isPublic) {
+                saveRemoteBoard(b).catch(() => {});
+              }
+            }
+          }
+
           const finalBoards = applySavedOrders(merged);
           setBoards(finalBoards);
           localStorage.setItem('school_padlet_boards', JSON.stringify(finalBoards));
@@ -367,7 +378,7 @@ export default function HomePage() {
   };
 
   // 3) 보드 복제하기 (다른 사람의 보드를 내 보드로 가져오기)
-  const handleDuplicateBoard = (e: React.MouseEvent, board: Board) => {
+  const handleDuplicateBoard = async (e: React.MouseEvent, board: Board) => {
     e.stopPropagation();
     if (!currentUser) {
       alert('보드를 복제하려면 먼저 로그인해 주세요.');
@@ -375,6 +386,9 @@ export default function HomePage() {
     }
     const copied = duplicateBoard(board.id, currentUser);
     if (copied) {
+      if (isSupabaseConfigured) {
+        await saveRemoteBoard(copied).catch(() => {});
+      }
       loadData();
       try {
         confetti({ particleCount: 50, spread: 70, origin: { y: 0.7 } });
