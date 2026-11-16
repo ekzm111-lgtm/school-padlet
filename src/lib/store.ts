@@ -578,6 +578,23 @@ export const getStoreData = (): StoreData => {
     if (isSupabaseConfigured) {
       saveRemoteBoard(ENTRY_MIDDLE_SCHOOL_BOARD).catch(() => {});
     }
+  } else {
+    // 기존 보드가 있더라도 구버전 컬럼 목록을 가진 경우 최신 5대 정규 컬럼으로 갱신
+    const currentBoard = boardsList[entryBoardIdx];
+    const targetCols = ENTRY_MIDDLE_SCHOOL_BOARD.columns || [];
+    if (!currentBoard.columns || currentBoard.columns.join('|') !== targetCols.join('|')) {
+      boardsList[entryBoardIdx] = {
+        ...currentBoard,
+        columns: targetCols,
+        updatedAt: Date.now(),
+      };
+      try {
+        localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
+      } catch (e) {}
+      if (isSupabaseConfigured) {
+        saveRemoteBoard(boardsList[entryBoardIdx]).catch(() => {});
+      }
+    }
   }
 
   // 삭제된 디지털튜터 보드(202501)가 로컬에 남아있다면 영구 제거 필터링
@@ -625,18 +642,58 @@ export const getStoreData = (): StoreData => {
     }
   }
 
-  // 엔트리 중학교 인기 추천 영상 카드 누락분 자동 보강
-  const missingEntryPosts = ENTRY_MIDDLE_SCHOOL_POSTS.filter((p) => !existingPostIds.has(p.id));
+  // 엔트리 중학교 인기 추천 영상 보드 (board-entry-middle-school) 포스트 정규화:
+  // 1) 구버전 더미 카드(unsplash 이미지나 구버전 임의 ID 등) 정리
+  // 2) 22개 공식 검증 영상 카드 보강
+  // 3) 모든 카드의 배경색을 'white'로 보장
+  // 4) 썸네일을 해당 유튜브 영상의 공식 썸네일(img.youtube.com/vi/{id}/hqdefault.jpg)로 보장
+  const validEntryPostIds = new Set(ENTRY_MIDDLE_SCHOOL_POSTS.map((p) => p.id));
+  let entryPostsCleaned = false;
+
+  // 구버전 더미 카드(unsplash 이미지, 비디오 미매칭 구버전 포스트) 제거
+  postsList = postsList.filter((p) => {
+    if (p.boardId === ENTRY_MIDDLE_SCHOOL_BOARD.id) {
+      if (!validEntryPostIds.has(p.id) || (p.imageUrl && p.imageUrl.includes('unsplash.com'))) {
+        entryPostsCleaned = true;
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // 모든 엔트리 보드 카드의 배경을 'white'로, 썸네일을 해당 영상 썸네일로 보장
+  postsList = postsList.map((p) => {
+    if (p.boardId === ENTRY_MIDDLE_SCHOOL_BOARD.id) {
+      const canonical = ENTRY_MIDDLE_SCHOOL_POSTS.find((ep) => ep.id === p.id);
+      if (canonical) {
+        if (p.color !== 'white' || p.imageUrl !== canonical.imageUrl || p.linkUrl !== canonical.linkUrl) {
+          entryPostsCleaned = true;
+          return { ...p, color: 'white', imageUrl: canonical.imageUrl, linkUrl: canonical.linkUrl };
+        }
+      } else if (p.color !== 'white') {
+        entryPostsCleaned = true;
+        return { ...p, color: 'white' };
+      }
+    }
+    return p;
+  });
+
+  const currentEntryPostIds = new Set(postsList.map((p) => p.id));
+  const missingEntryPosts = ENTRY_MIDDLE_SCHOOL_POSTS.filter((p) => !currentEntryPostIds.has(p.id));
   if (missingEntryPosts.length > 0) {
     postsList = [...missingEntryPosts, ...postsList];
-    try {
-      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(postsList));
-    } catch (e) {}
+    entryPostsCleaned = true;
     if (isSupabaseConfigured) {
       missingEntryPosts.forEach((p) => {
         saveRemotePost(p).catch(() => {});
       });
     }
+  }
+
+  if (entryPostsCleaned) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(postsList));
+    } catch (e) {}
   }
 
   const hasVibePost = postsList.some((p) => p.boardId === 'board-vibecoding');

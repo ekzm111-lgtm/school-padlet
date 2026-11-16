@@ -639,7 +639,15 @@ export default function BoardDetailPage() {
               }
             }
 
-            const merged = localPending.length > 0 ? [...remote, ...localPending] : remote;
+            let merged = localPending.length > 0 ? [...remote, ...localPending] : remote;
+
+            // 🔥 엔트리 중학교 보드: 구버전 unsplash 카드 정리 및 모든 카드 배경 흰색('white') 보장
+            if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
+              merged = merged
+                .filter((p) => !(p.imageUrl && p.imageUrl.includes('unsplash.com')))
+                .map((p) => ({ ...p, color: 'white' }));
+            }
+
             // 🔥 카드 order 기준 오름차순 안정 정렬 보장!
             merged.sort((a, b) => (typeof a.order === 'number' ? a.order : 9999) - (typeof b.order === 'number' ? b.order : 9999));
 
@@ -714,6 +722,18 @@ export default function BoardDetailPage() {
                 '모둠 1', '모둠 2', '모둠 3', '모둠 1 (과제 수행 계획)', '모둠 2 (의견 및 아이디어)', '모둠 3 (최종 결과물)'
               ]);
               cleanCols = cleanCols.filter((c) => !foreignColumns.has(c));
+            }
+
+            // 🔥 엔트리 중학교 보드: 구버전 컬럼 격리
+            if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
+              const obsoleteEntryColumns = new Set([
+                '🎮 아케이드 & 액션 게임',
+                '🧠 뇌섹 퍼즐 & 스토리',
+                '🤖 엔트리 AI 인공지능',
+                '📊 실생활 유틸리티 & 수학',
+                '⚡ 중학 정보 핵심 알고리즘',
+              ]);
+              cleanCols = cleanCols.filter((c) => !obsoleteEntryColumns.has(c));
             }
 
             if (cleanCols.length > 0) {
@@ -1016,6 +1036,65 @@ export default function BoardDetailPage() {
       await saveRemoteBoard(updatedBoard);
       const affectedCards = updatedPosts.filter((p) => p.column === trimmed);
       for (const card of affectedCards) {
+        await saveRemotePost(card);
+      }
+    }
+  };
+
+  // 모둠(열) 및 내부 카드 전체 복제
+  const handleDuplicateColumn = async (colName: string) => {
+    lastUserActionTimeRef.current = Date.now();
+
+    // 1. 중복되지 않는 복제 열 이름 결정
+    let copyName = `${colName} (복사본)`;
+    let counter = 2;
+    while (columns.includes(copyName)) {
+      copyName = `${colName} (복사본 ${counter})`;
+      counter++;
+    }
+
+    // 2. 기존 열 바로 다음에 새 열 삽입
+    const colIdx = columns.indexOf(colName);
+    const updatedCols =
+      colIdx >= 0
+        ? [...columns.slice(0, colIdx + 1), copyName, ...columns.slice(colIdx + 1)]
+        : [...columns, copyName];
+    const cleanCols = Array.from(new Set(updatedCols.map((c) => String(c || '').trim()).filter(Boolean)));
+
+    // 3. 해당 열에 속한 모든 카드를 새 ID로 복제
+    const sourceCards = posts.filter((p) => p.column === colName);
+    const nowTs = Date.now();
+    const clonedCards: Post[] = sourceCards.map((p, idx) => ({
+      ...p,
+      id: `post-${nowTs}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+      column: copyName,
+      createdAt: '방금 전',
+      reactions: { like: 0, clap: 0, heart: 0, insight: 0 },
+      comments: [],
+    }));
+
+    const updatedPosts = [...posts, ...clonedCards];
+
+    // 4. 로컬 및 메모리 캐시 상태 갱신
+    setColumns(cleanCols);
+    setPosts(updatedPosts);
+
+    if (typeof window !== 'undefined') {
+      const g = window as any;
+      if (!g.__BOARD_COLUMNS_CACHE__) g.__BOARD_COLUMNS_CACHE__ = {};
+      g.__BOARD_COLUMNS_CACHE__[board.id] = cleanCols;
+    }
+
+    const data = getStoreData();
+    const updatedBoard = { ...board, columns: cleanCols, updatedAt: nowTs };
+    saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
+    saveStoreData.posts([...data.posts, ...clonedCards]);
+    setBoard(updatedBoard);
+
+    // 5. Supabase 원격 저장
+    if (isSupabaseConfigured) {
+      await saveRemoteBoard(updatedBoard);
+      for (const card of clonedCards) {
         await saveRemotePost(card);
       }
     }
@@ -2007,6 +2086,14 @@ export default function BoardDetailPage() {
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
                             {colPosts.length}개
                           </span>
+                          {/* 📋 모둠(열) 및 내부 카드 전체 복제 버튼 */}
+                          <button
+                            onClick={() => handleDuplicateColumn(colName)}
+                            className="p-1 text-slate-400 hover:text-blue-600 rounded-md transition"
+                            title="이 모둠(열)과 카드를 전체 복사"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
                           {columns.length > 1 && (
                             <button
                               onClick={() => handleDeleteColumn(colName)}
