@@ -279,15 +279,18 @@ export default function HomePage() {
             if (local && rem) {
               const localTime = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
               const remTime = typeof rem.updatedAt === 'number' ? rem.updatedAt : 0;
-              // 원격 데이터가 더 최신이거나 같으면 원격의 최신 커버 이미지 및 내용 반영
-              const useRemote = remTime >= localTime;
-              const base = useRemote ? { ...local, ...rem } : { ...rem, ...local };
-              // 중요한 공유 설정(isPublic, title, description, coverImageUrl, category 등)은 원격 클라우드 최신 상태 우선 반영
+              const remoteIsNewer = remTime > localTime;
+              const base = remoteIsNewer ? { ...local, ...rem } : { ...rem, ...local };
+              // 최신 타임스탬프를 가진 쪽의 isPublic 우선 채택 (로컬 수정 직후 서버 덮어쓰기 방지)
+              const chosenIsPublic = remoteIsNewer
+                ? (rem.isPublic !== undefined ? rem.isPublic : local.isPublic)
+                : (local.isPublic !== undefined ? local.isPublic : rem.isPublic);
+
               merged.push({
                 ...base,
-                isPublic: rem.isPublic !== undefined ? rem.isPublic : base.isPublic,
-                title: rem.title || base.title,
-                category: rem.category || base.category,
+                isPublic: chosenIsPublic !== false,
+                title: remoteIsNewer ? (rem.title || local.title) : (local.title || rem.title),
+                category: remoteIsNewer ? (rem.category || local.category) : (local.category || rem.category),
                 order: local.order ?? rem.order,
                 pinned: local.pinned ?? rem.pinned,
               });
@@ -298,12 +301,15 @@ export default function HomePage() {
             }
           }
 
-          // 🔥 내 로컬 보드 중 원격 DB에 아직 업로드되지 않았거나 공개 상태가 다른 보드 즉시 자동 동기화 업로드!
+          // 🔥 내 로컬 보드 중 원격 DB에 아직 업로드되지 않았거나 상태가 갱신된 보드 즉시 자동 동기화 업로드!
           for (const b of currentLocal) {
-            if (isMyBoard(b)) {
+            const isMine = isMyBoard(b) || b.id.startsWith('board-copy-') || b.title.includes('복제본');
+            if (isMine) {
               const rem = remoteMap.get(b.id);
-              if (!rem || rem.isPublic !== b.isPublic) {
-                saveRemoteBoard(b).catch(() => {});
+              const localTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+              const remTime = rem && typeof rem.updatedAt === 'number' ? rem.updatedAt : 0;
+              if (!rem || rem.isPublic !== b.isPublic || localTime > remTime) {
+                await saveRemoteBoard(b).catch(() => {});
               }
             }
           }
@@ -435,14 +441,15 @@ export default function HomePage() {
 
   // 🔥 내가 만든 보드 판정 (직접 생성한 보드 + 다른 사람 보드에서 복사해 온 복사본 100% 내 자료로 분류)
   const isMyBoard = (b: Board) => {
-    if (!currentUser) return false;
+    const cur = currentUser || getStoreData().currentUser;
+    if (!cur) return false;
     const myBoardIds = getMyBoardIds();
     return Boolean(
       myBoardIds.includes(b.id) ||
-      b.authorId === currentUser.id ||
-      b.authorName === currentUser.name ||
-      (b.copiedFromTitle && (b.authorId === currentUser.id || b.authorName === currentUser.name || myBoardIds.includes(b.id))) ||
-      (currentUser.name === 'minwan1 kim' && (b.authorName === 'minwan1 kim' || b.title.includes('테스트')))
+      (b.authorId && b.authorId === cur.id) ||
+      (b.authorName && (b.authorName === cur.name || b.authorName === cur.username)) ||
+      (b.copiedFromTitle && (b.authorId === cur.id || b.authorName === cur.name || myBoardIds.includes(b.id))) ||
+      (cur.name === 'minwan1 kim' && (b.authorName === 'minwan1 kim' || b.title.includes('테스트')))
     );
   };
 

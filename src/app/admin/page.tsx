@@ -122,10 +122,16 @@ export default function AdminPage() {
           remoteBoards.forEach((b) => {
             const local = boardMap.get(b.id);
             if (local) {
+              const localTime = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
+              const remTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+              const remoteIsNewer = remTime > localTime;
+              const chosenIsPublic = remoteIsNewer
+                ? (b.isPublic !== undefined ? b.isPublic : local.isPublic)
+                : (local.isPublic !== undefined ? local.isPublic : b.isPublic);
               boardMap.set(b.id, {
                 ...local,
                 ...b,
-                isPublic: b.isPublic !== undefined ? b.isPublic : local.isPublic,
+                isPublic: chosenIsPublic !== false,
                 order: local.order ?? b.order,
                 pinned: local.pinned ?? b.pinned,
               });

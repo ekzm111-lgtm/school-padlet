@@ -93,9 +93,11 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
   try {
     let cleanDesc = board.description || '';
     cleanDesc = cleanDesc.replace(/<!--SCHOOLPAD_BOARD_META:[\s\S]*?-->/g, '').trim();
+    const finalCode = board.code || Math.floor(100000 + Math.random() * 900000).toString();
+    const isPub = board.isPublic !== false;
     const metaPayload = JSON.stringify({
       columns: board.columns,
-      code: board.code,
+      code: finalCode,
       title: board.title,
       description: cleanDesc,
       coverImageUrl: board.coverImageUrl,
@@ -103,7 +105,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       category: board.category,
       theme: board.theme,
       layout: board.layout,
-      isPublic: board.isPublic !== false,
+      isPublic: isPub,
       authorId: board.authorId,
       authorName: board.authorName,
       authorRole: board.authorRole || 'teacher',
@@ -113,10 +115,9 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
     });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
 
-    // 1. boards 테이블에 실제 스키마에 맞는 컬럼(columns, author_id, author_name 등 포함)으로 즉시 저장
-    let { error } = await supabase.from('boards').upsert({
+    const fullPayload = {
       id: board.id,
-      code: board.code,
+      code: finalCode,
       title: board.title,
       description: finalDesc,
       theme: board.theme || 'blue',
@@ -124,35 +125,53 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       author_id: board.authorId || null,
       author_name: board.authorName || null,
       author_role: board.authorRole || 'teacher',
-      is_public: board.isPublic !== false,
+      is_public: isPub,
       category: board.category || '수업자료',
       cover_image_url: board.coverImageUrl || null,
       custom_bg_url: board.customBgUrl || null,
-    });
+    };
 
+    // 1. onConflict: 'id' 명시하여 upsert 시도
+    let { error } = await supabase.from('boards').upsert(fullPayload, { onConflict: 'id' });
+
+    // 2. 만약 upsert가 실패하면, 기존 행 직접 update 시도
     if (error) {
-      console.warn('saveRemoteBoard full upsert failed, retrying with core columns:', error);
-      // 필수 핵심 컬럼들로 2차 재시도 (일부 부가 컬럼이 없더라도 안전 저장)
-      const coreRetry = await supabase.from('boards').upsert({
+      const upRes = await supabase.from('boards').update(fullPayload).eq('id', board.id);
+      if (!upRes.error) {
+        error = null;
+      }
+    }
+
+    // 3. 만약 여전히 실패하면 core 컬럼으로 upsert 및 update 시도
+    if (error) {
+      console.warn('saveRemoteBoard full save failed, retrying with core columns:', error);
+      const corePayload = {
         id: board.id,
-        code: board.code,
+        code: finalCode,
         title: board.title,
         description: finalDesc,
         theme: board.theme || 'blue',
-        is_public: board.isPublic !== false,
+        is_public: isPub,
         category: board.category || '수업자료',
-      });
-      if (coreRetry.error) {
-        console.warn('saveRemoteBoard core retry failed, retrying with minimal columns:', coreRetry.error);
-        // 기본 4대 필수 컬럼으로 3차 최종 재시도 (metaPayload가 description에 100% 보존되므로 모든 데이터 유지)
-        const minimalRetry = await supabase.from('boards').upsert({
+      };
+      let retry = await supabase.from('boards').upsert(corePayload, { onConflict: 'id' });
+      if (retry.error) {
+        const coreUp = await supabase.from('boards').update(corePayload).eq('id', board.id);
+        if (!coreUp.error) retry = { error: null } as any;
+      }
+
+      // 4. 최후의 보루: minimal 컬럼으로 update/upsert 시도 (metaPayload가 description에 100% 보존됨)
+      if (retry.error) {
+        console.warn('saveRemoteBoard core retry failed, retrying with minimal columns:', retry.error);
+        const minPayload = {
           id: board.id,
-          code: board.code,
+          code: finalCode,
           title: board.title,
           description: finalDesc,
-        });
-        if (minimalRetry.error) {
-          console.error('saveRemoteBoard minimal retry failed:', minimalRetry.error);
+        };
+        const minUp = await supabase.from('boards').update(minPayload).eq('id', board.id);
+        if (minUp.error) {
+          await supabase.from('boards').upsert(minPayload, { onConflict: 'id' });
         }
       }
     }
@@ -166,7 +185,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
         title: '__BOARD_COLUMNS_META__',
         content: JSON.stringify({
           columns: board.columns,
-          code: board.code,
+          code: finalCode,
           title: board.title,
           coverImageUrl: board.coverImageUrl,
           category: board.category,
@@ -175,7 +194,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
         color: 'white',
         author_id: 'system',
         author_name: '시스템',
-      });
+      }, { onConflict: 'id' });
     } catch (e2) {}
 
     return true;
