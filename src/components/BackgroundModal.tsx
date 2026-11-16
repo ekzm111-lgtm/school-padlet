@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { X, Image as ImageIcon, Upload, Sparkles, Check, Palette } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Image as ImageIcon, Upload,
+  ClipboardCheck, Sparkles, Check, Palette } from 'lucide-react';
 import { Board, BoardTheme } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { saveRemoteBoard } from '@/lib/supabaseStore';
@@ -88,6 +89,7 @@ export default function BackgroundModal({
 }: BackgroundModalProps) {
   const [customUrl, setCustomUrl] = useState(board.customBgUrl || '');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pasteNotice, setPasteNotice] = useState(false);
 
   if (!isOpen) return null;
 
@@ -108,6 +110,44 @@ export default function BackgroundModal({
     onUpdated(updated);
     onClose();
   };
+
+  
+  // 🔥 클립보드 이미지 바로 붙여넣기 (Ctrl + V) 지원
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              if (event.target?.result) {
+                const bgDataUrl = event.target.result as string;
+                const updated: Board = { ...board, customBgUrl: bgDataUrl };
+                const data = getStoreData();
+                saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updated : b)));
+                onUpdated(updated);
+                setPasteNotice(true);
+                setTimeout(() => {
+                  setPasteNotice(false);
+                  onClose();
+                }, 1000);
+              }
+            };
+            reader.readAsDataURL(file);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [board, onUpdated, onClose]);
 
   // 내 컴퓨터 사진 업로드
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,6 +198,14 @@ export default function BackgroundModal({
         </div>
 
         <div className="mt-5 space-y-6">
+
+          {pasteNotice && (
+            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200 animate-in fade-in slide-in-from-top-1">
+              <ClipboardCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>클립보드 배경 사진이 성공적으로 적용되었습니다!</span>
+            </div>
+          )}
+  
           {/* 내 사진 직접 올리기 */}
           <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-200/80 text-center space-y-2">
             <div className="text-xs font-bold text-purple-900">

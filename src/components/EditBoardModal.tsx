@@ -14,6 +14,7 @@ import {
   UploadCloud,
   Check,
   Trash2,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Board, BoardLayout, BoardTheme } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
@@ -69,6 +70,7 @@ export default function EditBoardModal({
   const [coverImageUrl, setCoverImageUrl] = useState<string>(board.coverImageUrl || board.customBgUrl || '');
   const [isPublic, setIsPublic] = useState<boolean>(board.isPublic !== false);
   const [isDragging, setIsDragging] = useState(false);
+  const [pasteNotice, setPasteNotice] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [allowStudentPost, setAllowStudentPost] = useState(board.allowStudentPost ?? true);
@@ -108,6 +110,33 @@ export default function EditBoardModal({
     };
     reader.readAsDataURL(file);
   };
+
+  
+  // 🔥 클립보드 이미지 바로 붙여넣기 (Ctrl + V) 지원
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            processImageFile(file);
+            setPasteNotice(true);
+            setTimeout(() => setPasteNotice(false), 3000);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [isOpen]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -335,7 +364,7 @@ export default function EditBoardModal({
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-700">
-                    새 사진을 여기로 드래그하거나 <span className="text-blue-600 underline">클릭하여 첨부</span>하세요
+                    새 사진을 여기로 드래그하거나 <span className="text-blue-600 underline">클릭</span> 또는 <span className="text-blue-700 bg-blue-50 px-1 py-0.5 rounded border border-blue-200 font-extrabold">Ctrl+V로 붙여넣기</span>하세요
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
                     JPG, PNG, GIF, WebP (최대 10MB) • 메인 화면 카드 썸네일로 사용됩니다.

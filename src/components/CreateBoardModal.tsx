@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   X,
   Sparkles,
@@ -13,6 +13,7 @@ import {
   UploadCloud,
   Check,
   Trash2,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Board, BoardLayout, BoardTheme, User } from '@/lib/types';
 import { getStoreData, saveStoreData } from '@/lib/store';
@@ -62,6 +63,7 @@ export default function CreateBoardModal({
   const [category, setCategory] = useState<'수업자료' | '모둠활동' | '학급회의' | '자유나눔' | '프로젝트'>('수업자료');
   const [coverImageUrl, setCoverImageUrl] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [pasteNotice, setPasteNotice] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [allowStudentPost, setAllowStudentPost] = useState(true);
@@ -88,6 +90,33 @@ export default function CreateBoardModal({
     };
     reader.readAsDataURL(file);
   };
+
+  
+  // 🔥 클립보드 이미지 바로 붙여넣기 (Ctrl + V) 지원
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            processImageFile(file);
+            setPasteNotice(true);
+            setTimeout(() => setPasteNotice(false), 3000);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [isOpen]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
