@@ -22,12 +22,14 @@ import {
   ChevronsUp,
   ChevronsDown,
   ArrowUpDown,
+  Maximize2,
 } from 'lucide-react';
 import { Post, User, FileAttachment, PostComment } from '@/lib/types';
 import { getStoreData, saveStoreData, getMyPostIds, getMyCommentIds, addMyCommentId } from '@/lib/store';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { saveRemotePost } from '@/lib/supabaseStore';
 import PostModal from './PostModal';
+import PostDetailModal from './PostDetailModal';
 import confetti from 'canvas-confetti';
 
 interface PostCardProps {
@@ -108,6 +110,7 @@ export default function PostCard({
 }: PostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [currentPost, setCurrentPost] = useState(post);
   const [commentInput, setCommentInput] = useState('');
@@ -581,24 +584,42 @@ export default function PostCard({
             </div>
           </div>
 
-          {/* 제목 (마우스 드래그 선택 및 복사 완벽 지원) */}
+          {/* 제목 (클릭 시 패들렛 공식 뷰어 스타일의 상세 팝업 오픈) */}
           {currentPost.title && (
             <h4
-              onMouseDown={(e) => e.stopPropagation()}
-              className="font-bold text-xs sm:text-sm text-slate-900 mb-1 leading-snug break-words [word-break:keep-all] select-text cursor-text tracking-tight"
+              onClick={() => setShowDetailModal(true)}
+              className="font-bold text-xs sm:text-sm text-slate-900 mb-1 leading-snug break-words [word-break:keep-all] cursor-pointer hover:text-blue-600 transition tracking-tight group/title flex items-center justify-between gap-1 select-text"
+              title="클릭하여 상세 보기"
             >
-              {currentPost.title}
+              <span>{currentPost.title}</span>
+              <Maximize2 className="w-3 h-3 text-slate-400 opacity-0 group-hover/title:opacity-100 transition shrink-0" />
             </h4>
           )}
 
-          {/* 본문 (마우스 드래그 선택 및 복사 완벽 지원) */}
+          {/* 본문 (2줄로 축소 표시 + 자세히 보기 버튼 지원으로 열 높이 균일화) */}
           {displayContent && (
-            <p
-              onMouseDown={(e) => e.stopPropagation()}
-              className="text-[11px] sm:text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words [word-break:keep-all] select-text cursor-text"
-            >
-              {displayContent}
-            </p>
+            <div className="space-y-1">
+              <p
+                onClick={() => setShowDetailModal(true)}
+                className="text-[11px] sm:text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words [word-break:keep-all] select-text cursor-pointer line-clamp-2 hover:text-slate-900 transition"
+                title="클릭하여 전체 내용 보기"
+              >
+                {displayContent}
+              </p>
+              {(displayContent.length > 60 || displayContent.includes('\n')) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDetailModal(true);
+                  }}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 pt-0.5"
+                >
+                  <span>자세히 보기</span>
+                  <Maximize2 className="w-2.5 h-2.5" />
+                </button>
+              )}
+            </div>
           )}
 
           {/* 🔥 다중 첨부 파일 다운로드 목록 (한글, PDF, 워드, PPT 등) */}
@@ -639,33 +660,39 @@ export default function PostCard({
             </div>
           )}
 
-          {/* 첨부 이미지 (또는 링크로부터 자동 추출된 썸네일) - 카드/열 크기에 맞춰 유동적으로 16:9 비율로 확대/축소 */}
+          {/* 첨부 이미지 (또는 링크로부터 자동 추출된 썸네일) - 클릭 시 패들렛 상세 팝업 오픈 */}
           {cardImage && (
             <div
               onClick={(e) => {
                 e.stopPropagation();
-                if (currentPost.linkUrl) {
-                  let url = currentPost.linkUrl.trim();
-                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                    url = 'https://' + url;
-                  }
-                  window.open(url, '_blank', 'noopener,noreferrer');
-                } else {
-                  setShowImageModal(true);
-                }
+                setShowDetailModal(true);
               }}
               className="mt-2 relative w-full overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group bg-black/5"
-              title={
-                currentPost.linkUrl
-                  ? `클릭하여 새 탭에서 링크 열기: ${currentPost.linkUrl}`
-                  : '클릭하여 이미지 크게 보기'
-              }
+              title="클릭하여 상세 모달에서 보기 (동영상 재생 및 전체 내용)"
             >
               <img
                 src={cardImage}
                 alt="대표 이미지"
                 className="w-full aspect-video object-cover group-hover:scale-105 transition-all duration-300 block"
               />
+              {/* 유튜브 또는 외부 링크가 있을 때 우측 상단 새 탭 열기 버튼 */}
+              {currentPost.linkUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    let url = currentPost.linkUrl!.trim();
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                      url = 'https://' + url;
+                    }
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-black/60 hover:bg-black/80 text-white transition opacity-0 group-hover:opacity-100 shadow-sm"
+                  title="새 탭에서 바로 링크 열기"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              )}
             </div>
           )}
 
@@ -780,11 +807,18 @@ export default function PostCard({
                 const isEditing = editingCommentId === c.id;
 
                 return (
-                  <div key={c.id} className="bg-white/90 p-2.5 rounded-xl text-xs space-y-1 group/comment relative border border-slate-100/90 shadow-2xs">
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
-                      <span className="font-bold text-slate-700">{c.authorName}</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-slate-400">{c.updatedAt || c.createdAt}</span>
+                  <div key={c.id} className="bg-white/95 p-2 sm:p-2.5 rounded-xl text-xs space-y-1.5 group/comment relative border border-slate-200/80 shadow-2xs">
+                    {/* 댓글 헤더: 좁은 화면에서도 어색하게 꺾이지 않도록 작성자명(1행) + 시간(2행)/버튼으로 깔끔하게 정렬 */}
+                    <div className="flex items-start justify-between gap-1 leading-tight">
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-slate-800 text-[11px] block truncate [word-break:keep-all]" title={c.authorName}>
+                          {c.authorName}
+                        </span>
+                        <span className="text-[9px] text-slate-400 block whitespace-nowrap mt-0.5">
+                          {c.updatedAt || c.createdAt}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover/comment:opacity-100 transition">
                         {canEditThisComment && !isEditing && (
                           <button
                             type="button"
@@ -793,7 +827,7 @@ export default function PostCard({
                               setEditingCommentId(c.id);
                               setEditCommentText(c.content);
                             }}
-                            className="text-slate-400 hover:text-blue-600 p-0.5 rounded transition"
+                            className="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-slate-100 transition"
                             title="댓글 수정"
                           >
                             <Pencil className="w-3 h-3" />
@@ -806,7 +840,7 @@ export default function PostCard({
                               e.stopPropagation();
                               handleDeleteComment(c.id);
                             }}
-                            className="text-slate-400 hover:text-red-500 p-0.5 rounded transition"
+                            className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-100 transition"
                             title="댓글 삭제"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -851,7 +885,9 @@ export default function PostCard({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-slate-800 font-normal break-words leading-relaxed">{c.content}</div>
+                      <p className="text-[11px] sm:text-xs text-slate-800 font-normal whitespace-pre-wrap leading-relaxed break-words [word-break:keep-all] select-text">
+                        {c.content}
+                      </p>
                     )}
                   </div>
                 );
@@ -876,6 +912,19 @@ export default function PostCard({
           )}
         </div>
       </div>
+
+      {/* 패들렛 공식 뷰어 스타일: 상세 팝업 모달 (유튜브 플레이어 + 전체 내용 + 링크) */}
+      {showDetailModal && (
+        <PostDetailModal
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          post={currentPost}
+          currentUser={currentUser}
+          onReaction={handleReaction}
+          onEdit={() => setShowEditModal(true)}
+          canEdit={canEdit}
+        />
+      )}
 
       {/* 이미지 확대 모달 */}
       {showImageModal && cardImage && typeof document !== 'undefined' && createPortal(
