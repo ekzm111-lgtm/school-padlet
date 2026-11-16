@@ -709,25 +709,29 @@ export const getStoreData = (): StoreData => {
     postsList = [...dtPosts, ...postsList];
   }
 
-  let usersList: User[] = storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS;
+  let rawUsers: User[] = storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS;
 
-  // 🌟 ekzm11133@gmail.com 계정은 무조건 교사(teacher) 권한 보장 및 복구
-  const minwanInList = usersList.find((u) => u.email?.toLowerCase() === 'ekzm11133@gmail.com');
-  if (minwanInList) {
-    if (minwanInList.role === 'student') {
-      minwanInList.role = 'teacher';
-      try {
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
-      } catch (e) {}
+  // 🌟 이메일 및 아이디 기준 중복 계정 자동 단일화 (Deduplication)
+  const uniqueUsersMap = new Map<string, User>();
+  for (const u of rawUsers) {
+    const key = (u.email || u.username || u.id).trim().toLowerCase();
+    if (!uniqueUsersMap.has(key)) {
+      uniqueUsersMap.set(key, u);
+    } else {
+      const existing = uniqueUsersMap.get(key)!;
+      if (existing.role === 'student' && (u.role === 'teacher' || u.role === 'admin')) {
+        existing.role = u.role;
+      }
+      if (u.name && u.name !== existing.name) {
+        existing.name = u.name;
+      }
     }
-  } else {
-    const minwanDefault = INITIAL_USERS.find((u) => u.email === 'ekzm11133@gmail.com');
-    if (minwanDefault) {
-      usersList = [minwanDefault, ...usersList];
-      try {
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
-      } catch (e) {}
-    }
+  }
+  let usersList: User[] = Array.from(uniqueUsersMap.values());
+  if (usersList.length !== rawUsers.length) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersList));
+    } catch (e) {}
   }
 
   let parsedUser: User | null = storedCurrentUser ? JSON.parse(storedCurrentUser) : null;
@@ -795,10 +799,19 @@ export const saveStoreData = {
   },
   users: (data: User[]) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data));
+      // 🌟 이메일 및 아이디 기준 중복 방지 단일화
+      const uniqueMap = new Map<string, User>();
+      for (const u of data) {
+        const key = (u.email || u.username || u.id).trim().toLowerCase();
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, u);
+        }
+      }
+      const deduplicated = Array.from(uniqueMap.values());
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(deduplicated));
       window.dispatchEvent(new Event('store_updated'));
-      if (isSupabaseConfigured && data.length > 0) {
-        data.forEach((u) => saveRemoteUser(u).catch(() => {}));
+      if (isSupabaseConfigured && deduplicated.length > 0) {
+        deduplicated.forEach((u) => saveRemoteUser(u).catch(() => {}));
       }
     }
   },

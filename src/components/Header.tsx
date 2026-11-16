@@ -15,10 +15,13 @@ import {
   CheckCircle2,
   Pencil,
   X,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { getStoreData, saveStoreData } from '@/lib/store';
 import { User } from '@/lib/types';
-import { saveRemoteUser } from '@/lib/supabaseStore';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { saveRemoteUser, deleteRemoteUser, deleteRemoteBoard, deleteRemotePost } from '@/lib/supabaseStore';
 
 interface HeaderProps {
   extraRight?: React.ReactNode;
@@ -36,6 +39,65 @@ export default function Header({ extraRight }: HeaderProps = {}) {
   // 🌟 본인 이름 직접 수정 상태
   const [showNameModal, setShowNameModal] = useState(false);
   const [myNewName, setMyNewName] = useState('');
+
+  // 🌟 본인 회원 탈퇴 모달 상태
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // 🌟 회원 탈퇴 및 모든 관련 데이터 영구 삭제 처리
+  const handleWithdrawAccount = async () => {
+    if (!currentUser) return;
+    setIsWithdrawing(true);
+
+    try {
+      const data = getStoreData();
+      const userId = currentUser.id;
+      const userName = currentUser.name;
+      const userEmail = currentUser.email;
+
+      // 1. 해당 사용자가 작성한 보드들 삭제
+      const userBoards = data.boards.filter((b) => b.authorId === userId || b.authorName === userName);
+      const remainingBoards = data.boards.filter((b) => b.authorId !== userId && b.authorName !== userName);
+      saveStoreData.boards(remainingBoards);
+
+      // 2. 해당 사용자가 작성한 모든 카드/포스트 삭제
+      const userPosts = data.posts.filter((p) => p.authorId === userId || p.authorName === userName);
+      const remainingPosts = data.posts.filter((p) => p.authorId !== userId && p.authorName !== userName);
+      saveStoreData.posts(remainingPosts);
+
+      // 3. 사용자 목록에서 본인 삭제
+      const remainingUsers = data.users.filter((u) => u.id !== userId);
+      saveStoreData.users(remainingUsers);
+
+      // 4. 원격 Supabase DB에서도 계정, 보드들, 카드들 영구 완전 삭제
+      if (isSupabaseConfigured) {
+        await deleteRemoteUser(userId, userEmail).catch(() => {});
+        for (const b of userBoards) {
+          await deleteRemoteBoard(b.id).catch(() => {});
+        }
+        for (const p of userPosts) {
+          await deleteRemotePost(p.id).catch(() => {});
+        }
+      }
+
+      // 5. 로그인 세션 및 로컬스토리지 정리 후 로그인 페이지로 이동
+      saveStoreData.currentUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('schoolpad_last_login_id');
+        localStorage.removeItem('schoolpad_last_gmail');
+        localStorage.removeItem('schoolpad_last_name');
+      }
+
+      alert('회원 탈퇴가 완료되었습니다. 모든 활동 데이터가 안전하게 삭제되었습니다.');
+      setShowWithdrawModal(false);
+      router.push('/login');
+    } catch (e) {
+      console.error('Withdraw error:', e);
+      alert('회원 탈퇴 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
 
   const handleUpdateMyName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,16 +245,25 @@ export default function Header({ extraRight }: HeaderProps = {}) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    saveStoreData.currentUser(null);
-                    router.push('/login');
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-slate-100 transition shrink-0"
-                  title="로그아웃"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    onClick={() => {
+                      saveStoreData.currentUser(null);
+                      router.push('/login');
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition"
+                    title="로그아웃"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setShowWithdrawModal(true)}
+                    className="px-2 py-1 text-[10px] text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition font-medium"
+                    title="회원 탈퇴 및 모든 활동 데이터 삭제"
+                  >
+                    탈퇴
+                  </button>
+                </div>
               </div>
             ) : (
               <Link
@@ -309,6 +380,59 @@ export default function Header({ extraRight }: HeaderProps = {}) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 회원 탈퇴 및 모든 활동 데이터 영구 삭제 확인 모달 */}
+      {showWithdrawModal && currentUser && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-rose-100 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-xs">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">회원 탈퇴 및 데이터 영구 삭제</h3>
+                <p className="text-xs text-rose-600 font-semibold mt-0.5">탈퇴 시 복구가 불가능합니다</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs text-rose-900 space-y-2 leading-relaxed">
+              <div className="font-bold flex items-center gap-1.5 text-rose-700">
+                <span>⚠️ 탈퇴 시 삭제되는 데이터 안내</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-700">
+                <li>현재 회원님의 로그인 계정 정보 영구 삭제</li>
+                <li><strong>직접 개설하신 모든 수업 보드 완전 삭제</strong></li>
+                <li><strong>다른 보드에 남기신 모든 쪽지, 메모, 댓글, 첨부파일 영구 삭제</strong></li>
+                <li>삭제된 모든 데이터는 데이터베이스에서 즉시 말소되며 복구할 수 없습니다.</li>
+              </ul>
+            </div>
+
+            <div className="text-xs text-slate-600 font-medium px-1">
+              정말 <strong>{currentUser.name}</strong> 계정을 탈퇴하고 모든 관련 데이터를 삭제하시겠습니까?
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isWithdrawing}
+                onClick={() => setShowWithdrawModal(false)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
+              >
+                취소하고 유지하기
+              </button>
+              <button
+                type="button"
+                disabled={isWithdrawing}
+                onClick={handleWithdrawAccount}
+                className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-md shadow-rose-600/20 flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isWithdrawing ? '삭제 처리 중...' : '모든 데이터 삭제 후 탈퇴'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

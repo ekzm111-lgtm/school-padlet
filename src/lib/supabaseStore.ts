@@ -645,15 +645,30 @@ export async function saveRemoteUser(user: User): Promise<boolean> {
   }
 }
 
-export async function deleteRemoteUser(userId: string): Promise<boolean> {
+export async function deleteRemoteUser(userId: string, userEmail?: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase || !userId) return false;
   try {
-    const { error } = await supabase
+    await supabase
       .from('posts')
       .delete()
       .eq('id', userId)
       .eq('board_id', '__SYSTEM_USERS__');
-    return !error;
+
+    // 이메일이 주어진 경우, 이메일이 일치하는 잔여 레코드도 확실히 정리
+    if (userEmail) {
+      const { data } = await supabase.from('posts').select('id, content').eq('board_id', '__SYSTEM_USERS__');
+      if (data) {
+        for (const row of data) {
+          try {
+            const u = JSON.parse(row.content);
+            if (u.email && u.email.toLowerCase() === userEmail.toLowerCase()) {
+              await supabase.from('posts').delete().eq('id', row.id);
+            }
+          } catch (e) {}
+        }
+      }
+    }
+    return true;
   } catch (e) {
     return false;
   }

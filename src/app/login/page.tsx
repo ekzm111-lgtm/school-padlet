@@ -407,6 +407,35 @@ export default function LoginPage() {
       return;
     }
 
+    const trimmedEmail = email.trim().toLowerCase();
+    const targetUsername = (newUsername.trim() || email.split('@')[0]).toLowerCase();
+
+    // 🌟 중복 가입 원천 차단 (로컬 + 원격 DB 실시간 확인)
+    let duplicateUser = data.users.find(
+      (u) =>
+        (u.email && u.email.toLowerCase() === trimmedEmail) ||
+        (u.username && u.username.toLowerCase() === targetUsername)
+    );
+
+    if (!duplicateUser) {
+      try {
+        const remoteUsers = await fetchRemoteUsers();
+        if (remoteUsers) {
+          duplicateUser = remoteUsers.find(
+            (u) =>
+              (u.email && u.email.toLowerCase() === trimmedEmail) ||
+              (u.username && u.username.toLowerCase() === targetUsername)
+          );
+        }
+      } catch (err) {}
+    }
+
+    if (duplicateUser) {
+      setErrorMsg('이미 가입된 이메일 또는 아이디입니다. (중복 가입 불가)');
+      alert('이미 동일한 이메일 또는 아이디로 등록된 계정이 존재합니다. [로그인] 탭에서 로그인해 주세요.');
+      return;
+    }
+
     const newUser: User = {
       id: `user-${Date.now()}`,
       username: newUsername.trim() || email.split('@')[0],

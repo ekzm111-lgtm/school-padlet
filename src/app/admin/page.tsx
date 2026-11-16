@@ -32,9 +32,12 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   fetchRemoteUsers,
   saveRemoteUser,
+  deleteRemoteUser,
   fetchRemoteSettings,
   saveRemoteSettings,
   saveRemoteBoard,
+  deleteRemoteBoard,
+  deleteRemotePost,
 } from '@/lib/supabaseStore';
 
 export default function AdminPage() {
@@ -124,8 +127,14 @@ export default function AdminPage() {
               if (ru && ru.length > 0) {
                 const data = getStoreData();
                 const userMap = new Map<string, User>();
-                data.users.forEach((u) => userMap.set(u.id, u));
-                ru.forEach((u) => userMap.set(u.id, u));
+                data.users.forEach((u) => {
+                  const key = (u.email || u.username || u.id).trim().toLowerCase();
+                  userMap.set(key, u);
+                });
+                ru.forEach((u) => {
+                  const key = (u.email || u.username || u.id).trim().toLowerCase();
+                  userMap.set(key, u);
+                });
                 const merged = Array.from(userMap.values());
                 setUsers(merged);
                 saveStoreData.users(merged);
@@ -141,8 +150,14 @@ export default function AdminPage() {
             setUsers((prev) => {
               if (ru.length !== prev.length || ru.some((r) => !prev.some((p) => p.id === r.id && p.status === r.status && p.role === r.role))) {
                 const userMap = new Map<string, User>();
-                prev.forEach((u) => userMap.set(u.id, u));
-                ru.forEach((u) => userMap.set(u.id, u));
+                prev.forEach((u) => {
+                  const key = (u.email || u.username || u.id).trim().toLowerCase();
+                  userMap.set(key, u);
+                });
+                ru.forEach((u) => {
+                  const key = (u.email || u.username || u.id).trim().toLowerCase();
+                  userMap.set(key, u);
+                });
                 const merged = Array.from(userMap.values());
                 saveStoreData.users(merged);
                 return merged;
@@ -216,6 +231,52 @@ export default function AdminPage() {
     }
 
     showToast(`권한이 '${newRole === 'admin' ? '관리자' : newRole === 'teacher' ? '교사' : '학생'}'(으)로 변경되었습니다.`);
+  };
+
+  // 🌟 관리자 회원 영구 삭제 처리 (계정 + 작성 보드 + 카드 일괄 영구 삭제)
+  const handleDeleteUser = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    if (target.role === 'admin' && users.filter((u) => u.role === 'admin').length <= 1) {
+      alert('마지막 남은 최고 관리자 계정은 삭제할 수 없습니다.');
+      return;
+    }
+    if (
+      confirm(
+        `⚠️ [경고: 회원 영구 삭제 및 관련 데이터 완전 삭제]\n\n정말 '${target.name}' (${target.email || target.username}) 회원을 영구 삭제하시겠습니까?\n\n※ 삭제 시 해당 회원이 작성한 모든 보드, 쪽지/카드 등의 모든 활동 데이터가 DB에서 영구 삭제되며 절대 복구할 수 없습니다.`
+      )
+    ) {
+      const data = getStoreData();
+
+      // 1. 해당 사용자의 보드들 삭제
+      const userBoards = data.boards.filter((b) => b.authorId === userId || b.authorName === target.name);
+      const remainingBoards = data.boards.filter((b) => b.authorId !== userId && b.authorName !== target.name);
+      saveStoreData.boards(remainingBoards);
+      setBoards(remainingBoards);
+
+      // 2. 해당 사용자의 카드들 삭제
+      const userPosts = data.posts.filter((p) => p.authorId === userId || p.authorName === target.name);
+      const remainingPosts = data.posts.filter((p) => p.authorId !== userId && p.authorName !== target.name);
+      saveStoreData.posts(remainingPosts);
+
+      // 3. 사용자 목록에서 삭제
+      const updated = users.filter((u) => u.id !== userId);
+      setUsers(updated);
+      saveStoreData.users(updated);
+
+      // 4. 원격 Supabase DB에서도 계정, 보드들, 카드들 일괄 삭제
+      if (isSupabaseConfigured) {
+        await deleteRemoteUser(userId, target.email).catch(() => {});
+        for (const b of userBoards) {
+          await deleteRemoteBoard(b.id).catch(() => {});
+        }
+        for (const p of userPosts) {
+          await deleteRemotePost(p.id).catch(() => {});
+        }
+      }
+
+      showToast(`'${target.name}' 회원 및 모든 관련 데이터가 완전 삭제되었습니다.`);
+    }
   };
 
   // 회원 비밀번호 재설정 처리
@@ -651,6 +712,7 @@ export default function AdminPage() {
                     <th className="pb-3 px-3">가입 상태</th>
                     <th className="pb-3 px-3 text-center">비밀번호 관리</th>
                     <th className="pb-3 px-3 text-right">권한 레벨 변경</th>
+                    <th className="pb-3 px-3 text-center">계정 삭제</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -762,6 +824,16 @@ export default function AdminPage() {
                           <option value="teacher">교사 레벨</option>
                           <option value="admin">관리자 레벨</option>
                         </select>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                          title="회원 및 데이터 영구 삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
