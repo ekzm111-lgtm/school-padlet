@@ -18,6 +18,7 @@ import {
 import { Board, BoardLayout, BoardTheme, User } from '@/lib/types';
 import { getStoreData, saveStoreData, addMyBoardId } from '@/lib/store';
 import { saveRemoteBoard } from '@/lib/supabaseStore';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface CreateBoardModalProps {
   isOpen: boolean;
@@ -144,7 +145,7 @@ export default function CreateBoardModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
@@ -170,13 +171,16 @@ export default function CreateBoardModal({
       isPublic: true, // 기본 전체 공유
       columns: ['모둠 1', '모둠 2', '모둠 3'],
       createdAt: new Date().toISOString().split('T')[0],
+      updatedAt: Date.now(),
       postCount: 0,
     };
 
     const currentData = getStoreData();
     addMyBoardId(newBoard.id);
     saveStoreData.boards([newBoard, ...currentData.boards]);
-    saveRemoteBoard(newBoard).catch(() => {});
+    if (isSupabaseConfigured) {
+      await saveRemoteBoard(newBoard).catch(() => {});
+    }
     onCreated(newBoard);
     onClose();
   };

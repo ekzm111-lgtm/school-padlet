@@ -293,7 +293,7 @@ export default function HomePage() {
           // 🔥 원격 DB에 아직 없는 로컬 보드만 최초 1회 안전 업로드
           for (const b of currentLocal) {
             if (!remoteMap.has(b.id) && isMyBoard(b)) {
-              saveRemoteBoard(b).catch(() => {});
+              await saveRemoteBoard(b).catch(() => {});
             }
           }
 

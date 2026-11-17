@@ -144,7 +144,7 @@ export default function AdminPage() {
           // 로컬에만 있는 보드가 있다면 원격 DB로 안전 동기화
           for (const b of localBoards) {
             if (!remoteMap.has(b.id)) {
-              saveRemoteBoard(b).catch(() => {});
+              await saveRemoteBoard(b).catch(() => {});
             }
           }
         }

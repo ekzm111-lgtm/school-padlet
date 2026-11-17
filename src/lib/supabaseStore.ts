@@ -131,12 +131,18 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       custom_bg_url: board.customBgUrl || null,
     };
 
-    // 1. 기존 보드 id에 대해 update 먼저 시도 (가장 안전하고 빠른 방법으로 원격 DB에 is_public 즉시 반영)
-    const upRes = await supabase.from('boards').update(fullPayload).eq('id', board.id);
-    let error = upRes.error;
+    // 1. 기존 보드 id에 대해 update 먼저 시도 (select('id')로 실제 수정된 행이 있는지 확인)
+    let isUpdated = false;
+    const { data: updatedRows, error: upErr } = await supabase
+      .from('boards')
+      .update(fullPayload)
+      .eq('id', board.id)
+      .select('id');
 
-    // 만약 전체 컬럼 update 실패 시 (일부 부가 컬럼이 Supabase 스키마에 없을 경우), 핵심 컬럼으로 update 재시도
-    if (error) {
+    if (!upErr && updatedRows && updatedRows.length > 0) {
+      isUpdated = true;
+    } else if (upErr) {
+      // fullPayload의 컬럼 에러일 수 있으므로 corePayload로 update 재시도
       const corePayload = {
         code: finalCode,
         title: board.title,
@@ -145,25 +151,39 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
         is_public: isPub,
         category: board.category || '수업자료',
       };
-      const coreUp = await supabase.from('boards').update(corePayload).eq('id', board.id);
-      if (!coreUp.error) {
-        error = null;
+      const { data: coreUpdated, error: coreErr } = await supabase
+        .from('boards')
+        .update(corePayload)
+        .eq('id', board.id)
+        .select('id');
+      if (!coreErr && coreUpdated && coreUpdated.length > 0) {
+        isUpdated = true;
       }
     }
 
-    // 2. 만약 해당 id의 보드가 DB에 아직 없다면(신규 보드), upsert/insert 시도
-    if (error) {
-      const insRes = await supabase.from('boards').upsert(fullPayload, { onConflict: 'id' });
+    // 2. 만약 update된 행이 없다면 (신규 보드이거나 id가 DB에 아직 없는 보드) -> 반드시 INSERT/UPSERT 실행!
+    if (!isUpdated) {
+      const corePayload = {
+        id: board.id,
+        code: finalCode,
+        title: board.title,
+        description: finalDesc,
+        theme: board.theme || 'blue',
+        is_public: isPub,
+        category: board.category || '수업자료',
+      };
+      let insRes = await supabase.from('boards').upsert(fullPayload, { onConflict: 'id' });
       if (insRes.error) {
-        await supabase.from('boards').upsert({
-          id: board.id,
-          code: finalCode,
-          title: board.title,
-          description: finalDesc,
-          theme: board.theme || 'blue',
-          is_public: isPub,
-          category: board.category || '수업자료',
-        }, { onConflict: 'id' });
+        let coreIns = await supabase.from('boards').upsert(corePayload, { onConflict: 'id' });
+        if (coreIns.error) {
+          // 혹시 code 컬럼 중복 에러일 수 있으므로, 새로운 랜덤 6자리 코드로 재생성 후 재시도
+          const freshCode = Math.floor(100000 + Math.random() * 900000).toString();
+          const retryCore = { ...corePayload, code: freshCode };
+          let retryRes = await supabase.from('boards').upsert(retryCore, { onConflict: 'id' });
+          if (retryRes.error) {
+            await supabase.from('boards').insert(retryCore);
+          }
+        }
       }
     }
 
