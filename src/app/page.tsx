@@ -49,9 +49,17 @@ import {
   fetchRemoteNotice,
   saveRemoteNotice,
   fetchRemoteUsers,
+  fetchRemoteUserPrefs,
+  saveRemoteUserPrefs,
 } from '@/lib/supabaseStore';
 import { Board, User, Notice } from '@/lib/types';
 import confetti from 'canvas-confetti';
+
+// 🔑 사용자 계정별(ID/이메일/아이디) 고유 식별 키 추출 헬퍼
+const getUserStorageKey = (user: User | null): string => {
+  if (!user) return 'guest';
+  return (user.id || user.username || user.email || 'user').trim().toLowerCase();
+};
 
 export default function HomePage() {
   const router = useRouter();
@@ -83,6 +91,10 @@ export default function HomePage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [dismissedNoticeId, setDismissedNoticeId] = useState<string | null>(null);
+
+  // 📌 각 사용자(ID)별 독립적인 상단 고정(Pin) 목록 및 순서(Order) 상태
+  const [userPinnedIds, setUserPinnedIds] = useState<string[]>([]);
+  const [userOrderMap, setUserOrderMap] = useState<Record<string, number>>({});
 
   // 🎛️ 메인 페이지 보드 카드 크기 유동 조절 상태: 'auto'(개수에 따라 유동 조절) | 'large'(크게) | 'medium'(보통) | 'compact'(작게)
   const [cardDensity, setCardDensity] = useState<'auto' | 'large' | 'medium' | 'compact'>('auto');
@@ -217,6 +229,28 @@ export default function HomePage() {
     const initialBoards = applySavedOrders(data.boards);
     setBoards(initialBoards);
 
+    const userKey = getUserStorageKey(data.currentUser);
+
+    // 📌 아이디별 독립적인 상단 고정(Pin) 목록 로컬 로드
+    try {
+      const localPins = localStorage.getItem('schoolpad_user_pinned_' + userKey);
+      if (localPins) {
+        setUserPinnedIds(JSON.parse(localPins));
+      } else {
+        setUserPinnedIds([]);
+      }
+    } catch (e) {}
+
+    // 🔢 아이디별 독립적인 보드 순서(Order) 로컬 로드
+    try {
+      const localOrders = localStorage.getItem('schoolpad_user_orders_' + userKey);
+      if (localOrders) {
+        setUserOrderMap(JSON.parse(localOrders));
+      } else {
+        setUserOrderMap({});
+      }
+    } catch (e) {}
+
     // 로컬 공지사항 로드
     try {
       const cachedNotice = localStorage.getItem('schoolpad_global_notice');
@@ -227,14 +261,62 @@ export default function HomePage() {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        // 📌 사용자별 원격 고정(Pin) 및 순서(Order) 실시간 동기화
+        fetchRemoteUserPrefs(userKey)
+          .then((remPrefs) => {
+            if (remPrefs) {
+              if (Array.isArray(remPrefs.pinnedIds)) {
+                setUserPinnedIds(remPrefs.pinnedIds);
+                try {
+                  localStorage.setItem('schoolpad_user_pinned_' + userKey, JSON.stringify(remPrefs.pinnedIds));
+                } catch (e) {}
+              }
+              if (remPrefs.orderMap && typeof remPrefs.orderMap === 'object') {
+                setUserOrderMap(remPrefs.orderMap);
+                try {
+                  localStorage.setItem('schoolpad_user_orders_' + userKey, JSON.stringify(remPrefs.orderMap));
+                } catch (e) {}
+              }
+            }
+          })
+          .catch(() => {});
+
         // 원격 공지사항 비동기 조회
         fetchRemoteNotice()
           .then((remNotice) => {
             if (remNotice !== null) {
-              setNotice(remNotice);
+              let localTime = 0;
               try {
-                localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
+                const cached = localStorage.getItem('schoolpad_global_notice');
+                if (cached) {
+                  const parsed = JSON.parse(cached);
+                  localTime = parsed.updatedAt || 0;
+                }
+                const deletedTime = Number(localStorage.getItem('schoolpad_global_notice_deleted') || '0');
+                localTime = Math.max(localTime, deletedTime);
               } catch (e) {}
+
+              const remTime = remNotice.updatedAt || 0;
+              if (remTime >= localTime) {
+                setNotice((prev) => {
+                  if (
+                    prev &&
+                    prev.id === remNotice.id &&
+                    prev.isActive === remNotice.isActive &&
+                    prev.title === remNotice.title &&
+                    prev.content === remNotice.content &&
+                    prev.category === remNotice.category &&
+                    prev.expiresAt === remNotice.expiresAt &&
+                    prev.updatedAt === remNotice.updatedAt
+                  ) {
+                    return prev;
+                  }
+                  return remNotice;
+                });
+                try {
+                  localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
+                } catch (e) {}
+              }
             }
           })
           .catch(() => {});
@@ -302,7 +384,7 @@ export default function HomePage() {
               merged.push({
                 ...rem,
                 order: local?.order ?? rem.order,
-                pinned: local?.pinned ?? rem.pinned,
+                pinned: false,
               });
             } else if (local) {
               // 원격에 아직 없는 로컬 신규 보드
@@ -431,22 +513,23 @@ export default function HomePage() {
     }
   };
 
-  // 5) 보드 상단 고정(Pin) 상태 토글
+  // 5) 보드 상단 고정(Pin) 상태 토글 (각 사용자/아이디별 독립 저장)
   const handleTogglePinBoard = async (e: React.MouseEvent, targetBoard: Board) => {
     e.stopPropagation();
-    const newPinned = !targetBoard.pinned;
-    const updated = { ...targetBoard, pinned: newPinned, updatedAt: Date.now() };
+    const userKey = getUserStorageKey(currentUser);
+    const isPinned = userPinnedIds.includes(targetBoard.id);
+    const newPinnedIds = isPinned
+      ? userPinnedIds.filter((id) => id !== targetBoard.id)
+      : [...userPinnedIds, targetBoard.id];
 
-    const updatedAll = boards.map((b) => (b.id === targetBoard.id ? updated : b));
-    setBoards(updatedAll);
-    const data = getStoreData();
-    saveStoreData.boards(updatedAll);
+    setUserPinnedIds(newPinnedIds);
+
     try {
-      localStorage.setItem('school_padlet_boards', JSON.stringify(updatedAll));
+      localStorage.setItem('schoolpad_user_pinned_' + userKey, JSON.stringify(newPinnedIds));
     } catch (err) {}
 
     if (isSupabaseConfigured) {
-      await saveRemoteBoard(updated).catch(() => {});
+      saveRemoteUserPrefs(userKey, { pinnedIds: newPinnedIds, orderMap: userOrderMap }).catch(() => {});
     }
   };
 
@@ -492,27 +575,33 @@ export default function HomePage() {
     }
   };
 
-  // 📢 관리자 공지사항 저장 및 동기화 (오직 관리자 admin 전용)
+  // 📢 관리자/교사 공지사항 저장 및 원격 동기화
   const handleSaveNotice = async (newNotice: Notice | null) => {
-    if (currentUser?.role !== 'admin') {
-      alert('공지사항 관리는 관리자(admin) 권한에서만 가능합니다.');
+    if (currentUser?.role !== 'admin' && currentUser?.role !== 'teacher') {
+      alert('공지사항 관리는 관리자(admin) 및 교사 권한에서만 가능합니다.');
       return;
     }
-    setNotice(newNotice);
+    const nowTime = Date.now();
+    const stampedNotice = newNotice ? { ...newNotice, updatedAt: nowTime } : null;
+    setNotice(stampedNotice);
     try {
-      if (newNotice) {
-        localStorage.setItem('schoolpad_global_notice', JSON.stringify(newNotice));
+      if (stampedNotice) {
+        localStorage.setItem('schoolpad_global_notice', JSON.stringify(stampedNotice));
+        localStorage.removeItem('schoolpad_global_notice_deleted');
       } else {
         localStorage.removeItem('schoolpad_global_notice');
+        localStorage.setItem('schoolpad_global_notice_deleted', String(nowTime));
       }
     } catch (e) {}
 
     if (isSupabaseConfigured) {
-      await saveRemoteNotice(newNotice).catch(() => {});
+      await saveRemoteNotice(stampedNotice).catch((err) => {
+        console.error('Remote notice save error:', err);
+      });
     }
   };
 
-  // 1) 좌/우 화살표 버튼으로 한 칸씩 순서 이동
+  // 1) 좌/우 화살표 버튼으로 한 칸씩 순서 이동 (아이디별 독립 순서 저장)
   const handleMoveBoardStep = async (e: React.MouseEvent, boardId: string, direction: 'prev' | 'next', currentList: Board[]) => {
     e.stopPropagation();
     const idx = currentList.findIndex((b) => b.id === boardId);
@@ -520,28 +609,35 @@ export default function HomePage() {
     const targetIdx = direction === 'prev' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= currentList.length) return;
 
+    const isPinned = userPinnedIds.includes(boardId);
+    const targetIsPinned = userPinnedIds.includes(currentList[targetIdx].id);
+
+    // 고정된 카드는 고정된 카드끼리만, 일반 카드는 일반 카드끼리만 교환
+    if (isPinned !== targetIsPinned) return;
+
     // 현재 리스트에서 순서 스왑
     const newList = [...currentList];
     const temp = newList[idx];
     newList[idx] = newList[targetIdx];
     newList[targetIdx] = temp;
 
-    // order 필드 업데이트 (0, 1, 2, ...)
-    const orderMap = new Map<string, number>();
-    newList.forEach((b, i) => orderMap.set(b.id, i));
-
-    // 전체 boards 배열에도 반영
-    const updatedAll = boards.map((b) => {
-      if (orderMap.has(b.id)) {
-        return { ...b, order: orderMap.get(b.id)! };
-      }
-      return b;
+    const newOrderMap = { ...userOrderMap };
+    newList.forEach((b, i) => {
+      newOrderMap[b.id] = i;
     });
 
-    await saveReorderedBoards(updatedAll);
+    setUserOrderMap(newOrderMap);
+    const userKey = getUserStorageKey(currentUser);
+    try {
+      localStorage.setItem('schoolpad_user_orders_' + userKey, JSON.stringify(newOrderMap));
+    } catch (e) {}
+
+    if (isSupabaseConfigured) {
+      saveRemoteUserPrefs(userKey, { pinnedIds: userPinnedIds, orderMap: newOrderMap }).catch(() => {});
+    }
   };
 
-  // 2) 마우스 드래그 앤 드롭으로 순서 변경
+  // 2) 마우스 드래그 앤 드롭으로 순서 변경 (고정된 카드끼리 순서 변경 포함 & 아이디별 독립 저장)
   const handleDropBoard = async (targetBoardId: string, currentList: Board[]) => {
     if (!draggedBoardId || draggedBoardId === targetBoardId) {
       setDraggedBoardId(null);
@@ -558,23 +654,32 @@ export default function HomePage() {
       return;
     }
 
+    const fromIsPinned = userPinnedIds.includes(draggedBoardId);
+    const toIsPinned = userPinnedIds.includes(targetBoardId);
+
+    // 고정된 카드끼리 드래그 시 고정된 카드 사이에서 순서 변경,
+    // 일반 카드끼리 드래그 시 일반 카드 사이에서 순서 변경
     const newList = [...currentList];
     const [moved] = newList.splice(fromIdx, 1);
     newList.splice(toIdx, 0, moved);
 
-    const orderMap = new Map<string, number>();
-    newList.forEach((b, i) => orderMap.set(b.id, i));
-
-    const updatedAll = boards.map((b) => {
-      if (orderMap.has(b.id)) {
-        return { ...b, order: orderMap.get(b.id)! };
-      }
-      return b;
+    const newOrderMap = { ...userOrderMap };
+    newList.forEach((b, i) => {
+      newOrderMap[b.id] = i;
     });
+
+    setUserOrderMap(newOrderMap);
+    const userKey = getUserStorageKey(currentUser);
+    try {
+      localStorage.setItem('schoolpad_user_orders_' + userKey, JSON.stringify(newOrderMap));
+    } catch (e) {}
+
+    if (isSupabaseConfigured) {
+      saveRemoteUserPrefs(userKey, { pinnedIds: userPinnedIds, orderMap: newOrderMap }).catch(() => {});
+    }
 
     setDraggedBoardId(null);
     setDragOverBoardId(null);
-    await saveReorderedBoards(updatedAll);
   };
 
   // 필터링
@@ -655,8 +760,11 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1 w-full px-4 sm:px-8 lg:px-12 py-6 sm:py-8">
-        {/* 📢 전역 공지사항 배너 (활성화되어 있고 dismiss되지 않은 경우) */}
-        {notice && notice.isActive && dismissedNoticeId !== notice.id && (
+        {/* 📢 전역 공지사항 배너 (활성화되어 있고 기한이 만료되지 않았으며 닫지 않은 경우) */}
+        {notice &&
+          notice.isActive &&
+          (!notice.expiresAt || new Date(notice.expiresAt).getTime() > Date.now()) &&
+          dismissedNoticeId !== notice.id && (
           <div
             onClick={() => setShowNoticeModal(true)}
             className={`cursor-pointer mb-6 rounded-2xl p-3.5 sm:p-4 border shadow-sm transition-all hover:shadow-md flex items-center justify-between gap-3 ${
@@ -755,14 +863,14 @@ export default function HomePage() {
                   <span>추천 템플릿 복제하기</span>
                 </button>
 
-                {currentUser?.role === 'admin' && (
+                {(currentUser?.role === 'admin' || currentUser?.role === 'teacher') && (
                   <button
                     onClick={() => setShowNoticeModal(true)}
                     className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition-all active:scale-95"
                   >
                     <Megaphone className="w-4 h-4 text-amber-900" />
                     <span>{notice ? '공지사항 관리' : '공지사항 작성'}</span>
-                    {notice && notice.isActive && (
+                    {notice && notice.isActive && (!notice.expiresAt || new Date(notice.expiresAt).getTime() > Date.now()) && (
                       <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
                     )}
                   </button>
@@ -954,14 +1062,15 @@ export default function HomePage() {
 
         {/* 보드 카드 그리드 & 섹터 분리 (내가 만든 자료 vs 다른 사람 자료) */}
         {(() => {
-          // 정렬 헬퍼 (📌 고정된 카드가 항상 제일 위쪽으로 우선 정렬)
+          // 정렬 헬퍼 (📌 현재 로그인 사용자 기준 상단 고정 및 개별 순서 적용)
           const sortList = (items: Board[]) => {
             return [...items].sort((a, b) => {
-              const pa = a.pinned ? 0 : 1;
-              const pb = b.pinned ? 0 : 1;
-              if (pa !== pb) return pa - pb; // 📌 고정된 카드가 무조건 최상단
-              const oa = typeof a.order === 'number' ? a.order : 999999;
-              const ob = typeof b.order === 'number' ? b.order : 999999;
+              const pa = userPinnedIds.includes(a.id) ? 0 : 1;
+              const pb = userPinnedIds.includes(b.id) ? 0 : 1;
+              if (pa !== pb) return pa - pb; // 📌 고정된 카드가 최상단 그룹 유지
+
+              const oa = userOrderMap[a.id] !== undefined ? userOrderMap[a.id] : (typeof a.order === 'number' ? a.order : 999999);
+              const ob = userOrderMap[b.id] !== undefined ? userOrderMap[b.id] : (typeof b.order === 'number' ? b.order : 999999);
               if (oa !== ob) return oa - ob;
               const ta = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
               const tb = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
@@ -988,6 +1097,7 @@ export default function HomePage() {
             const canEditBoard = Boolean(currentUser && (isMine || currentUser.role === 'admin'));
             const isDragging = draggedBoardId === board.id;
             const isDragOver = dragOverBoardId === board.id;
+            const isPinned = userPinnedIds.includes(board.id);
 
             return (
               <div
@@ -996,6 +1106,9 @@ export default function HomePage() {
                 onDragStart={(e) => {
                   setDraggedBoardId(board.id);
                   e.dataTransfer.effectAllowed = 'move';
+                  try {
+                    e.dataTransfer.setData('text/plain', board.id);
+                  } catch (err) {}
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -1019,8 +1132,12 @@ export default function HomePage() {
                 className={`group relative rounded-2xl ${cfg.padding} border transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer bg-gradient-to-br flex flex-col justify-between select-none ${
                   themeStyles[board.theme] || 'from-white to-slate-50 border-slate-200'
                 } ${isDragging ? 'opacity-40 scale-95' : 'opacity-100'} ${
-                  isDragOver ? 'ring-2 ring-blue-500 ring-offset-2 scale-[1.02] shadow-lg' : ''
-                } ${board.pinned ? 'ring-2 ring-amber-400/90 shadow-md border-amber-300' : ''}`}
+                  isDragOver
+                    ? userPinnedIds.includes(draggedBoardId || '') && isPinned
+                      ? 'ring-2 ring-amber-500 ring-offset-2 scale-[1.02] shadow-lg bg-amber-50/40'
+                      : 'ring-2 ring-blue-500 ring-offset-2 scale-[1.02] shadow-lg'
+                    : ''
+                } ${isPinned ? 'ring-2 ring-amber-400/90 shadow-md border-amber-300' : ''}`}
               >
                 <div>
                   {/* 상단 태그 & 순서 변경 컨트롤 바 */}
@@ -1031,25 +1148,25 @@ export default function HomePage() {
                         type="button"
                         onClick={(e) => handleTogglePinBoard(e, board)}
                         className={`p-1 rounded-lg transition shrink-0 ${
-                          board.pinned
+                          isPinned
                             ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 shadow-2xs font-bold'
                             : 'text-slate-400 hover:text-slate-700 hover:bg-black/5 opacity-60 hover:opacity-100'
                         }`}
-                        title={board.pinned ? '상단 고정 해제하기' : '이 보드를 맨 위쪽으로 항상 고정하기'}
+                        title={isPinned ? '상단 고정 해제하기' : '이 보드를 맨 위쪽으로 항상 고정하기'}
                       >
-                        <Pin className={`w-3.5 h-3.5 ${board.pinned ? 'fill-amber-500 text-amber-600 rotate-45' : ''}`} />
+                        <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-amber-500 text-amber-600 rotate-45' : ''}`} />
                       </button>
 
                       {/* 드래그 핸들 */}
                       <span
                         className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 p-0.5 rounded transition shrink-0"
-                        title="카드를 마우스로 끌어서 순서를 변경하세요"
+                        title="카드를 마우스로 끌어서 순서를 변경하세요 (고정된 카드끼리 드래그 순서 변경 가능)"
                       >
                         <GripVertical className="w-3 h-3" />
                       </span>
 
                       {/* 고정 배지 */}
-                      {board.pinned && (
+                      {isPinned && (
                         <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 border border-amber-300/80 shrink-0 flex items-center gap-0.5 shadow-2xs">
                           <span>📌 고정</span>
                         </span>
@@ -1099,14 +1216,14 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* 순서 이동 화살표 (◀ / ▶) */}
+                    {/* 순서 이동 화살표 (◀ / ▶) - 고정된 카드끼리 및 일반 카드끼리 각각 순서 이동 */}
                     <div className="flex items-center gap-0.5 shrink-0 bg-black/5 rounded-lg p-0.5" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        disabled={idx === 0}
+                        disabled={idx === 0 || (isPinned !== userPinnedIds.includes(list[idx - 1]?.id))}
                         onClick={(e) => handleMoveBoardStep(e, board.id, 'prev', list)}
                         className={`p-0.5 rounded transition ${
-                          idx === 0
+                          idx === 0 || (isPinned !== userPinnedIds.includes(list[idx - 1]?.id))
                             ? 'text-slate-300 cursor-not-allowed'
                             : 'text-slate-600 hover:bg-white hover:text-blue-600 shadow-2xs'
                         }`}
@@ -1116,10 +1233,10 @@ export default function HomePage() {
                       </button>
                       <button
                         type="button"
-                        disabled={idx === list.length - 1}
+                        disabled={idx === list.length - 1 || (isPinned !== userPinnedIds.includes(list[idx + 1]?.id))}
                         onClick={(e) => handleMoveBoardStep(e, board.id, 'next', list)}
                         className={`p-0.5 rounded transition ${
-                          idx === list.length - 1
+                          idx === list.length - 1 || (isPinned !== userPinnedIds.includes(list[idx + 1]?.id))
                             ? 'text-slate-300 cursor-not-allowed'
                             : 'text-slate-600 hover:bg-white hover:text-blue-600 shadow-2xs'
                         }`}
@@ -1136,7 +1253,8 @@ export default function HomePage() {
                       <img
                         src={board.coverImageUrl || board.customBgUrl}
                         alt={board.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        draggable={false}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none select-none"
                       />
                     </div>
                   )}

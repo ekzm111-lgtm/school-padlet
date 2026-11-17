@@ -108,6 +108,7 @@ export interface Notice {
   category: 'urgent' | 'general' | 'event';
   authorName: string;
   isActive: boolean;
+  expiresAt?: string | null; // ISO 문자열 또는 null (무기한)
   createdAt: string;
   updatedAt?: number;
 }

@@ -87,7 +87,10 @@ export default function StudentHomeView({
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
         {/* 📢 선생님 전체 공지사항 배너 (학생 뷰) */}
-        {notice && notice.isActive && !dismissedNotice && (
+        {notice &&
+          notice.isActive &&
+          (!notice.expiresAt || new Date(notice.expiresAt).getTime() > Date.now()) &&
+          !dismissedNotice && (
           <div
             onClick={onOpenNotice}
             className={`cursor-pointer rounded-2xl p-3.5 sm:p-4 border shadow-sm transition-all hover:shadow-md flex items-center justify-between gap-3 ${

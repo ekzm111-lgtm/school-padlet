@@ -62,7 +62,7 @@ export async function fetchRemoteBoards(): Promise<Board[] | null> {
         layout: metaLayout || b.layout || 'kanban',
         theme: metaTheme || b.theme || 'blue',
         order: metaOrder !== undefined ? metaOrder : undefined,
-        pinned: metaPinned === true,
+        pinned: false, // 📌 고정 여부는 사용자 계정별(UserPrefs)로 독립 관리
         coverImageUrl:
           metaCover ||
           b.cover_image_url ||
@@ -110,7 +110,7 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
       authorName: board.authorName,
       authorRole: board.authorRole || 'teacher',
       order: board.order,
-      pinned: board.pinned === true,
+      pinned: false,
       updatedAt: board.updatedAt || Date.now(),
     });
     const finalDesc = `${cleanDesc}\n<!--SCHOOLPAD_BOARD_META:${metaPayload}-->`;
@@ -787,6 +787,17 @@ export async function fetchRemoteSettings(): Promise<SystemSettings | null> {
 export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
+    // __SYSTEM_USERS__ 시스템 보드가 없을 경우 외래키 제약조건 위반 방지를 위해 보장
+    await supabase.from('boards').upsert({
+      id: '__SYSTEM_USERS__',
+      code: 'SYSUSER',
+      title: '__SYSTEM_USERS__',
+      description: 'System User Registry for Cross-Device Sync',
+      is_public: false,
+      author_id: 'system',
+      author_name: '시스템',
+    });
+
     if (!notice) {
       await supabase.from('posts').delete().eq('id', 'schoolpad_global_notice');
       return true;
@@ -800,9 +811,13 @@ export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> 
       author_name: notice.authorName || '관리자',
       column_name: '__notice__',
     });
-    return !error;
+    if (error) {
+      console.error('saveRemoteNotice Supabase error:', error);
+      return false;
+    }
+    return true;
   } catch (e) {
-    console.error('saveRemoteNotice error', e);
+    console.error('saveRemoteNotice exception:', e);
     return false;
   }
 }
@@ -818,6 +833,51 @@ export async function fetchRemoteNotice(): Promise<Notice | null> {
 
     if (error || !data?.content) return null;
     return JSON.parse(data.content) as Notice;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 📌 사용자별 개별 설정(고정 보드 ID 목록 & 보드 정렬 순서) Supabase 원격 동기화
+export interface UserPreferences {
+  pinnedIds: string[];
+  orderMap: Record<string, number>;
+  updatedAt?: number;
+}
+
+export async function saveRemoteUserPrefs(userKey: string, prefs: { pinnedIds: string[]; orderMap: Record<string, number> }): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !userKey) return false;
+  try {
+    const safeKey = userKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const { error } = await supabase.from('posts').upsert({
+      id: `user_prefs_${safeKey}`,
+      board_id: '__SYSTEM_USERS__',
+      title: `User Preferences: ${userKey}`,
+      content: JSON.stringify({ ...prefs, updatedAt: Date.now() }),
+      author_id: safeKey,
+      author_name: userKey,
+      column_name: '__user_prefs__',
+    });
+    return !error;
+  } catch (e) {
+    console.error('saveRemoteUserPrefs error:', e);
+    return false;
+  }
+}
+
+export async function fetchRemoteUserPrefs(userKey: string): Promise<UserPreferences | null> {
+  if (!isSupabaseConfigured || !supabase || !userKey) return null;
+  try {
+    const safeKey = userKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const { data, error } = await supabase
+      .from('posts')
+      .select('content')
+      .eq('id', `user_prefs_${safeKey}`)
+      .eq('board_id', '__SYSTEM_USERS__')
+      .maybeSingle();
+
+    if (error || !data?.content) return null;
+    return JSON.parse(data.content) as UserPreferences;
   } catch (e) {
     return null;
   }

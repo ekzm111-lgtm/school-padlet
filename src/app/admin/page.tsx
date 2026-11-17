@@ -23,11 +23,13 @@ import {
   Lock,
   Pencil,
   Globe,
+  Megaphone,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import NoticeModal from '@/components/NoticeModal';
 import { getStoreData, saveStoreData } from '@/lib/store';
-import { User, SystemSettings, Board } from '@/lib/types';
+import { User, SystemSettings, Board, Notice } from '@/lib/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   fetchRemoteUsers,
@@ -39,6 +41,8 @@ import {
   saveRemoteBoard,
   deleteRemoteBoard,
   deleteRemotePost,
+  fetchRemoteNotice,
+  saveRemoteNotice,
 } from '@/lib/supabaseStore';
 
 export default function AdminPage() {
@@ -47,6 +51,8 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(getStoreData().settings);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [activeTab, setActiveTabState] = useState<'pending' | 'users' | 'boards' | 'adminPw'>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -92,14 +98,39 @@ export default function AdminPage() {
     setBoards(data.boards);
     setSettings(data.settings);
 
+    // 로컬 공지사항 로드
+    try {
+      const cachedNotice = localStorage.getItem('schoolpad_global_notice');
+      if (cachedNotice) {
+        setNotice(JSON.parse(cachedNotice));
+      }
+    } catch (e) {}
+
     // 🌟 원격 Supabase 클라우드에서 최신 사용자, 보드 및 시스템 설정 불러오기
     if (isSupabaseConfigured) {
       try {
-        const [remoteUsers, remoteSettings, remoteBoards] = await Promise.all([
+        const [remoteUsers, remoteSettings, remoteBoards, remoteNotice] = await Promise.all([
           fetchRemoteUsers(),
           fetchRemoteSettings(),
           fetchRemoteBoards(),
+          fetchRemoteNotice(),
         ]);
+
+        if (remoteNotice !== null) {
+          let localTime = 0;
+          try {
+            const cached = localStorage.getItem('schoolpad_global_notice');
+            if (cached) localTime = JSON.parse(cached).updatedAt || 0;
+            const delTime = Number(localStorage.getItem('schoolpad_global_notice_deleted') || '0');
+            localTime = Math.max(localTime, delTime);
+          } catch (e) {}
+          if ((remoteNotice.updatedAt || 0) >= localTime) {
+            setNotice(remoteNotice);
+            try {
+              localStorage.setItem('schoolpad_global_notice', JSON.stringify(remoteNotice));
+            } catch (e) {}
+          }
+        }
 
         if (remoteUsers && remoteUsers.length > 0) {
           const userMap = new Map<string, User>();
@@ -149,7 +180,7 @@ export default function AdminPage() {
               mergedBoards.push({
                 ...rem,
                 order: local?.order ?? rem.order,
-                pinned: local?.pinned ?? rem.pinned,
+                pinned: false,
               });
             } else if (local) {
               mergedBoards.push(local);
@@ -229,10 +260,20 @@ export default function AdminPage() {
           () => {
             fetchRemoteBoards().then((rb) => {
               if (rb && rb.length > 0) {
+                const deletedIds = new Set<string>();
+                try {
+                  const rawDel = localStorage.getItem('schoolpad_deleted_boards');
+                  if (rawDel) {
+                    const parsed = JSON.parse(rawDel);
+                    if (Array.isArray(parsed)) parsed.forEach((id: string) => deletedIds.add(id));
+                  }
+                } catch (e) {}
+                const validRb = rb.filter((b) => !deletedIds.has(b.id) && !(b.code && deletedIds.has(b.code)));
+
                 const data = getStoreData();
                 const boardMap = new Map<string, Board>();
-                data.boards.forEach((b) => boardMap.set(b.id, b));
-                rb.forEach((b) => {
+                data.boards.filter((b) => !deletedIds.has(b.id) && !(b.code && deletedIds.has(b.code))).forEach((b) => boardMap.set(b.id, b));
+                validRb.forEach((b) => {
                   const local = boardMap.get(b.id);
                   boardMap.set(
                     b.id,
@@ -256,7 +297,7 @@ export default function AdminPage() {
         )
         .subscribe();
 
-      // 3. 주기적 동기화 폴링 (사용자 및 보드 최신화 100% 보장)
+      // 3. 주기적 동기화 폴링 (사용자, 보드 및 공지사항 최신화 100% 보장)
       pollTimer = setInterval(() => {
         fetchRemoteUsers().then((ru) => {
           if (ru && ru.length > 0) {
@@ -280,12 +321,52 @@ export default function AdminPage() {
           }
         });
 
+        fetchRemoteNotice().then((rn) => {
+          if (rn !== null) {
+            let localTime = 0;
+            try {
+              const cached = localStorage.getItem('schoolpad_global_notice');
+              if (cached) localTime = JSON.parse(cached).updatedAt || 0;
+              const delTime = Number(localStorage.getItem('schoolpad_global_notice_deleted') || '0');
+              localTime = Math.max(localTime, delTime);
+            } catch (e) {}
+            if ((rn.updatedAt || 0) >= localTime) {
+              setNotice((prev) => {
+                if (
+                  prev &&
+                  prev.id === rn.id &&
+                  prev.isActive === rn.isActive &&
+                  prev.title === rn.title &&
+                  prev.content === rn.content &&
+                  prev.category === rn.category &&
+                  prev.expiresAt === rn.expiresAt &&
+                  prev.updatedAt === rn.updatedAt
+                ) return prev;
+                return rn;
+              });
+              try {
+                localStorage.setItem('schoolpad_global_notice', JSON.stringify(rn));
+              } catch (e) {}
+            }
+          }
+        });
+
         fetchRemoteBoards().then((rb) => {
           if (rb && rb.length > 0) {
+            const deletedIds = new Set<string>();
+            try {
+              const rawDel = localStorage.getItem('schoolpad_deleted_boards');
+              if (rawDel) {
+                const parsed = JSON.parse(rawDel);
+                if (Array.isArray(parsed)) parsed.forEach((id: string) => deletedIds.add(id));
+              }
+            } catch (e) {}
+            const validRb = rb.filter((b) => !deletedIds.has(b.id) && !(b.code && deletedIds.has(b.code)));
+
             setBoards((prev) => {
-              const prevMap = new Map(prev.map((b) => [b.id, b]));
-              let changed = rb.length !== prev.length;
-              for (const r of rb) {
+              const prevMap = new Map(prev.filter((b) => !deletedIds.has(b.id) && !(b.code && deletedIds.has(b.code))).map((b) => [b.id, b]));
+              let changed = validRb.length !== prevMap.size;
+              for (const r of validRb) {
                 const existing = prevMap.get(r.id);
                 if (!existing || existing.isPublic !== r.isPublic || existing.title !== r.title) {
                   changed = true;
@@ -294,7 +375,7 @@ export default function AdminPage() {
               }
               if (changed) {
                 const mergedMap = new Map(prevMap);
-                rb.forEach((b) => {
+                validRb.forEach((b) => {
                   const local = mergedMap.get(b.id);
                   mergedMap.set(
                     b.id,
@@ -578,6 +659,29 @@ export default function AdminPage() {
     showToast(`'${board.title}' 보드가 '${newStatus ? '공개' : '비공개'}'(으)로 변경되었습니다.`);
   };
 
+  // 📢 관리자 전체 공지사항 저장 및 동기화
+  const handleSaveNotice = async (newNotice: Notice | null) => {
+    const nowTime = Date.now();
+    const stampedNotice = newNotice ? { ...newNotice, updatedAt: nowTime } : null;
+    setNotice(stampedNotice);
+    try {
+      if (stampedNotice) {
+        localStorage.setItem('schoolpad_global_notice', JSON.stringify(stampedNotice));
+        localStorage.removeItem('schoolpad_global_notice_deleted');
+      } else {
+        localStorage.removeItem('schoolpad_global_notice');
+        localStorage.setItem('schoolpad_global_notice_deleted', String(nowTime));
+      }
+    } catch (e) {}
+
+    if (isSupabaseConfigured) {
+      await saveRemoteNotice(stampedNotice).catch((err) => {
+        console.error('Remote notice save error:', err);
+      });
+    }
+    showToast('전체 공지사항 설정이 성공적으로 저장되었습니다.');
+  };
+
   const pendingUsers = users.filter((u) => u.status === 'pending');
   const rejectedUsers = users.filter((u) => u.status === 'rejected');
   const filteredUsers = users.filter(
@@ -623,41 +727,55 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* 자동 가입 토글 스위치 */}
-          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3">
-            <div>
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <span>가입 승인 정책:</span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                    settings.autoApproveUsers
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}
-                >
-                  {settings.autoApproveUsers ? '자동 가입 허용(기본)' : '수동 승인제'}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                {settings.autoApproveUsers
-                  ? 'G메일/계정 가입 즉시 수업 참여'
-                  : '관리자 승인 후 입장 가능'}
-              </div>
-            </div>
-
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* 전체 공지사항 관리 버튼 */}
             <button
-              onClick={handleToggleAutoApprove}
-              className={`p-1 rounded-xl transition ${
-                settings.autoApproveUsers ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'
-              }`}
-              title="가입 방식 전환"
+              onClick={() => setShowNoticeModal(true)}
+              className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-sm transition active:scale-95 cursor-pointer"
             >
-              {settings.autoApproveUsers ? (
-                <ToggleRight className="w-8 h-8 fill-current" />
-              ) : (
-                <ToggleLeft className="w-8 h-8 fill-current" />
+              <Megaphone className="w-4 h-4 text-amber-900" />
+              <span>{notice ? '전체 공지사항 관리' : '전체 공지사항 작성'}</span>
+              {notice && notice.isActive && (!notice.expiresAt || new Date(notice.expiresAt).getTime() > Date.now()) && (
+                <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
               )}
             </button>
+
+            {/* 자동 가입 토글 스위치 */}
+            <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3">
+              <div>
+                <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>가입 승인 정책:</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      settings.autoApproveUsers
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {settings.autoApproveUsers ? '자동 가입 허용(기본)' : '수동 승인제'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {settings.autoApproveUsers
+                    ? 'G메일/계정 가입 즉시 수업 참여'
+                    : '관리자 승인 후 입장 가능'}
+                </div>
+              </div>
+
+              <button
+                onClick={handleToggleAutoApprove}
+                className={`p-1 rounded-xl transition ${
+                  settings.autoApproveUsers ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'
+                }`}
+                title="가입 방식 전환"
+              >
+                {settings.autoApproveUsers ? (
+                  <ToggleRight className="w-8 h-8 fill-current" />
+                ) : (
+                  <ToggleLeft className="w-8 h-8 fill-current" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1234,6 +1352,16 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* 📢 관리자 전체 공지사항 모달 */}
+      <NoticeModal
+        isOpen={showNoticeModal}
+        onClose={() => setShowNoticeModal(false)}
+        notice={notice}
+        onSave={handleSaveNotice}
+        isAdmin={true}
+        isTeacherOrAdmin={true}
+      />
     </div>
   );
 }
