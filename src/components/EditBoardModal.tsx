@@ -245,16 +245,43 @@ export default function EditBoardModal({
 
   const handleDelete = async () => {
     if (confirm(`'${board.title}' 보드를 정말 삭제하시겠습니까? 보드 안의 모든 카드와 댓글도 함께 삭제됩니다.`)) {
-      const currentData = getStoreData();
-      saveStoreData.boards(currentData.boards.filter((b) => b.id !== board.id));
-      saveStoreData.posts(currentData.posts.filter((p) => p.boardId !== board.id));
+      setIsSaving(true);
+      try {
+        // 1. 삭제된 보드 ID 영구 기록 (새로고침 시 자동 부활 원천 차단)
+        try {
+          const raw = localStorage.getItem('schoolpad_deleted_boards');
+          const deletedIds = raw ? JSON.parse(raw) : [];
+          if (!deletedIds.includes(board.id)) {
+            deletedIds.push(board.id);
+          }
+          if (board.code && !deletedIds.includes(board.code)) {
+            deletedIds.push(board.code);
+          }
+          localStorage.setItem('schoolpad_deleted_boards', JSON.stringify(deletedIds));
+        } catch (e) {}
 
-      if (isSupabaseConfigured) {
-        deleteRemoteBoard(board.id).catch(() => {});
+        // 2. 로컬 스토리지에서 즉시 삭제
+        const currentData = getStoreData();
+        const remainingBoards = currentData.boards.filter((b) => b.id !== board.id && b.code !== board.code);
+        const remainingPosts = currentData.posts.filter((p) => p.boardId !== board.id);
+        saveStoreData.boards(remainingBoards);
+        saveStoreData.posts(remainingPosts);
+        localStorage.setItem('school_padlet_boards', JSON.stringify(remainingBoards));
+
+        // 3. Supabase 원격 DB에서도 카드와 보드가 완전 삭제될 때까지 확실히 AWAIT!
+        if (isSupabaseConfigured) {
+          await deleteRemoteBoard(board.id);
+        }
+
+        // 4. 삭제 완료 후 콜백 호출
+        if (onDeleted) onDeleted(board.id);
+        onClose();
+      } catch (err) {
+        console.error('Board delete error:', err);
+        alert('보드 삭제 중 오류가 발생했습니다.');
+      } finally {
+        setIsSaving(false);
       }
-
-      if (onDeleted) onDeleted(board.id);
-      onClose();
     }
   };
 

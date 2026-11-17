@@ -516,10 +516,23 @@ export const getStoreData = (): StoreData => {
   const storedPosts = localStorage.getItem(STORAGE_KEYS.POSTS);
   const storedCurrentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
 
+  // 영구 삭제된 보드 ID 목록 로드 (사용자가 삭제한 보드가 자동 재생성되는 현상 차단)
+  const deletedBoardIds = new Set<string>();
+  try {
+    const rawDel = localStorage.getItem('schoolpad_deleted_boards');
+    if (rawDel) {
+      const parsed = JSON.parse(rawDel);
+      if (Array.isArray(parsed)) parsed.forEach((id: string) => deletedBoardIds.add(id));
+    }
+  } catch (e) {}
+
   let boardsList: Board[] = storedBoards ? JSON.parse(storedBoards) : INITIAL_BOARDS;
-  // '바이브코딩 (105207)' 보드 및 util 카드 영구 자동 동기화
+  // 삭제된 보드는 즉시 제외
+  boardsList = boardsList.filter((b) => !deletedBoardIds.has(b.id) && !deletedBoardIds.has(b.code));
+
+  // '바이브코딩 (105207)' 보드 및 util 카드 영구 자동 동기화 (삭제되지 않은 경우에만)
   const myVibeBoard = INITIAL_BOARDS.find((b) => b.code === '105207');
-  if (myVibeBoard) {
+  if (myVibeBoard && !deletedBoardIds.has('105207') && !deletedBoardIds.has(myVibeBoard.id)) {
     const existing = boardsList.find((b) => b.code === '105207' || b.id === 'board-1792975588752');
     if (!existing) {
       boardsList = [myVibeBoard, ...boardsList];
@@ -529,18 +542,18 @@ export const getStoreData = (): StoreData => {
     }
   }
 
-  // '바이브코딩 교육자료' (999190) 보드 자동 동기화
+  // '바이브코딩 교육자료' (999190) 보드 자동 동기화 (삭제되지 않은 경우에만)
   const vibeBoard = INITIAL_BOARDS.find((b) => b.code === '999190');
-  if (vibeBoard && !boardsList.some((b) => b.code === '999190')) {
+  if (vibeBoard && !deletedBoardIds.has('999190') && !deletedBoardIds.has(vibeBoard.id) && !boardsList.some((b) => b.code === '999190')) {
     boardsList = [vibeBoard, ...boardsList];
     try {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
     } catch (e) {}
   }
 
-  // '🌟 초·중·고 유용한 학습 사이트 & 에듀테크 링크 모음' (778899) 보드 및 에듀테크 링크 카드 자동 동기화
+  // '🌟 초·중·고 유용한 학습 사이트 & 에듀테크 링크 모음' (778899) 보드 (삭제되지 않은 경우에만)
   const usefulBoardIdx = boardsList.findIndex((b) => b.id === USEFUL_SCHOOL_LINKS_BOARD.id || b.code === USEFUL_SCHOOL_LINKS_BOARD.code);
-  if (usefulBoardIdx === -1) {
+  if (usefulBoardIdx === -1 && !deletedBoardIds.has('778899') && !deletedBoardIds.has(USEFUL_SCHOOL_LINKS_BOARD.id)) {
     boardsList = [USEFUL_SCHOOL_LINKS_BOARD, ...boardsList];
     try {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
@@ -548,7 +561,7 @@ export const getStoreData = (): StoreData => {
     if (isSupabaseConfigured) {
       saveRemoteBoard(USEFUL_SCHOOL_LINKS_BOARD).catch(() => {});
     }
-  } else {
+  } else if (usefulBoardIdx !== -1) {
     // 컬럼 정규화 (중복, 구버전 컬럼명 및 타 보드 유입 컬럼 원천 필터링)
     const foreignColumns = new Set([
       'Ai 모델', '몸풀기 예제', '몸풀기', '몸플기 예제', '실습', 'util', '바이브코딩', 
@@ -584,9 +597,9 @@ export const getStoreData = (): StoreData => {
     }
   }
 
-  // '🚀 중학교 엔트리 코딩 인기 추천 영상 & 실전 프로젝트' (334455) 보드 자동 동기화
+  // '🚀 중학교 엔트리 코딩 인기 추천 영상 & 실전 프로젝트' (334455) 보드 (삭제되지 않은 경우에만)
   const entryBoardIdx = boardsList.findIndex((b) => b.id === ENTRY_MIDDLE_SCHOOL_BOARD.id || b.code === ENTRY_MIDDLE_SCHOOL_BOARD.code);
-  if (entryBoardIdx === -1) {
+  if (entryBoardIdx === -1 && !deletedBoardIds.has('334455') && !deletedBoardIds.has(ENTRY_MIDDLE_SCHOOL_BOARD.id)) {
     boardsList = [ENTRY_MIDDLE_SCHOOL_BOARD, ...boardsList];
     try {
       localStorage.setItem(STORAGE_KEYS.BOARDS, JSON.stringify(boardsList));
@@ -594,7 +607,7 @@ export const getStoreData = (): StoreData => {
     if (isSupabaseConfigured) {
       saveRemoteBoard(ENTRY_MIDDLE_SCHOOL_BOARD).catch(() => {});
     }
-  } else {
+  } else if (entryBoardIdx !== -1) {
     // 기존 보드가 있더라도 구버전 컬럼 목록을 가진 경우 최신 5대 정규 컬럼으로 갱신
     const currentBoard = boardsList[entryBoardIdx];
     const targetCols = ENTRY_MIDDLE_SCHOOL_BOARD.columns || [];
@@ -613,8 +626,10 @@ export const getStoreData = (): StoreData => {
     }
   }
 
-  // 삭제된 디지털튜터 보드(202501)가 로컬에 남아있다면 영구 제거 필터링
-  boardsList = boardsList.filter((b) => b.id !== 'board-digital-tutor-2025' && b.code !== '202501');
+  // 삭제된 보드 목록에 포함된 보드는 절대 로컬에 남지 않도록 최종 필터링
+  boardsList = boardsList.filter(
+    (b) => !deletedBoardIds.has(b.id) && !deletedBoardIds.has(b.code) && b.id !== 'board-digital-tutor-2025' && b.code !== '202501'
+  );
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
 

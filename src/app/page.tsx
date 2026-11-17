@@ -45,6 +45,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   fetchRemoteBoards,
   saveRemoteBoard,
+  deleteRemoteBoard,
   fetchRemoteNotice,
   saveRemoteNotice,
   fetchRemoteUsers,
@@ -265,22 +266,41 @@ export default function HomePage() {
           })
           .catch(() => {});
 
+        // 🗑️ 삭제된 보드 ID 목록 로드 (원격 캐시나 구버전 데이터로 인한 재부활 차단)
+        const deletedIds = new Set<string>();
+        try {
+          const rawDel = localStorage.getItem('schoolpad_deleted_boards');
+          if (rawDel) {
+            const parsed = JSON.parse(rawDel);
+            if (Array.isArray(parsed)) parsed.forEach((id: string) => deletedIds.add(id));
+          }
+        } catch (e) {}
+
         const remote = await fetchRemoteBoards();
         if (remote && remote.length > 0) {
-          const currentLocal = getStoreData().boards;
+          // 삭제된 보드가 원격에 남아있다면 즉각 비동기 삭제 처리 및 뷰에서 영구 제외
+          const validRemote = remote.filter((b) => {
+            if (deletedIds.has(b.id) || (b.code && deletedIds.has(b.code))) {
+              deleteRemoteBoard(b.id).catch(() => {});
+              return false;
+            }
+            return true;
+          });
+
+          const currentLocal = getStoreData().boards.filter((b) => !deletedIds.has(b.id) && !deletedIds.has(b.code));
           const localMap = new Map(currentLocal.map((b) => [b.id, b]));
-          const remoteMap = new Map(remote.map((b) => [b.id, b]));
-          const allIds = Array.from(new Set([...currentLocal.map((b) => b.id), ...remote.map((b) => b.id)]));
+          const remoteMap = new Map(validRemote.map((b) => [b.id, b]));
+          const allIds = Array.from(new Set([...currentLocal.map((b) => b.id), ...validRemote.map((b) => b.id)]));
 
           const merged: Board[] = [];
           for (const id of allIds) {
+            if (deletedIds.has(id)) continue;
             const local = localMap.get(id);
             const rem = remoteMap.get(id);
             if (rem) {
               // 🔥 원격 클라우드 DB가 공유 여부(isPublic) 및 내용의 단일 진실 소스(Single Source of Truth)!
               merged.push({
                 ...rem,
-                // 기기별 개인 설정(화면 순서, 개인 고정 등)만 로컬 설정 보존
                 order: local?.order ?? rem.order,
                 pinned: local?.pinned ?? rem.pinned,
               });
@@ -290,9 +310,9 @@ export default function HomePage() {
             }
           }
 
-          // 🔥 원격 DB에 아직 없는 로컬 보드만 최초 1회 안전 업로드
+          // 🔥 원격 DB에 아직 없는 로컬 보드만 최초 1회 안전 업로드 (삭제된 것은 절대 업로드 안함)
           for (const b of currentLocal) {
-            if (!remoteMap.has(b.id) && isMyBoard(b)) {
+            if (!remoteMap.has(b.id) && isMyBoard(b) && !deletedIds.has(b.id) && !deletedIds.has(b.code)) {
               await saveRemoteBoard(b).catch(() => {});
             }
           }
@@ -1459,9 +1479,10 @@ export default function HomePage() {
             loadData();
             setEditingBoard(null);
           }}
-          onDeleted={() => {
-            loadData();
+          onDeleted={(deletedId) => {
+            setBoards((prev) => prev.filter((b) => b.id !== deletedId));
             setEditingBoard(null);
+            loadData();
           }}
         />
       )}

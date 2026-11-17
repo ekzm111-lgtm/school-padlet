@@ -116,18 +116,36 @@ export default function AdminPage() {
           saveStoreData.settings(remoteSettings);
         }
 
+        // 🗑️ 삭제된 보드 ID 목록 로드
+        const deletedIds = new Set<string>();
+        try {
+          const rawDel = localStorage.getItem('schoolpad_deleted_boards');
+          if (rawDel) {
+            const parsed = JSON.parse(rawDel);
+            if (Array.isArray(parsed)) parsed.forEach((id: string) => deletedIds.add(id));
+          }
+        } catch (e) {}
+
         if (remoteBoards && remoteBoards.length > 0) {
-          const localBoards = data.boards;
+          const validRemote = remoteBoards.filter((b) => {
+            if (deletedIds.has(b.id) || (b.code && deletedIds.has(b.code))) {
+              deleteRemoteBoard(b.id).catch(() => {});
+              return false;
+            }
+            return true;
+          });
+
+          const localBoards = data.boards.filter((b) => !deletedIds.has(b.id) && !deletedIds.has(b.code));
           const localMap = new Map(localBoards.map((b) => [b.id, b]));
-          const remoteMap = new Map(remoteBoards.map((b) => [b.id, b]));
-          const allIds = Array.from(new Set([...localBoards.map((b) => b.id), ...remoteBoards.map((b) => b.id)]));
+          const remoteMap = new Map(validRemote.map((b) => [b.id, b]));
+          const allIds = Array.from(new Set([...localBoards.map((b) => b.id), ...validRemote.map((b) => b.id)]));
 
           const mergedBoards: Board[] = [];
           for (const id of allIds) {
+            if (deletedIds.has(id)) continue;
             const local = localMap.get(id);
             const rem = remoteMap.get(id);
             if (rem) {
-              // 원격 클라우드 DB가 단일 진실 소스
               mergedBoards.push({
                 ...rem,
                 order: local?.order ?? rem.order,
@@ -141,9 +159,9 @@ export default function AdminPage() {
           setBoards(mergedBoards);
           localStorage.setItem('school_padlet_boards', JSON.stringify(mergedBoards));
 
-          // 로컬에만 있는 보드가 있다면 원격 DB로 안전 동기화
+          // 로컬에만 있는 보드가 있다면 원격 DB로 안전 동기화 (삭제된 보드는 제외)
           for (const b of localBoards) {
-            if (!remoteMap.has(b.id)) {
+            if (!remoteMap.has(b.id) && !deletedIds.has(b.id) && !deletedIds.has(b.code)) {
               await saveRemoteBoard(b).catch(() => {});
             }
           }
@@ -517,11 +535,28 @@ export default function AdminPage() {
   };
 
   // 보드 삭제
-  const handleDeleteBoard = (boardId: string) => {
+  const handleDeleteBoard = async (boardId: string) => {
     if (confirm('정말 이 보드를 삭제하시겠습니까? 관련된 모든 글이 함께 삭제됩니다.')) {
+      // 1. 삭제된 보드 ID 영구 기록
+      try {
+        const raw = localStorage.getItem('schoolpad_deleted_boards');
+        const deletedIds = raw ? JSON.parse(raw) : [];
+        if (!deletedIds.includes(boardId)) {
+          deletedIds.push(boardId);
+          localStorage.setItem('schoolpad_deleted_boards', JSON.stringify(deletedIds));
+        }
+      } catch (e) {}
+
+      // 2. 화면 및 로컬 스토어 즉시 반영
       const updated = boards.filter((b) => b.id !== boardId);
-      saveStoreData.boards(updated);
       setBoards(updated);
+      saveStoreData.boards(updated);
+      localStorage.setItem('school_padlet_boards', JSON.stringify(updated));
+
+      // 3. Supabase 원격 DB에서도 관련 카드와 함께 완전 삭제
+      if (isSupabaseConfigured) {
+        await deleteRemoteBoard(boardId).catch(() => {});
+      }
       showToast('보드가 삭제되었습니다.');
     }
   };

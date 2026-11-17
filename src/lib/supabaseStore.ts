@@ -219,9 +219,19 @@ export async function saveRemoteBoard(board: Board): Promise<boolean> {
 export async function deleteRemoteBoard(boardId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
+    // 1. 해당 보드에 연결된 모든 카드, 포스트, 시스템 메타 레코드 먼저 완전 삭제 (외래키 제약조건 방어)
+    await supabase.from('posts').delete().eq('board_id', boardId);
+    await supabase.from('posts').delete().eq('id', `board_columns_${boardId}`);
+
+    // 2. boards 테이블에서 보드 완전 삭제
     const { error } = await supabase.from('boards').delete().eq('id', boardId);
-    return !error;
+    if (error) {
+      console.error('deleteRemoteBoard error:', error);
+      return false;
+    }
+    return true;
   } catch (e) {
+    console.error('deleteRemoteBoard exception:', e);
     return false;
   }
 }
