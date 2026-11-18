@@ -1048,11 +1048,15 @@ export default function BoardDetailPage() {
     setIsSyncingToCloud(true);
     try {
       const data = getStoreData();
-      const localForThisBoard = data.posts.filter((p) => p.boardId === board.id);
+      const localForThisBoard = data.posts
+        .filter((p) => p.boardId === board.id)
+        .filter((p) => !p.id?.startsWith('active_quiz_') && p.column !== '__active_quiz__' && !p.title?.startsWith('Active Quiz'));
 
-      // 화면의 posts와 로컬스토리지의 posts를 ID 기준으로 병합 (누락된 카드 완벽 보존)
+      // 화면의 posts와 로컬스토리지의 posts를 ID 기준으로 병합 (누락된 카드 완벽 보존 및 시스템 카드 필터링)
       const postMap = new Map();
-      (posts || []).forEach((p) => postMap.set(p.id, p));
+      (posts || [])
+        .filter((p) => !p.id?.startsWith('active_quiz_') && p.column !== '__active_quiz__' && !p.title?.startsWith('Active Quiz'))
+        .forEach((p) => postMap.set(p.id, p));
       localForThisBoard.forEach((p) => {
         if (!postMap.has(p.id)) postMap.set(p.id, p);
       });

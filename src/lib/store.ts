@@ -633,6 +633,18 @@ export const getStoreData = (): StoreData => {
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
 
+  // 🧹 퀴즈 시스템 메타데이터 카드(Active Quiz)가 로컬 캐시에 남아있다면 영구 소거
+  const cleanPosts = postsList.filter(
+    (p) => !p.id?.startsWith('active_quiz_') && p.column !== '__active_quiz__' && !p.title?.startsWith('Active Quiz')
+  );
+  if (cleanPosts.length !== postsList.length) {
+    postsList = cleanPosts;
+    memoryPostsCache = cleanPosts;
+    try {
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(cleanPosts));
+    } catch (e) {}
+  }
+
   // 유용한 학습 사이트 보드의 중복/구버전 컬럼명 정규화
   let postsMigrated = false;
   postsList = postsList.map((p) => {
