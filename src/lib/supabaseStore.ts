@@ -812,7 +812,26 @@ export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> 
     });
 
     if (!notice) {
-      await supabase.from('posts').delete().eq('id', 'schoolpad_global_notice');
+      // 명시적으로 삭제된 상태(Tombstone)를 저장하여 모든 클라이언트에 삭제 이벤트를 확실히 동기화
+      const deletedNotice: Notice = {
+        id: 'deleted',
+        title: '__DELETED__',
+        content: '',
+        category: 'general',
+        authorName: '관리자',
+        createdAt: new Date().toISOString().split('T')[0],
+        isActive: false,
+        updatedAt: Date.now(),
+      };
+      await supabase.from('posts').upsert({
+        id: 'schoolpad_global_notice',
+        board_id: '__SYSTEM_USERS__',
+        title: '__DELETED__',
+        content: JSON.stringify(deletedNotice),
+        author_id: 'admin',
+        author_name: '관리자',
+        column_name: '__notice__',
+      });
       return true;
     }
     const { error } = await supabase.from('posts').upsert({
@@ -852,6 +871,9 @@ export async function fetchRemoteNoticeResult(): Promise<{ notice: Notice | null
     }
     try {
       const parsed = JSON.parse(data.content) as Notice;
+      if (parsed.id === 'deleted' || parsed.isActive === false || parsed.title === '__DELETED__') {
+        return { notice: { ...parsed, isActive: false }, error: null };
+      }
       return { notice: parsed, error: null };
     } catch (parseErr) {
       return { notice: null, error: parseErr };

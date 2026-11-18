@@ -361,27 +361,41 @@ export default function AdminPage() {
             return;
           }
           if (rn !== null) {
-            setNotice((prev) => {
-              if (
-                prev &&
-                prev.id === rn.id &&
-                prev.isActive === rn.isActive &&
-                prev.title === rn.title &&
-                prev.content === rn.content &&
-                prev.category === rn.category &&
-                prev.expiresAt === rn.expiresAt &&
-                prev.updatedAt === rn.updatedAt
-              ) return prev;
-              return rn;
-            });
-            try {
-              localStorage.setItem('schoolpad_global_notice', JSON.stringify(rn));
-              localStorage.removeItem('schoolpad_global_notice_deleted');
-            } catch (e) {}
+            if (rn.isActive === false || rn.title === '__DELETED__') {
+              // 명시적으로 삭제된 공지
+              setNotice(null);
+              try {
+                localStorage.removeItem('schoolpad_global_notice');
+              } catch (e) {}
+            } else {
+              setNotice((prev) => {
+                if (
+                  prev &&
+                  prev.id === rn.id &&
+                  prev.isActive === rn.isActive &&
+                  prev.title === rn.title &&
+                  prev.content === rn.content &&
+                  prev.category === rn.category &&
+                  prev.expiresAt === rn.expiresAt &&
+                  prev.updatedAt === rn.updatedAt
+                ) return prev;
+                return rn;
+              });
+              try {
+                localStorage.setItem('schoolpad_global_notice', JSON.stringify(rn));
+                localStorage.removeItem('schoolpad_global_notice_deleted');
+              } catch (e) {}
+            }
           } else {
-            setNotice(null);
+            // 원격 DB에 아직 행이 없는 경우 로컬 공지사항이 있다면 업로드하여 보존
             try {
-              localStorage.removeItem('schoolpad_global_notice');
+              const localStr = localStorage.getItem('schoolpad_global_notice');
+              if (localStr) {
+                const localObj = JSON.parse(localStr);
+                if (localObj && localObj.title && localObj.isActive !== false) {
+                  saveRemoteNotice(localObj).catch(() => {});
+                }
+              }
             } catch (e) {}
           }
         });

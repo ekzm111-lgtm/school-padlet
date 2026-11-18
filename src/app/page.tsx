@@ -96,7 +96,27 @@ export default function HomePage() {
   // 📢 관리자 공지사항 상태
   const [notice, setNotice] = useState<Notice | null>(null);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
-  const [dismissedNoticeId, setDismissedNoticeId] = useState<string | null>(null);
+  const [dismissedNoticeId, setDismissedNoticeIdState] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return sessionStorage.getItem('schoolpad_dismissed_notice_id');
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const setDismissedNoticeId = (id: string | null) => {
+    setDismissedNoticeIdState(id);
+    if (typeof window !== 'undefined') {
+      try {
+        if (id) {
+          sessionStorage.setItem('schoolpad_dismissed_notice_id', id);
+        } else {
+          sessionStorage.removeItem('schoolpad_dismissed_notice_id');
+        }
+      } catch (e) {}
+    }
+  };
 
   // 📌 각 사용자(ID)별 독립적인 상단 고정(Pin) 목록 및 순서(Order) 상태
   const [userPinnedIds, setUserPinnedIds] = useState<string[]>([]);
@@ -337,34 +357,47 @@ export default function HomePage() {
         fetchRemoteNoticeResult()
           .then(({ notice: remNotice, error }) => {
             if (error) {
-              // ⚠️ 네트워크 지연 또는 에러 발생 시 기존 공지사항을 지우지 않고 유지하여 깜빡임 원천 차단!
+              // ⚠️ 네트워크 지연 또는 일시적 에러 시 기존 로컬 공지사항을 유지하여 깜빡임 원천 차단!
               return;
             }
             if (remNotice !== null) {
-              setNotice((prev) => {
-                if (
-                  prev &&
-                  prev.id === remNotice.id &&
-                  prev.isActive === remNotice.isActive &&
-                  prev.title === remNotice.title &&
-                  prev.content === remNotice.content &&
-                  prev.category === remNotice.category &&
-                  prev.expiresAt === remNotice.expiresAt &&
-                  prev.updatedAt === remNotice.updatedAt
-                ) {
-                  return prev;
-                }
-                return remNotice;
-              });
-              try {
-                localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
-                localStorage.removeItem('schoolpad_global_notice_deleted');
-              } catch (e) {}
+              if (remNotice.isActive === false || remNotice.title === '__DELETED__') {
+                // 명시적으로 관리자가 삭제한 공지
+                setNotice(null);
+                try {
+                  localStorage.removeItem('schoolpad_global_notice');
+                } catch (e) {}
+              } else {
+                setNotice((prev) => {
+                  if (
+                    prev &&
+                    prev.id === remNotice.id &&
+                    prev.isActive === remNotice.isActive &&
+                    prev.title === remNotice.title &&
+                    prev.content === remNotice.content &&
+                    prev.category === remNotice.category &&
+                    prev.expiresAt === remNotice.expiresAt &&
+                    prev.updatedAt === remNotice.updatedAt
+                  ) {
+                    return prev;
+                  }
+                  return remNotice;
+                });
+                try {
+                  localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
+                  localStorage.removeItem('schoolpad_global_notice_deleted');
+                } catch (e) {}
+              }
             } else {
-              // 원격 DB에 공지사항 행이 정상적으로 없음 (관리자가 명시적으로 삭제함)
-              setNotice(null);
+              // 원격 DB에 아직 행이 없는 경우: 로컬에 공지사항이 있다면 삭제하지 않고 원격으로 보존 업로드
               try {
-                localStorage.removeItem('schoolpad_global_notice');
+                const localStr = localStorage.getItem('schoolpad_global_notice');
+                if (localStr) {
+                  const localObj = JSON.parse(localStr);
+                  if (localObj && localObj.title && localObj.isActive !== false) {
+                    saveRemoteNotice(localObj).catch(() => {});
+                  }
+                }
               } catch (e) {}
             }
           })
