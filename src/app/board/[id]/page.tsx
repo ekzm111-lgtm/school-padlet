@@ -47,7 +47,7 @@ import { QuizHostScreen } from '@/components/quiz/QuizHostScreen';
 import { QuizStudentScreen } from '@/components/quiz/QuizStudentScreen';
 import { getStoreData, saveStoreData, duplicateBoard, deletePost, getMyPostIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, saveAllRemotePosts, deleteRemotePost } from '@/lib/supabaseStore';
+import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, saveAllRemotePosts, deleteRemotePost, saveRemoteBoardActiveQuiz, fetchRemoteBoardActiveQuiz } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
 import { ENTRY_MIDDLE_SCHOOL_POSTS } from '@/data/entryMiddleSchoolBoard';
@@ -301,15 +301,29 @@ export default function BoardDetailPage() {
       }
     }
 
-    // 이 보드의 활성화된 퀴즈 확인
-    const checkActiveQuiz = () => {
+    // 🎯 이 보드의 활성화된 실시간 퀴즈 확인 및 Supabase 클라우드 동기화
+    const syncActiveQuiz = async () => {
+      let currentPin: string | null = null;
       if (typeof window !== 'undefined') {
-        const pin = localStorage.getItem(`board_active_quiz_${boardId}`);
-        setActiveQuizPin(pin || null);
+        currentPin = localStorage.getItem(`board_active_quiz_${boardId}`) || null;
       }
+      if (isSupabaseConfigured) {
+        try {
+          const remotePin = await fetchRemoteBoardActiveQuiz(boardId);
+          if (remotePin) {
+            currentPin = remotePin;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`board_active_quiz_${boardId}`, remotePin);
+            }
+          } else if (!currentPin) {
+            currentPin = null;
+          }
+        } catch (e) {}
+      }
+      setActiveQuizPin(currentPin);
     };
-    checkActiveQuiz();
-    const timer = setInterval(checkActiveQuiz, 2500);
+    syncActiveQuiz();
+    const timer = setInterval(syncActiveQuiz, 2500);
 
     return () => {
       if (presenceChannel && supabase) {
@@ -855,6 +869,17 @@ export default function BoardDetailPage() {
             }
           }
         }
+
+        // 🎯 실시간 활성 퀴즈 PIN 클라우드 동기화
+        try {
+          const remotePin = await fetchRemoteBoardActiveQuiz(targetBoardId);
+          if (remotePin) {
+            setActiveQuizPin(remotePin);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`board_active_quiz_${targetBoardId}`, remotePin);
+            }
+          }
+        } catch (e) {}
       } catch (e) {
         console.error('syncRemoteData error', e);
       } finally {
@@ -928,12 +953,15 @@ export default function BoardDetailPage() {
       <div className="fixed inset-0 z-50 bg-slate-950">
         <QuizHostScreen
           pin={activeHostPin}
-          onExit={() => {
+          onExit={async () => {
             setActiveHostPin(null);
             if (typeof window !== 'undefined' && board) {
               localStorage.removeItem(`board_active_quiz_${board.id}`);
             }
             setActiveQuizPin(null);
+            if (isSupabaseConfigured && board) {
+              await saveRemoteBoardActiveQuiz(board.id, null).catch(() => {});
+            }
           }}
           onViewLeaderboard={() => {
             setActiveHostPin(null);
@@ -961,8 +989,8 @@ export default function BoardDetailPage() {
       (currentUser.id === board.authorId || currentUser.name === board.authorName)
   );
 
-  // 최고 관리자이거나 해당 보드의 소유자(본인/복제자)만 보드 설정(잠금/배경/모둠수정 등) 가능
-  const isTeacherOrAdmin = currentUser?.role === 'admin' || isBoardOwner;
+  // 최고 관리자이거나 교사(선생님) 또는 해당 보드의 소유자(본인/복제자) 권한 부여
+  const isTeacherOrAdmin = currentUser?.role === 'admin' || currentUser?.role === 'teacher' || isBoardOwner;
 
   // 레이아웃 변경 시 보드 설정 및 브라우저 캐시에 즉시 저장하고 클라우드 동기화
   const handleChangeLayout = (newLayout: BoardLayout) => {
@@ -1856,7 +1884,7 @@ export default function BoardDetailPage() {
                 title="이 보드 전용 실시간 퀴즈(QuizN) 대결 시작"
               >
                 <Gamepad2 className="w-3.5 h-3.5" />
-                <span>실시간 퀴즈</span>
+                <span>{activeQuizPin ? `퀴즈 진행 중 (${activeQuizPin})` : '실시간 퀴즈'}</span>
               </button>
             </div>
           }
@@ -2716,15 +2744,31 @@ export default function BoardDetailPage() {
         currentUser={currentUser}
         isTeacherOrAdmin={isTeacherOrAdmin}
         activeQuizPin={activeQuizPin}
-        onStartLive={(pin) => {
+        onStartLive={async (pin) => {
           setActiveQuizPin(pin);
           setActiveHostPin(pin);
           if (typeof window !== 'undefined') {
             localStorage.setItem(`board_active_quiz_${board.id}`, pin);
           }
+          if (isSupabaseConfigured) {
+            await saveRemoteBoardActiveQuiz(board.id, pin).catch(() => {});
+          }
         }}
         onJoinAsStudent={(pin) => {
           setActiveStudentPin(pin);
+        }}
+        onOpenHostScreen={(pin) => {
+          setActiveHostPin(pin);
+        }}
+        onStopQuiz={async () => {
+          setActiveHostPin(null);
+          setActiveQuizPin(null);
+          if (typeof window !== 'undefined' && board) {
+            localStorage.removeItem(`board_active_quiz_${board.id}`);
+          }
+          if (isSupabaseConfigured && board) {
+            await saveRemoteBoardActiveQuiz(board.id, null).catch(() => {});
+          }
         }}
       />
     </div>

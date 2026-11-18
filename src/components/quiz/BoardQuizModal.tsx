@@ -60,6 +60,8 @@ interface BoardQuizModalProps {
   activeQuizPin?: string | null;
   onStartLive: (pin: string, with100Bots?: boolean) => void;
   onJoinAsStudent: (pin: string) => void;
+  onOpenHostScreen?: (pin: string) => void;
+  onStopQuiz?: () => void;
 }
 
 export default function BoardQuizModal({
@@ -71,12 +73,18 @@ export default function BoardQuizModal({
   activeQuizPin,
   onStartLive,
   onJoinAsStudent,
+  onOpenHostScreen,
+  onStopQuiz,
 }: BoardQuizModalProps) {
   // 모달 메인 탭: 'new'(새 퀴즈 출제) | 'history'(진행 기록 및 보관함 게시판)
   const [mainTab, setMainTab] = useState<'new' | 'history'>('new');
   
   // 보관함 서브 필터: 'my'(내가 낸 문제) | 'shared'(공유 보관함) | 'all'(전체)
   const [historyScope, setHistoryScope] = useState<'my' | 'shared' | 'all'>('my');
+
+  // 학생 PIN 직접 입력 상태
+  const [manualPinInput, setManualPinInput] = useState('');
+  const [manualPinError, setManualPinError] = useState('');
 
   // 새 퀴즈 출제 상태
   const [selectedPresetId, setSelectedPresetId] = useState<string>('general');
@@ -401,41 +409,160 @@ export default function BoardQuizModal({
           </div>
         )}
 
-        {/* 학생 화면: 현재 진행 중인 퀴즈가 있는 경우 바로 입장 */}
-        {!isTeacherOrAdmin && activeQuizPin ? (
-          <div className="p-8 text-center space-y-5">
-            <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/20 animate-bounce">
-              <Gamepad2 className="w-9 h-9" />
+        {/* 📡 교사/관리자 전용: 현재 진행 중인 퀴즈 바로가기 컨트롤 바 */}
+        {isTeacherOrAdmin && activeQuizPin && !editingPackage && (
+          <div className="mx-5 mt-3 p-3 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <div>
+                <span className="text-xs font-black text-purple-900">
+                  현재 실시간 퀴즈 진행 중 (참여 PIN: {activeQuizPin})
+                </span>
+                <p className="text-[10px] text-purple-700">
+                  선생님 대기실을 다시 열거나 학생 모드로 입장하여 테스트할 수 있습니다.
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                선생님이 퀴즈를 시작했습니다!
-              </span>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                지금 바로 퀴즈 대결에 입장하세요!
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                별도의 PIN 번호 입력 없이 버튼 하나로 1초 만에 입장합니다.
-              </p>
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+              {onOpenHostScreen && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenHostScreen(activeQuizPin);
+                    onClose();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>📡 대기실 열기</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  onJoinAsStudent(activeQuizPin);
+                  onClose();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-purple-700 border border-purple-200 font-bold text-xs shadow-xs transition flex items-center gap-1"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>학생 화면 테스트</span>
+              </button>
+              {onStopQuiz && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('현재 진행 중인 퀴즈를 종료하시겠습니까?')) {
+                      onStopQuiz();
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition"
+                  title="퀴즈 종료"
+                >
+                  종료
+                </button>
+              )}
             </div>
-
-            <button
-              onClick={() => {
-                onJoinAsStudent(activeQuizPin);
-                onClose();
-              }}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-indigo-500/25 active:scale-98 transition flex items-center justify-center gap-2"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>🎮 퀴즈 대결 입장하기</span>
-            </button>
           </div>
-        ) : !isTeacherOrAdmin ? (
-          <div className="p-12 text-center text-slate-500 text-xs space-y-2">
-            <Gamepad2 className="w-12 h-12 text-slate-300 mx-auto" />
-            <p className="font-bold text-slate-700 text-sm">현재 진행 중인 퀴즈가 없습니다.</p>
-            <p className="text-slate-400">선생님이 이 보드에서 실시간 퀴즈를 시작하면 화면에 알림이 나타납니다.</p>
+        )}
+
+        {/* 학생 화면: 진행 중인 퀴즈가 있는 경우 바로 입장 + PIN 직접 입력창 상시 제공 */}
+        {!isTeacherOrAdmin ? (
+          <div className="p-6 sm:p-8 space-y-6 max-h-[80vh] overflow-y-auto">
+            {activeQuizPin ? (
+              /* 1. 이 보드에서 실시간 진행 중인 퀴즈가 있는 경우 */
+              <div className="text-center space-y-4 p-6 rounded-3xl bg-gradient-to-b from-purple-50/80 to-indigo-50/80 border border-purple-200/60 shadow-xs">
+                <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-md shadow-indigo-500/20 animate-bounce">
+                  <Gamepad2 className="w-8 h-8" />
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    선생님이 퀴즈를 시작했습니다!
+                  </span>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                    지금 바로 퀴즈 대결에 입장하세요!
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    참여 PIN: <span className="font-mono font-black text-purple-600 text-sm">{activeQuizPin}</span> (원클릭 자동 연결)
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onJoinAsStudent(activeQuizPin);
+                    onClose();
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-indigo-500/25 active:scale-98 transition flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>🎮 퀴즈 대결 바로 입장하기</span>
+                </button>
+              </div>
+            ) : (
+              /* 2. 진행 중인 퀴즈가 없을 때 안내 */
+              <div className="text-center space-y-2 py-4">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                  <Gamepad2 className="w-6 h-6" />
+                </div>
+                <h3 className="font-black text-slate-800 text-sm">현재 이 보드에서 실시간 진행 중인 퀴즈가 없습니다.</h3>
+                <p className="text-xs text-slate-400">
+                  선생님이 퀴즈를 시작하면 보드 상단에 알림 배너가 자동으로 나타납니다.
+                </p>
+              </div>
+            )}
+
+            {/* 3. 6자리 PIN 번호 직접 입력하여 입장 (언제든 사용 가능) */}
+            <div className="pt-4 border-t border-slate-100">
+              <div className="text-center mb-3">
+                <span className="text-xs font-bold text-slate-700">
+                  선생님이 알려주신 6자리 참여 PIN 번호가 있나요?
+                </span>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  칠판이나 화면에 표시된 PIN 번호를 입력하면 바로 입장할 수 있습니다.
+                </p>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const cleaned = manualPinInput.trim().replace(/[^0-9]/g, '');
+                  if (!cleaned || cleaned.length < 4) {
+                    setManualPinError('올바른 6자리 PIN 번호를 입력해 주세요.');
+                    return;
+                  }
+                  setManualPinError('');
+                  onJoinAsStudent(cleaned);
+                  onClose();
+                }}
+                className="max-w-md mx-auto space-y-2.5"
+              >
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    maxLength={8}
+                    placeholder="예: 992143"
+                    value={manualPinInput}
+                    onChange={(e) => {
+                      setManualPinInput(e.target.value);
+                      if (manualPinError) setManualPinError('');
+                    }}
+                    className="flex-1 px-4 py-3 text-center font-mono font-black text-lg tracking-widest rounded-2xl border-2 border-slate-200 focus:border-purple-600 focus:outline-none transition bg-slate-50 focus:bg-white"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md shadow-purple-500/20 active:scale-95 transition shrink-0 flex items-center gap-1.5"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>입장하기</span>
+                  </button>
+                </div>
+                {manualPinError && (
+                  <p className="text-xs font-bold text-rose-500 text-center">{manualPinError}</p>
+                )}
+              </form>
+            </div>
           </div>
         ) : editingPackage ? (
           /* ======================================================== */

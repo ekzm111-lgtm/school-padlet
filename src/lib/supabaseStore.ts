@@ -960,3 +960,50 @@ export async function fetchRemoteBannerSettings(): Promise<BannerSettings | null
     return null;
   }
 }
+
+// 🎯 보드별 실시간 진행 중인 퀴즈 PIN Supabase 클라우드 동기화
+export async function saveRemoteBoardActiveQuiz(boardId: string, pin: string | null): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !boardId) return false;
+  try {
+    const postKey = `active_quiz_${boardId}`;
+    if (!pin) {
+      await supabase.from('posts').delete().eq('id', postKey);
+      return true;
+    }
+    const { error } = await supabase.from('posts').upsert({
+      id: postKey,
+      board_id: boardId,
+      title: `Active Quiz: ${pin}`,
+      content: JSON.stringify({ pin, updatedAt: Date.now() }),
+      author_id: 'system',
+      author_name: '퀴즈 시스템',
+      column_name: '__active_quiz__',
+    });
+    return !error;
+  } catch (e) {
+    console.error('saveRemoteBoardActiveQuiz error:', e);
+    return false;
+  }
+}
+
+export async function fetchRemoteBoardActiveQuiz(boardId: string): Promise<string | null> {
+  if (!isSupabaseConfigured || !supabase || !boardId) return null;
+  try {
+    const postKey = `active_quiz_${boardId}`;
+    const { data, error } = await supabase
+      .from('posts')
+      .select('content')
+      .eq('id', postKey)
+      .maybeSingle();
+
+    if (error || !data?.content) return null;
+    const parsed = JSON.parse(data.content);
+    // 2시간 이상 지난 오래된 퀴즈 PIN은 만료 처리
+    if (parsed.updatedAt && Date.now() - parsed.updatedAt > 2 * 60 * 60 * 1000) {
+      return null;
+    }
+    return parsed.pin || null;
+  } catch (e) {
+    return null;
+  }
+}
