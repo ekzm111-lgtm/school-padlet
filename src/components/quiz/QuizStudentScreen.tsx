@@ -18,6 +18,7 @@ import {
 } from '@/utils/avatarCollector';
 import { clientJoinRoom, clientSubmitLiveAnswer } from '@/utils/liveQuizSync';
 import { getApiBaseUrl } from '@/utils/hostNetwork';
+import { getStoreData } from '@/lib/store';
 import { calculateCompetitionRanks, getRankBadgeStyle, getPodiumStyle } from '@/utils/ranking';
 import { CheeringCharacter } from '@/components/quiz/CheeringCharacter';
 import {
@@ -101,7 +102,15 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
   const [isJoined, setIsJoined] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<QuizAvatar>(QUIZ_AVATARS[0]);
   const [avatarCategory, setAvatarCategory] = useState<'all' | 'anime' | 'animal' | 'hero'>('all');
-  const [nickname, setNickname] = useState('');
+  const [nickname, setNickname] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const u = getStoreData().currentUser;
+        if (u && u.name) return u.name;
+      } catch {}
+    }
+    return '';
+  });
   const studentIdRef = useRef<string>(`s_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
 
   // 현재 문제 풀이 상호작용
@@ -454,7 +463,7 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
               )}
             </span>
             <h1 className={`${isSidePreview ? 'text-xl' : 'text-2xl'} font-black text-white pt-1`}>
-              선생님 라이브 퀴즈 입장
+              실시간 퀴즈 입장
             </h1>
             <p className="text-xs text-slate-400">
               PIN: <strong className="text-amber-400 font-mono text-sm">{room.pin}</strong> · {room.title}
@@ -574,7 +583,7 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
               type="text"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="예: 3반 김엔트리"
+              placeholder="예: 3반 김엔트리 또는 이수학 선생님"
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 font-bold"
             />
           </div>

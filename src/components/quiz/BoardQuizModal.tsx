@@ -76,8 +76,8 @@ export default function BoardQuizModal({
   onOpenHostScreen,
   onStopQuiz,
 }: BoardQuizModalProps) {
-  // 모달 메인 탭: 'new'(새 퀴즈 출제) | 'history'(진행 기록 및 보관함 게시판)
-  const [mainTab, setMainTab] = useState<'new' | 'history'>('new');
+  // 모달 메인 탭: 'new'(새 퀴즈 출제) | 'history'(진행 기록 및 보관함 게시판) | 'join'(직접 퀴즈 참여)
+  const [mainTab, setMainTab] = useState<'new' | 'history' | 'join'>('new');
   
   // 보관함 서브 필터: 'my'(내가 낸 문제) | 'shared'(공유 보관함) | 'all'(전체)
   const [historyScope, setHistoryScope] = useState<'my' | 'shared' | 'all'>('my');
@@ -378,7 +378,7 @@ export default function BoardQuizModal({
 
         {/* 탭 네비게이션 (교사/관리자 전용) */}
         {isTeacherOrAdmin && !editingPackage && (
-          <div className="px-5 pt-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2 shrink-0">
+          <div className="px-5 pt-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2 shrink-0 overflow-x-auto no-scrollbar">
             <button
               type="button"
               onClick={() => setMainTab('new')}
@@ -406,24 +406,50 @@ export default function BoardQuizModal({
               <History className="w-3.5 h-3.5" />
               <span>📜 퀴즈 진행 기록 및 보관함 ({savedPackages.length}개)</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setMainTab('join')}
+              className={`flex items-center gap-1.5 px-4 py-2 border-b-2 font-black text-xs transition whitespace-nowrap ${
+                mainTab === 'join'
+                  ? 'border-indigo-600 text-indigo-700 bg-white rounded-t-xl shadow-2xs'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Gamepad2 className="w-3.5 h-3.5 text-purple-600" />
+              <span>🎮 퀴즈 직접 참여 (PIN 입력)</span>
+            </button>
           </div>
         )}
 
         {/* 📡 교사/관리자 전용: 현재 진행 중인 퀴즈 바로가기 컨트롤 바 */}
         {isTeacherOrAdmin && activeQuizPin && !editingPackage && (
-          <div className="mx-5 mt-3 p-3 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="mx-5 mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <div>
-                <span className="text-xs font-black text-purple-900">
-                  현재 실시간 퀴즈 진행 중 (참여 PIN: {activeQuizPin})
+                <span className="text-xs sm:text-sm font-black text-purple-950 flex items-center gap-1.5">
+                  <span>현재 실시간 퀴즈 진행 중</span>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-200 text-purple-900 font-mono text-xs font-black">
+                    PIN: {activeQuizPin}
+                  </span>
                 </span>
-                <p className="text-[10px] text-purple-700">
-                  선생님 대기실을 다시 열거나 학생 모드로 입장하여 테스트할 수 있습니다.
+                <p className="text-[11px] text-purple-700">
+                  선생님도 학생들과 함께 플레이어로 참여하거나 호스트 대기실을 열 수 있습니다.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  onJoinAsStudent(activeQuizPin);
+                  onClose();
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs shadow-md transition flex items-center gap-1.5 active:scale-95"
+              >
+                <Gamepad2 className="w-3.5 h-3.5" />
+                <span>🎮 퀴즈 직접 참여하기</span>
+              </button>
               {onOpenHostScreen && (
                 <button
                   type="button"
@@ -431,23 +457,12 @@ export default function BoardQuizModal({
                     onOpenHostScreen(activeQuizPin);
                     onClose();
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-purple-700 border border-purple-200 font-bold text-xs shadow-xs transition flex items-center gap-1"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
                   <span>📡 대기실 열기</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  onJoinAsStudent(activeQuizPin);
-                  onClose();
-                }}
-                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-purple-700 border border-purple-200 font-bold text-xs shadow-xs transition flex items-center gap-1"
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>학생 화면 테스트</span>
-              </button>
               {onStopQuiz && (
                 <button
                   type="button"
@@ -1075,6 +1090,94 @@ export default function BoardQuizModal({
                 })}
               </div>
             )}
+          </div>
+        ) : mainTab === 'join' ? (
+          /* ======================================================== */
+          /* 🎮 선생님 직접 퀴즈 참여 화면 (PIN 입력)                   */
+          /* ======================================================== */
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 no-scrollbar">
+            {activeQuizPin ? (
+              <div className="text-center space-y-4 p-6 rounded-3xl bg-gradient-to-b from-purple-50/80 to-indigo-50/80 border border-purple-200/60 shadow-xs">
+                <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-md shadow-indigo-500/20 animate-bounce">
+                  <Gamepad2 className="w-8 h-8" />
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    이 보드에서 실시간 퀴즈 진행 중!
+                  </span>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                    선생님도 직접 퀴즈 플레이어로 입장하세요!
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    참여 PIN: <span className="font-mono font-black text-purple-600 text-sm">{activeQuizPin}</span> (원클릭 자동 연결)
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onJoinAsStudent(activeQuizPin);
+                    onClose();
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-indigo-500/25 active:scale-98 transition flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>🎮 실시간 퀴즈 바로 입장하기</span>
+                </button>
+              </div>
+            ) : null}
+
+            {/* 6자리 PIN 번호 직접 입력하여 입장 */}
+            <div className="pt-2">
+              <div className="text-center mb-3">
+                <span className="text-xs font-bold text-slate-700">
+                  다른 선생님이 공유한 6자리 참여 PIN 번호가 있나요?
+                </span>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  화면이나 메신저로 받은 6자리 PIN 번호를 입력하면 바로 플레이어로 참여할 수 있습니다.
+                </p>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const cleaned = manualPinInput.trim().replace(/[^0-9]/g, '');
+                  if (!cleaned || cleaned.length < 4) {
+                    setManualPinError('올바른 6자리 PIN 번호를 입력해 주세요.');
+                    return;
+                  }
+                  setManualPinError('');
+                  onJoinAsStudent(cleaned);
+                  onClose();
+                }}
+                className="max-w-md mx-auto space-y-2.5"
+              >
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    maxLength={8}
+                    placeholder="예: 358283"
+                    value={manualPinInput}
+                    onChange={(e) => {
+                      setManualPinInput(e.target.value);
+                      if (manualPinError) setManualPinError('');
+                    }}
+                    className="flex-1 px-4 py-3 text-center font-mono font-black text-lg tracking-widest rounded-2xl border-2 border-slate-200 focus:border-purple-600 focus:outline-none transition bg-slate-50 focus:bg-white"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md shadow-purple-500/20 active:scale-95 transition shrink-0 flex items-center gap-1.5"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>입장하기</span>
+                  </button>
+                </div>
+                {manualPinError && (
+                  <p className="text-xs font-bold text-rose-500 text-center">{manualPinError}</p>
+                )}
+              </form>
+            </div>
           </div>
         ) : (
           /* ======================================================== */

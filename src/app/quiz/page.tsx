@@ -386,7 +386,7 @@ function QuizAppContent() {
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>학생 참여 모드</span>
+              <span>직접 참여 모드 (학생/선생님)</span>
             </button>
 
             <button

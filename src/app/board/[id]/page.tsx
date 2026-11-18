@@ -1930,21 +1930,36 @@ export default function BoardDetailPage() {
           }
         />
 
-        {/* 🔔 학생 실시간 퀴즈 시작 알림 배너 */}
-        {activeQuizPin && !isTeacherOrAdmin && (
+        {/* 🔔 실시간 퀴즈 시작 알림 배너 (선생님/학생 모두에게 표시되어 직접 참여 가능) */}
+        {activeQuizPin && !activeHostPin && (
           <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white px-4 py-2.5 flex items-center justify-between gap-3 shadow-md z-20 shrink-0 animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
-              <span className="text-xs sm:text-sm font-black">
-                🔔 선생님이 이 보드에서 실시간 퀴즈를 시작했습니다!
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping shrink-0" />
+              <span className="text-xs sm:text-sm font-black truncate">
+                {isTeacherOrAdmin
+                  ? `🔔 이 보드에서 실시간 퀴즈(PIN: ${activeQuizPin})가 진행 중입니다! (선생님도 직접 참여 가능)`
+                  : '🔔 선생님이 이 보드에서 실시간 퀴즈를 시작했습니다!'}
               </span>
             </div>
-            <button
-              onClick={() => setActiveStudentPin(activeQuizPin)}
-              className="px-3.5 py-1.5 rounded-xl bg-white text-purple-700 hover:bg-purple-50 text-xs font-black transition shadow-sm active:scale-95 shrink-0 flex items-center gap-1"
-            >
-              <span>🎮 지금 참여하기</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setActiveStudentPin(activeQuizPin)}
+                className="px-3.5 py-1.5 rounded-xl bg-white text-purple-700 hover:bg-purple-50 text-xs font-black transition shadow-sm active:scale-95 shrink-0 flex items-center gap-1.5"
+              >
+                <Gamepad2 className="w-3.5 h-3.5 text-purple-600" />
+                <span>🎮 지금 참여하기</span>
+              </button>
+              {isTeacherOrAdmin && (
+                <button
+                  onClick={() => setActiveHostPin(activeQuizPin)}
+                  className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-purple-950/60 text-purple-100 border border-purple-300/40 text-xs font-bold transition shadow-sm active:scale-95"
+                  title="교사용 호스트 대기실 열기"
+                >
+                  <Play className="w-3 h-3 fill-current" />
+                  <span>호스트 대기실</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
 

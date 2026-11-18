@@ -892,10 +892,10 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
                   <span>실시간 라이브 대기실 운영 중</span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight break-keep">
-                  학생들이 입장하기를 기다리는 중입니다
+                  참여자들이 입장하기를 기다리는 중입니다
                 </h1>
                 <p className="text-xs md:text-sm text-slate-400 break-keep">
-                  학생 스마트폰 카메라로 QR 코드를 비추거나 아래 주소로 접속하세요. 참여자가 전부 들어오면 <strong className="text-amber-400">퀴즈 시작 버튼</strong>을 누르세요!
+                  스마트폰 카메라로 QR 코드를 비추거나 아래 주소로 접속하세요. 학생과 선생님 모두 실시간 참여할 수 있습니다!
                 </p>
               </div>
 
@@ -1062,9 +1062,9 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
 
                 {participantCount === 0 ? (
                   <div className="py-6 sm:py-8 text-center text-slate-500 text-xs space-y-1">
-                    <p className="font-semibold">아직 입장한 학생이 없습니다.</p>
+                    <p className="font-semibold">아직 입장한 참가자(학생/선생님)가 없습니다.</p>
                     <p className="text-[11px] text-slate-600">
-                      스마트폰 카메라로 위 QR 코드를 비추거나, 우측 상단의 [🚀 100명 일괄 입장 테스트] 버튼을 눌러보세요.
+                      스마트폰 카메라로 위 QR 코드를 비추거나 주소로 접속해 학생과 선생님 모두 참여할 수 있습니다.
                     </p>
                   </div>
                 ) : (
