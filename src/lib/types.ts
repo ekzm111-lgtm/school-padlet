@@ -117,6 +117,7 @@ export interface BannerSlide {
   id: string;
   url: string;
   title?: string;
+  position?: string; // 사진 보이는 위치 (예: 'center top', 'center 25%', 'center center', 'center bottom')
 }
 
 export interface BannerSettings {

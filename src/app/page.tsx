@@ -332,42 +332,34 @@ export default function HomePage() {
           })
           .catch(() => {});
 
-        // 원격 공지사항 비동기 조회
+        // 원격 공지사항 비동기 조회 (원격 서버를 단일 진실의 원천으로 신뢰하여 모든 기기/계정에 즉시 동기화)
         fetchRemoteNotice()
           .then((remNotice) => {
             if (remNotice !== null) {
-              let localTime = 0;
-              try {
-                const cached = localStorage.getItem('schoolpad_global_notice');
-                if (cached) {
-                  const parsed = JSON.parse(cached);
-                  localTime = parsed.updatedAt || 0;
+              setNotice((prev) => {
+                if (
+                  prev &&
+                  prev.id === remNotice.id &&
+                  prev.isActive === remNotice.isActive &&
+                  prev.title === remNotice.title &&
+                  prev.content === remNotice.content &&
+                  prev.category === remNotice.category &&
+                  prev.expiresAt === remNotice.expiresAt &&
+                  prev.updatedAt === remNotice.updatedAt
+                ) {
+                  return prev;
                 }
-                const deletedTime = Number(localStorage.getItem('schoolpad_global_notice_deleted') || '0');
-                localTime = Math.max(localTime, deletedTime);
+                return remNotice;
+              });
+              try {
+                localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
+                localStorage.removeItem('schoolpad_global_notice_deleted');
               } catch (e) {}
-
-              const remTime = remNotice.updatedAt || 0;
-              if (remTime >= localTime) {
-                setNotice((prev) => {
-                  if (
-                    prev &&
-                    prev.id === remNotice.id &&
-                    prev.isActive === remNotice.isActive &&
-                    prev.title === remNotice.title &&
-                    prev.content === remNotice.content &&
-                    prev.category === remNotice.category &&
-                    prev.expiresAt === remNotice.expiresAt &&
-                    prev.updatedAt === remNotice.updatedAt
-                  ) {
-                    return prev;
-                  }
-                  return remNotice;
-                });
-                try {
-                  localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
-                } catch (e) {}
-              }
+            } else {
+              setNotice(null);
+              try {
+                localStorage.removeItem('schoolpad_global_notice');
+              } catch (e) {}
             }
           })
           .catch(() => {});
@@ -471,7 +463,7 @@ export default function HomePage() {
     };
     window.addEventListener('store_updated', handleUpdate);
 
-    // ⚡ 다른 사용자의 보드 개설 및 공개/비공개 토글 실시간 감지
+    // ⚡ 다른 사용자의 보드 개설 및 공개/비공개 토글, 공지사항/배너 변경 실시간 감지
     let boardChannel: any = null;
     let pollTimer: any = null;
     if (isSupabaseConfigured && supabase) {
@@ -480,11 +472,14 @@ export default function HomePage() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'boards' }, () => {
           loadData();
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+          loadData();
+        })
         .subscribe();
 
       pollTimer = setInterval(() => {
         loadData();
-      }, 5000);
+      }, 4000);
     }
 
     return () => {
@@ -834,7 +829,7 @@ export default function HomePage() {
       <main className="flex-1 w-full px-4 sm:px-8 lg:px-12 py-6 sm:py-8">
         {/* 📢 전역 공지사항 배너 (활성화되어 있고 기한이 만료되지 않았으며 닫지 않은 경우) */}
         {notice &&
-          notice.isActive &&
+          notice.isActive !== false &&
           (!notice.expiresAt || new Date(notice.expiresAt).getTime() > Date.now()) &&
           dismissedNoticeId !== notice.id && (
           <div
@@ -889,7 +884,7 @@ export default function HomePage() {
 
         {/* 학교/교실 실사진 배경의 단정하고 깔끔한 프리미엄 배너 (여러 장 슬라이드쇼 회전 지원) */}
         <div className="relative overflow-hidden rounded-[2rem] text-white p-7 sm:p-10 shadow-xl mb-8 border border-white/20 min-h-[300px] flex items-center group">
-          {/* 슬라이드 이미지들 (부드러운 크로스페이드 전환) */}
+          {/* 슬라이드 이미지들 (부드러운 크로스페이드 전환 & 개별 사진 위치 반영) */}
           {(bannerSettings.slides && bannerSettings.slides.length > 0
             ? bannerSettings.slides
             : DEFAULT_BANNER_SETTINGS.slides
@@ -898,11 +893,12 @@ export default function HomePage() {
             return (
               <div
                 key={slide.id || sIdx}
-                className={`absolute inset-0 bg-cover bg-[center_top_25%] transition-opacity duration-1000 ease-in-out ${
+                className={`absolute inset-0 bg-cover transition-opacity duration-1000 ease-in-out ${
                   isCurrent ? 'opacity-100 z-0' : 'opacity-0 -z-10 pointer-events-none'
                 }`}
                 style={{
                   backgroundImage: `url('${slide.url}')`,
+                  backgroundPosition: slide.position || 'center 25%',
                 }}
               />
             );

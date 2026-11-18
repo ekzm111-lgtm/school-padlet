@@ -356,31 +356,28 @@ export default function AdminPage() {
 
         fetchRemoteNotice().then((rn) => {
           if (rn !== null) {
-            let localTime = 0;
+            setNotice((prev) => {
+              if (
+                prev &&
+                prev.id === rn.id &&
+                prev.isActive === rn.isActive &&
+                prev.title === rn.title &&
+                prev.content === rn.content &&
+                prev.category === rn.category &&
+                prev.expiresAt === rn.expiresAt &&
+                prev.updatedAt === rn.updatedAt
+              ) return prev;
+              return rn;
+            });
             try {
-              const cached = localStorage.getItem('schoolpad_global_notice');
-              if (cached) localTime = JSON.parse(cached).updatedAt || 0;
-              const delTime = Number(localStorage.getItem('schoolpad_global_notice_deleted') || '0');
-              localTime = Math.max(localTime, delTime);
+              localStorage.setItem('schoolpad_global_notice', JSON.stringify(rn));
+              localStorage.removeItem('schoolpad_global_notice_deleted');
             } catch (e) {}
-            if ((rn.updatedAt || 0) >= localTime) {
-              setNotice((prev) => {
-                if (
-                  prev &&
-                  prev.id === rn.id &&
-                  prev.isActive === rn.isActive &&
-                  prev.title === rn.title &&
-                  prev.content === rn.content &&
-                  prev.category === rn.category &&
-                  prev.expiresAt === rn.expiresAt &&
-                  prev.updatedAt === rn.updatedAt
-                ) return prev;
-                return rn;
-              });
-              try {
-                localStorage.setItem('schoolpad_global_notice', JSON.stringify(rn));
-              } catch (e) {}
-            }
+          } else {
+            setNotice(null);
+            try {
+              localStorage.removeItem('schoolpad_global_notice');
+            } catch (e) {}
           }
         });
 

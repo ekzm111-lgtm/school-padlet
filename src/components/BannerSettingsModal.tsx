@@ -33,33 +33,50 @@ const PRESET_IMAGES = [
     title: '한국형 교실 풍경',
     url: '/korean_classroom_banner.jpg',
     tag: '기본 교실',
+    position: 'center 25%',
   },
   {
     title: '밝고 쾌적한 교실',
     url: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1600&auto=format&fit=crop&q=80',
     tag: '모던 교실',
+    position: 'center 25%',
   },
   {
     title: '도서관과 북카페',
     url: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1600&auto=format&fit=crop&q=80',
     tag: '도서관',
+    position: 'center 40%',
   },
   {
     title: '열정적인 수업과 발표',
     url: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1600&auto=format&fit=crop&q=80',
     tag: '수업 참여',
+    position: 'center 30%',
   },
   {
     title: '함께 탐구하는 학생들',
     url: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1600&auto=format&fit=crop&q=80',
     tag: '모둠 활동',
+    position: 'center 35%',
   },
   {
     title: '창의 과학 실험실',
     url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=1600&auto=format&fit=crop&q=80',
     tag: '과학실',
+    position: 'center 30%',
   },
 ];
+
+// 사진 세로 위치 백분율(0%~100%) 추출 헬퍼
+function getPositionPercent(pos?: string): number {
+  if (!pos) return 25;
+  if (pos.includes('top')) return 0;
+  if (pos.includes('bottom')) return 100;
+  if (pos.includes('center center') || pos === 'center') return 50;
+  const match = pos.match(/(\d+)%/);
+  if (match) return Math.min(100, Math.max(0, parseInt(match[1], 10)));
+  return 25;
+}
 
 export default function BannerSettingsModal({
   isOpen,
@@ -128,6 +145,7 @@ export default function BannerSettingsModal({
             id: `slide-${Date.now()}`,
             url: compressedDataUrl,
             title: file.name.replace(/\.[^/.]+$/, ''),
+            position: 'center 25%',
           };
 
           setSlides((prev) => [...prev, newSlide]);
@@ -142,11 +160,12 @@ export default function BannerSettingsModal({
   };
 
   // 2. 프리셋 이미지 추가
-  const handleAddPreset = (preset: { title: string; url: string }) => {
+  const handleAddPreset = (preset: { title: string; url: string; position?: string }) => {
     const newSlide: BannerSlide = {
       id: `slide-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       url: preset.url,
       title: preset.title,
+      position: preset.position || 'center 25%',
     };
     setSlides((prev) => [...prev, newSlide]);
   };
@@ -160,10 +179,18 @@ export default function BannerSettingsModal({
       id: `slide-${Date.now()}`,
       url: inputUrl.trim(),
       title: inputTitle.trim() || '웹 배너 이미지',
+      position: 'center 25%',
     };
     setSlides((prev) => [...prev, newSlide]);
     setInputUrl('');
     setInputTitle('');
+  };
+
+  // 슬라이드 보이는 위치(포커스/정렬) 변경
+  const handleUpdatePosition = (id: string, newPos: string) => {
+    setSlides((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, position: newPos } : s))
+    );
   };
 
   // 순서 위로
@@ -266,80 +293,145 @@ export default function BannerSettingsModal({
               </span>
             </div>
 
-            <div className="space-y-2 max-h-56 overflow-y-auto p-1 bg-slate-50 rounded-2xl border border-slate-200">
-              {slides.map((slide, idx) => (
-                <div
-                  key={slide.id}
-                  className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-xs hover:border-indigo-300 transition"
-                >
-                  {/* 순서 뱃지 */}
-                  <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-mono font-black text-xs flex items-center justify-center shrink-0">
-                    {idx + 1}
-                  </span>
+            <div className="space-y-3 max-h-72 overflow-y-auto p-1.5 bg-slate-50 rounded-2xl border border-slate-200">
+              {slides.map((slide, idx) => {
+                const currentPercent = getPositionPercent(slide.position);
+                return (
+                  <div
+                    key={slide.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-indigo-300 transition"
+                  >
+                    {/* 상단/좌측: 순서 뱃지 + 썸네일 미리보기 (선택한 위치 실시간 반영) */}
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      {/* 순서 뱃지 */}
+                      <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-mono font-black text-xs flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
 
-                  {/* 썸네일 미리보기 */}
-                  <div className="w-16 h-10 rounded-lg overflow-hidden bg-slate-100 border border-black/5 shrink-0 relative">
-                    <img
-                      src={slide.url}
-                      alt={slide.title || '배너'}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/korean_classroom_banner.jpg';
-                      }}
-                    />
-                  </div>
+                      {/* 썸네일 미리보기 (실제 배너 비율과 동일하게 표시) */}
+                      <div className="w-24 h-14 rounded-xl overflow-hidden bg-slate-900 border border-black/10 shrink-0 relative group/thumb shadow-inner">
+                        <img
+                          src={slide.url}
+                          alt={slide.title || '배너'}
+                          className="w-full h-full object-cover transition-all duration-200"
+                          style={{
+                            objectPosition: slide.position || 'center 25%',
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/korean_classroom_banner.jpg';
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+                        <span className="absolute bottom-1 right-1 text-[9px] font-mono font-bold bg-black/60 text-white px-1 py-0.2 rounded backdrop-blur-xs">
+                          {currentPercent}%
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* 제목 */}
-                  <div className="flex-1 min-w-0">
-                    <input
-                      type="text"
-                      value={slide.title || ''}
-                      placeholder="이미지 설명/제목 (선택)"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSlides((prev) =>
-                          prev.map((s) => (s.id === slide.id ? { ...s, title: val } : s))
-                        );
-                      }}
-                      className="w-full text-xs font-bold text-slate-800 bg-transparent hover:bg-slate-50 focus:bg-white px-2 py-1 rounded-md border border-transparent focus:border-indigo-300 outline-none truncate"
-                    />
-                  </div>
+                    {/* 중앙: 이미지 설명 및 사진 보이는 위치(세로 포커스) 조절 */}
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      {/* 이미지 제목/설명 입력 */}
+                      <input
+                        type="text"
+                        value={slide.title || ''}
+                        placeholder="이미지 설명/제목 (선택)"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSlides((prev) =>
+                            prev.map((s) => (s.id === slide.id ? { ...s, title: val } : s))
+                          );
+                        }}
+                        className="w-full text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100/80 focus:bg-white px-2.5 py-1 rounded-lg border border-slate-200 focus:border-indigo-400 outline-none truncate"
+                      />
 
-                  {/* 컨트롤 버튼 */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => handleMoveUp(idx)}
-                      className={`p-1 rounded-lg transition ${
-                        idx === 0 ? 'text-slate-300' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                      }`}
-                      title="위로 이동"
-                    >
-                      <ChevronUp className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === slides.length - 1}
-                      onClick={() => handleMoveDown(idx)}
-                      className={`p-1 rounded-lg transition ${
-                        idx === slides.length - 1 ? 'text-slate-300' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                      }`}
-                      title="아래로 이동"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSlide(slide.id)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition ml-1"
-                      title="삭제"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      {/* 🎯 사진 보이는 위치(세로 정렬) 설정 컨트롤 */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 shrink-0">
+                          위치:
+                        </span>
+                        {/* 위치 프리셋 버튼들 */}
+                        <div className="flex items-center gap-1">
+                          {[
+                            { label: '상단', pos: 'center top', val: 0 },
+                            { label: '상단 25%', pos: 'center 25%', val: 25 },
+                            { label: '중앙', pos: 'center center', val: 50 },
+                            { label: '하단', pos: 'center bottom', val: 100 },
+                          ].map((preset) => {
+                            const isSelected = currentPercent === preset.val;
+                            return (
+                              <button
+                                key={preset.pos}
+                                type="button"
+                                onClick={() => handleUpdatePosition(slide.id, preset.pos)}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white font-black shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* 미세 조절 슬라이더 */}
+                        <div className="flex items-center gap-1 ml-auto shrink-0">
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="5"
+                            value={currentPercent}
+                            onChange={(e) =>
+                              handleUpdatePosition(slide.id, `center ${e.target.value}%`)
+                            }
+                            className="w-16 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            title={`세로 위치: ${currentPercent}%`}
+                          />
+                          <span className="text-[10px] font-mono text-slate-400 w-6 text-right">
+                            {currentPercent}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 우측: 순서 변경 및 삭제 컨트롤 */}
+                    <div className="flex items-center justify-end gap-1 shrink-0 border-t sm:border-t-0 pt-1.5 sm:pt-0 border-slate-100">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveUp(idx)}
+                        className={`p-1 rounded-lg transition ${
+                          idx === 0 ? 'text-slate-300' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                        }`}
+                        title="위로 이동"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === slides.length - 1}
+                        onClick={() => handleMoveDown(idx)}
+                        className={`p-1 rounded-lg transition ${
+                          idx === slides.length - 1 ? 'text-slate-300' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                        }`}
+                        title="아래로 이동"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSlide(slide.id)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition ml-1"
+                        title="삭제"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -488,6 +580,7 @@ export default function BannerSettingsModal({
                           src={preset.url}
                           alt={preset.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          style={{ objectPosition: preset.position || 'center 25%' }}
                         />
                       </div>
                       <div className="p-1.5 bg-white flex items-center justify-between">
