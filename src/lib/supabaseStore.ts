@@ -248,6 +248,15 @@ export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null>
 
     // 시스템 메타데이터 레코드 분리 (열 실시간 동기화용 - 보드별로 격리 캐싱)
     const normalRows = data.filter((p) => {
+      // 퀴즈 시스템 메타데이터 카드(Active Quiz)는 일반 포스트 목록에서 영구 제외
+      if (
+        p.column_name === '__active_quiz__' ||
+        p.id?.startsWith('active_quiz_') ||
+        p.title?.startsWith('Active Quiz')
+      ) {
+        return false;
+      }
+
       if (
         p.column_name === '__system_meta__' ||
         p.column_id === '__system_meta__' ||
@@ -961,20 +970,37 @@ export async function fetchRemoteBannerSettings(): Promise<BannerSettings | null
   }
 }
 
-// 🎯 보드별 실시간 진행 중인 퀴즈 PIN Supabase 클라우드 동기화
+// 🎯 보드별 실시간 진행 중인 퀴즈 PIN Supabase 클라우드 동기화 (시스템 전용 격리 저장)
 export async function saveRemoteBoardActiveQuiz(boardId: string, pin: string | null): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase || !boardId) return false;
   try {
     const postKey = `active_quiz_${boardId}`;
+
+    // 혹시 과거에 boardId로 잘못 들어간 구버전 데이터가 있다면 영구 삭제 (보드 카드 오염 방어)
+    await supabase.from('posts').delete().eq('board_id', boardId).eq('column_name', '__active_quiz__');
+    await supabase.from('posts').delete().eq('board_id', boardId).ilike('title', 'Active Quiz%');
+
     if (!pin) {
       await supabase.from('posts').delete().eq('id', postKey);
       return true;
     }
+
+    // 시스템 보드 존재 보장
+    await supabase.from('boards').upsert({
+      id: '__SYSTEM_USERS__',
+      code: 'SYSUSER',
+      title: '__SYSTEM_USERS__',
+      description: 'System User Registry for Cross-Device Sync',
+      is_public: false,
+      author_id: 'system',
+      author_name: '시스템',
+    });
+
     const { error } = await supabase.from('posts').upsert({
       id: postKey,
-      board_id: boardId,
-      title: `Active Quiz: ${pin}`,
-      content: JSON.stringify({ pin, updatedAt: Date.now() }),
+      board_id: '__SYSTEM_USERS__', // 보드 카드 목록에 절대 섞이지 않도록 시스템 보드로 안전 격리
+      title: `Active Quiz for ${boardId}: ${pin}`,
+      content: JSON.stringify({ boardId, pin, updatedAt: Date.now() }),
       author_id: 'system',
       author_name: '퀴즈 시스템',
       column_name: '__active_quiz__',

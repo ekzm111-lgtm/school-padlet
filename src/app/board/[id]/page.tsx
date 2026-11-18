@@ -144,6 +144,14 @@ export default function BoardDetailPage() {
     return () => window.removeEventListener('storage', restoreCopiedColumn);
   }, [boardId]);
 
+  // 🧹 과거에 실수로 board_id에 삽입되었던 시스템 퀴즈 메모장 카드 클라우드 영구 청소
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase && boardId) {
+      supabase.from('posts').delete().eq('board_id', boardId).eq('column_name', '__active_quiz__').then(() => {});
+      supabase.from('posts').delete().eq('board_id', boardId).ilike('title', 'Active Quiz%').then(() => {});
+    }
+  }, [boardId]);
+
   // 그리드 드래그 앤 드롭 순서 변경
   const dragItemIdx = useRef<number | null>(null);
   const dragOverItemIdx = useRef<number | null>(null);
@@ -304,9 +312,6 @@ export default function BoardDetailPage() {
     // 🎯 이 보드의 활성화된 실시간 퀴즈 확인 및 Supabase 클라우드 동기화
     const syncActiveQuiz = async () => {
       let currentPin: string | null = null;
-      if (typeof window !== 'undefined') {
-        currentPin = localStorage.getItem(`board_active_quiz_${boardId}`) || null;
-      }
       if (isSupabaseConfigured) {
         try {
           const remotePin = await fetchRemoteBoardActiveQuiz(boardId);
@@ -315,10 +320,22 @@ export default function BoardDetailPage() {
             if (typeof window !== 'undefined') {
               localStorage.setItem(`board_active_quiz_${boardId}`, remotePin);
             }
-          } else if (!currentPin) {
+          } else {
+            // 원격에 퀴즈가 없거나 종료된 경우, 로컬 캐시도 즉시 소거하고 null로 초기화
             currentPin = null;
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem(`board_active_quiz_${boardId}`);
+            }
           }
-        } catch (e) {}
+        } catch (e) {
+          if (typeof window !== 'undefined') {
+            currentPin = localStorage.getItem(`board_active_quiz_${boardId}`) || null;
+          }
+        }
+      } else {
+        if (typeof window !== 'undefined') {
+          currentPin = localStorage.getItem(`board_active_quiz_${boardId}`) || null;
+        }
       }
       setActiveQuizPin(currentPin);
     };
@@ -443,7 +460,9 @@ export default function BoardDetailPage() {
         } catch (e) {}
         setCurrentLayout(activeLayout);
         foundBoard.layout = activeLayout;
-        localBoardPosts = data.posts.filter((p) => p.boardId === foundBoard!.id);
+        localBoardPosts = data.posts
+          .filter((p) => p.boardId === foundBoard!.id)
+          .filter((p) => !p.id.startsWith('active_quiz_') && p.column !== '__active_quiz__' && !p.title?.startsWith('Active Quiz'));
         setPosts(localBoardPosts);
         setIsLoading(false);
       }
@@ -579,6 +598,7 @@ export default function BoardDetailPage() {
               }
             }
 
+            finalPosts = finalPosts.filter((p: Post) => !p.id.startsWith('active_quiz_') && p.column !== '__active_quiz__' && !p.title?.startsWith('Active Quiz'));
             setPosts(finalPosts);
             const otherPosts = data.posts.filter((p) => p.boardId !== targetId);
             saveStoreData.posts([...finalPosts, ...otherPosts]);
@@ -877,6 +897,11 @@ export default function BoardDetailPage() {
             setActiveQuizPin(remotePin);
             if (typeof window !== 'undefined') {
               localStorage.setItem(`board_active_quiz_${targetBoardId}`, remotePin);
+            }
+          } else {
+            setActiveQuizPin(null);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem(`board_active_quiz_${targetBoardId}`);
             }
           }
         } catch (e) {}
