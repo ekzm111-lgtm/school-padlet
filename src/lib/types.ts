@@ -111,6 +111,8 @@ export interface Notice {
   expiresAt?: string | null; // ISO 문자열 또는 null (무기한)
   createdAt: string;
   updatedAt?: number;
+  targetAudience?: 'teachers' | 'students' | 'all'; // 수신 대상 (teachers: 교직원/교사, students: 학생, all: 전체)
+  noticeType?: 'admin' | 'teacher'; // admin: 관리자 공지(교사 대상), teacher: 선생님 공지(학생 대상)
 }
 
 export interface BannerSlide {

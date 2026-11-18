@@ -1,16 +1,21 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Megaphone, Bell, Sparkles, Check, Trash2, Eye, EyeOff, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { X, Megaphone, Bell, Sparkles, Check, Trash2, Eye, EyeOff, Calendar, Clock, ShieldAlert, GraduationCap } from 'lucide-react';
 import { Notice } from '@/lib/types';
 
 interface NoticeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  notice: Notice | null;
-  onSave: (notice: Notice | null) => void;
+  notice?: Notice | null;
+  onSave?: (notice: Notice | null) => void;
+  adminNotice?: Notice | null;
+  teacherNotice?: Notice | null;
+  onSaveAdminNotice?: (notice: Notice | null) => void;
+  onSaveTeacherNotice?: (notice: Notice | null) => void;
   isAdmin?: boolean;
   isTeacherOrAdmin?: boolean;
+  initialTab?: 'admin' | 'teacher';
 }
 
 type DurationType = 'unlimited' | '1day' | '3days' | '7days' | 'custom';
@@ -31,11 +36,21 @@ export default function NoticeModal({
   onClose,
   notice,
   onSave,
+  adminNotice,
+  teacherNotice,
+  onSaveAdminNotice,
+  onSaveTeacherNotice,
   isAdmin,
   isTeacherOrAdmin,
+  initialTab = 'teacher',
 }: NoticeModalProps) {
-  // 선생님(교사) 및 관리자(admin) 모두 공지 작성/수정/삭제 관리 가능
-  const canManageNotice = Boolean(isAdmin || isTeacherOrAdmin);
+  // 현재 활성화된 탭 ('admin': 교직원 대상 공지, 'teacher': 학생 대상 공지)
+  const [activeTab, setActiveTab] = useState<'admin' | 'teacher'>('teacher');
+
+  // 관리 권한:
+  // - 학생 대상 공지(teacher): 교사 및 관리자 모두 관리 가능
+  // - 교직원 대상 공지(admin): 최고 관리자(admin)만 작성/수정 가능 (교사는 열람 가능)
+  const canManageCurrentTab = activeTab === 'admin' ? Boolean(isAdmin) : Boolean(isAdmin || isTeacherOrAdmin);
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -48,39 +63,60 @@ export default function NoticeModal({
 
   const prevIsOpenRef = useRef(false);
 
-  // 모달이 처음 열릴 때만 상태 초기화 (백그라운드 5초 폴링 시 유저 입력/토글 상태 덮어쓰기 방지)
-  useEffect(() => {
-    if (isOpen && !prevIsOpenRef.current) {
-      if (notice) {
-        setTitle(notice.title || '');
-        setContent(notice.content || '');
-        setCategory(notice.category || 'general');
-        setIsActive(notice.isActive !== false);
+  // 현재 탭에 해당하는 공지 객체 가져오기
+  const getCurrentTargetNotice = (tab: 'admin' | 'teacher'): Notice | null => {
+    if (tab === 'admin') {
+      return adminNotice || (notice?.noticeType === 'admin' ? notice : null);
+    }
+    return teacherNotice || notice || null;
+  };
 
-        if (notice.expiresAt) {
-          const expDate = new Date(notice.expiresAt);
-          if (!isNaN(expDate.getTime())) {
-            setDurationType('custom');
-            setCustomExpiresAt(toDatetimeLocalString(expDate));
-          } else {
-            setDurationType('unlimited');
-            setCustomExpiresAt('');
-          }
+  // 탭 변경 시 폼 입력값 재설정
+  const loadNoticeIntoForm = (targetNotice: Notice | null, tab: 'admin' | 'teacher') => {
+    if (targetNotice) {
+      setTitle(targetNotice.title || '');
+      setContent(targetNotice.content || '');
+      setCategory(targetNotice.category || 'general');
+      setIsActive(targetNotice.isActive !== false);
+
+      if (targetNotice.expiresAt) {
+        const expDate = new Date(targetNotice.expiresAt);
+        if (!isNaN(expDate.getTime())) {
+          setDurationType('custom');
+          setCustomExpiresAt(toDatetimeLocalString(expDate));
         } else {
           setDurationType('unlimited');
           setCustomExpiresAt('');
         }
       } else {
-        setTitle('');
-        setContent('');
-        setCategory('general');
-        setIsActive(true);
         setDurationType('unlimited');
         setCustomExpiresAt('');
       }
+    } else {
+      setTitle('');
+      setContent('');
+      setCategory('general');
+      setIsActive(true);
+      setDurationType('unlimited');
+      setCustomExpiresAt('');
+    }
+  };
+
+  // 모달이 열릴 때 초기 탭 및 데이터 설정
+  useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
+      const defaultTab = isAdmin && initialTab === 'admin' ? 'admin' : (initialTab || 'teacher');
+      setActiveTab(defaultTab);
+      loadNoticeIntoForm(getCurrentTargetNotice(defaultTab), defaultTab);
     }
     prevIsOpenRef.current = isOpen;
-  }, [isOpen, notice]);
+  }, [isOpen, initialTab, isAdmin, adminNotice, teacherNotice, notice]);
+
+  // 탭을 사용자가 전환했을 때
+  const handleSwitchTab = (tab: 'admin' | 'teacher') => {
+    setActiveTab(tab);
+    loadNoticeIntoForm(getCurrentTargetNotice(tab), tab);
+  };
 
   if (!isOpen) return null;
 
@@ -120,7 +156,6 @@ export default function NoticeModal({
   };
 
   const finalExpiresAt = calculateFinalExpiresAt();
-  const isExpired = Boolean(finalExpiresAt && new Date(finalExpiresAt).getTime() <= Date.now());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,27 +169,49 @@ export default function NoticeModal({
       return;
     }
 
+    const currentNotice = getCurrentTargetNotice(activeTab);
     const expiresAt = calculateFinalExpiresAt();
 
     const updatedNotice: Notice = {
-      id: notice?.id || `notice-${Date.now()}`,
+      id: currentNotice?.id || (activeTab === 'admin' ? 'schoolpad_admin_notice' : 'schoolpad_teacher_notice'),
       title: title.trim(),
       content: content.trim(),
       category,
-      authorName: notice?.authorName || '선생님 (관리자)',
+      authorName: currentNotice?.authorName || (activeTab === 'admin' ? '학교 관리자' : '선생님'),
       isActive,
       expiresAt,
-      createdAt: notice?.createdAt || new Date().toISOString().split('T')[0],
+      createdAt: currentNotice?.createdAt || new Date().toISOString().split('T')[0],
       updatedAt: Date.now(),
+      targetAudience: activeTab === 'admin' ? 'teachers' : 'students',
+      noticeType: activeTab,
     };
 
-    onSave(updatedNotice);
+    if (activeTab === 'admin') {
+      if (onSaveAdminNotice) {
+        onSaveAdminNotice(updatedNotice);
+      } else if (onSave) {
+        onSave(updatedNotice);
+      }
+    } else {
+      if (onSaveTeacherNotice) {
+        onSaveTeacherNotice(updatedNotice);
+      } else if (onSave) {
+        onSave(updatedNotice);
+      }
+    }
+
     onClose();
   };
 
   const handleDelete = () => {
-    if (confirm('공지사항을 완전히 삭제하시겠습니까?')) {
-      onSave(null);
+    if (confirm(`${activeTab === 'admin' ? '교직원 공지' : '학생 공지'}를 완전히 삭제(비활성화)하시겠습니까?`)) {
+      if (activeTab === 'admin') {
+        if (onSaveAdminNotice) onSaveAdminNotice(null);
+        else if (onSave) onSave(null);
+      } else {
+        if (onSaveTeacherNotice) onSaveTeacherNotice(null);
+        else if (onSave) onSave(null);
+      }
       onClose();
     }
   };
@@ -167,7 +224,7 @@ export default function NoticeModal({
       badge: 'bg-rose-500 text-white',
     },
     general: {
-      label: '수업 안내',
+      label: activeTab === 'admin' ? '교무 안내' : '수업 안내',
       icon: Bell,
       bg: 'bg-blue-50 text-blue-700 border-blue-200',
       badge: 'bg-blue-500 text-white',
@@ -205,23 +262,27 @@ export default function NoticeModal({
     return `${dateStr} 까지 (${minutes}분 남음)`;
   };
 
+  const currentNotice = getCurrentTargetNotice(activeTab);
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
-        {/* 모달 헤더 */}
+      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        {/* 모달 상단 헤더 */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-xs">
-              <Megaphone className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs ${
+              activeTab === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'
+            }`}>
+              {activeTab === 'admin' ? <ShieldAlert className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />}
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                {canManageNotice ? '📢 전체 공지사항 설정' : '📢 전체 공지사항'}
+                {activeTab === 'admin' ? '🏫 교직원 대상 공지사항' : '📢 학생 대상 공지사항'}
               </h3>
               <p className="text-[11px] text-slate-500">
-                {canManageNotice
-                  ? '모든 학생과 교사가 볼 수 있는 전역 공지를 작성하고 게시 기간을 관리합니다.'
-                  : notice?.createdAt ? `등록일: ${notice.createdAt}` : '공지사항 안내'}
+                {activeTab === 'admin'
+                  ? '선생님과 관리자에게만 노출되며, 학생에게는 표시되지 않습니다.'
+                  : '학생 홈 화면 메인 상단에 눈에 띄게 노출되는 공지입니다.'}
               </p>
             </div>
           </div>
@@ -233,9 +294,61 @@ export default function NoticeModal({
           </button>
         </div>
 
-        {/* 관리자 / 교사 작성 폼 */}
-        {canManageNotice ? (
-          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        {/* 🌟 교사/관리자 전용: 공지 대상 선택 탭 (교직원 vs 학생) */}
+        {(isAdmin || isTeacherOrAdmin) && (
+          <div className="mt-4 grid grid-cols-2 gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/70">
+            <button
+              type="button"
+              onClick={() => handleSwitchTab('admin')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'admin'
+                  ? 'bg-white text-indigo-700 shadow-sm border border-indigo-100'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>교직원 공지 {isAdmin ? '(관리자 전용)' : '(열람)'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSwitchTab('teacher')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'teacher'
+                  ? 'bg-white text-blue-700 shadow-sm border border-blue-100'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>학생 공지 (수업 안내)</span>
+            </button>
+          </div>
+        )}
+
+        {/* 안내 배너 */}
+        <div className={`mt-3 p-3 rounded-2xl border text-xs flex items-start gap-2 ${
+          activeTab === 'admin'
+            ? 'bg-indigo-50/70 border-indigo-200/60 text-indigo-900'
+            : 'bg-blue-50/70 border-blue-200/60 text-blue-900'
+        }`}>
+          <div className="mt-0.5 shrink-0">
+            {activeTab === 'admin' ? '🔒' : '📢'}
+          </div>
+          <div>
+            <span className="font-bold">
+              {activeTab === 'admin' ? '수신 대상: 교사 및 교직원' : '수신 대상: 전교생 (학생 홈 메인 노출)'}
+            </span>
+            <p className="text-[11px] opacity-80 mt-0.5">
+              {activeTab === 'admin'
+                ? '관리자가 교무 업무 및 학사 운영 안내를 전달하며, 학생 화면에는 절대 보이지 않습니다.'
+                : '선생님이 수업 및 학급 협업 소식을 학생들에게 직접 공지합니다.'}
+            </p>
+          </div>
+        </div>
+
+        {/* 작성 폼 (권한이 있는 경우) */}
+        {canManageCurrentTab ? (
+          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             {/* 공지 카테고리 선택 */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-2">공지 유형</label>
@@ -276,131 +389,112 @@ export default function NoticeModal({
                     {isActive ? '공지사항 게시 중 (화면 노출)' : '공지사항 숨김 (보관)'}
                   </div>
                   <div className="text-[10px] text-slate-500">
-                    {isActive ? '메인 화면 상단 띠 배너로 모든 사용자에게 표시됩니다.' : '메인 화면에서 숨겨집니다.'}
+                    {isActive
+                      ? (activeTab === 'admin' ? '교사 화면 상단 배너에 노출됩니다.' : '학생 홈 화면 상단 배너에 노출됩니다.')
+                      : '화면에서 숨겨집니다.'}
                   </div>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsActive((prev) => !prev)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
-                  isActive ? 'bg-blue-600' : 'bg-slate-300'
+                onClick={() => setIsActive(!isActive)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isActive ? 'bg-emerald-500' : 'bg-slate-300'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isActive ? 'translate-x-6' : 'translate-x-1'
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    isActive ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
             </div>
 
-            {/* ⏰ 게시 기간 설정 (언제까지 게시할 것인지 선택) */}
-            <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-100 space-y-2.5">
+            {/* 게시 기간 설정 */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-blue-950">
-                  <Clock className="w-3.5 h-3.5 text-blue-600" />
-                  <span>게시 기간 설정 (언제까지 노출할지 선택)</span>
-                </label>
-                {finalExpiresAt && (
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      isExpired ? 'bg-rose-100 text-rose-700' : 'bg-blue-200/70 text-blue-800'
-                    }`}
-                  >
-                    {isExpired ? '만료됨' : '예약됨'}
-                  </span>
-                )}
-              </div>
-
-              {/* 프리셋 버튼 그룹 */}
-              <div className="grid grid-cols-5 gap-1 sm:gap-1.5">
-                {[
-                  { id: 'unlimited', label: '무기한' },
-                  { id: '1day', label: '1일간' },
-                  { id: '3days', label: '3일간' },
-                  { id: '7days', label: '7일간' },
-                  { id: 'custom', label: '직접지정' },
-                ].map((item) => {
-                  const isSelected = durationType === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleSelectDuration(item.id as DurationType)}
-                      className={`py-1.5 px-1 text-center rounded-xl text-[11px] font-bold border transition ${
-                        isSelected
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 직접 지정 또는 프리셋 계산 날짜 표시 및 입력 */}
-              {durationType !== 'unlimited' && (
-                <div className="pt-1 space-y-1.5 animate-in fade-in duration-150">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <input
-                      type="datetime-local"
-                      value={customExpiresAt}
-                      onChange={(e) => {
-                        setCustomExpiresAt(e.target.value);
-                        setDurationType('custom');
-                      }}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-blue-200 bg-white text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  {isExpired && (
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-600">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>설정된 날짜가 이미 지나 만료되었습니다. 미래 날짜를 지정하거나 무기한을 선택하세요.</span>
-                    </div>
-                  )}
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <span>게시 기간 설정</span>
                 </div>
-              )}
-
-              {/* 현재 설정된 종료일 안내 문구 */}
-              <div className="text-[11px] text-slate-600 bg-white/70 px-2.5 py-1.5 rounded-lg border border-blue-100/60">
-                <span className="font-bold text-blue-900">게시 상태: </span>
-                <span className={isExpired ? 'text-rose-600 font-bold' : 'text-slate-700'}>
+                <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
                   {getRemainingTimeString(finalExpiresAt)}
                 </span>
               </div>
+
+              {/* 프리셋 버튼 */}
+              <div className="grid grid-cols-5 gap-1 text-[11px]">
+                {[
+                  { id: 'unlimited', label: '무기한' },
+                  { id: '1day', label: '1일' },
+                  { id: '3days', label: '3일' },
+                  { id: '7days', label: '7일' },
+                  { id: 'custom', label: '직접지정' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSelectDuration(item.id as DurationType)}
+                    className={`py-1.5 px-1 rounded-xl font-bold transition-all border ${
+                      durationType === item.id
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* 직접 지정 datetime-local 인풋 */}
+              {durationType !== 'unlimited' && (
+                <div className="pt-1">
+                  <label className="block text-[11px] text-slate-500 mb-1">종료 일시 지정</label>
+                  <input
+                    type="datetime-local"
+                    value={customExpiresAt}
+                    onChange={(e) => {
+                      setDurationType('custom');
+                      setCustomExpiresAt(e.target.value);
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
             </div>
 
-            {/* 제목 입력 */}
+            {/* 공지 제목 입력 */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">공지 제목 *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                공지사항 제목 <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="예: 2학기 모둠 프로젝트 활동 안내 및 제출 기한"
+                placeholder={activeTab === 'admin' ? "예: [교직원] 2학기 수업 평가 및 원격 연수 안내" : "예: 2학기 팀 프로젝트 활동 안내 및 규칙"}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 required
               />
             </div>
 
-            {/* 내용 입력 */}
+            {/* 공지 상세 내용 입력 */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">상세 내용</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                공지사항 상세 내용
+              </label>
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                rows={5}
-                placeholder="공지할 상세 내용을 자유롭게 작성하세요..."
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-normal leading-relaxed"
+                rows={4}
+                placeholder={activeTab === 'admin' ? "교직원 분들께 전달할 상세 공지 내용을 입력하세요." : "학생들에게 전달할 상세 안내 및 과제 지침을 입력하세요."}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium leading-relaxed"
               />
             </div>
 
             {/* 하단 버튼 액션 */}
             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-              {notice ? (
+              {currentNotice ? (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -412,11 +506,12 @@ export default function NoticeModal({
               ) : (
                 <div />
               )}
+
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold transition"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition"
                 >
                   취소
                 </button>
@@ -425,35 +520,35 @@ export default function NoticeModal({
                   className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition"
                 >
                   <Check className="w-4 h-4" />
-                  <span>{notice ? '공지사항 수정 저장' : '새 공지사항 등록'}</span>
+                  <span>{currentNotice ? '수정 내용 저장' : '공지사항 등록'}</span>
                 </button>
               </div>
             </div>
           </form>
         ) : (
-          /* 학생/일반 사용자 읽기 전용 뷰 */
-          <div className="mt-5 space-y-4">
+          /* 권한 없는 탭 (교사의 교직원 공지 열람 또는 학생 열람 뷰) */
+          <div className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${categoryMeta[category].badge}`}>
                   {categoryMeta[category].label}
                 </span>
-                <span className="text-xs text-slate-500">작성자: {notice?.authorName || '선생님'}</span>
+                <span className="text-xs text-slate-500">작성자: {currentNotice?.authorName || (activeTab === 'admin' ? '학교 관리자' : '선생님')}</span>
               </div>
-              {notice?.expiresAt && (
+              {currentNotice?.expiresAt && (
                 <span className="text-[10px] text-slate-500 flex items-center gap-1">
                   <Clock className="w-3 h-3 text-slate-400" />
-                  {getRemainingTimeString(notice.expiresAt)}
+                  {getRemainingTimeString(currentNotice.expiresAt)}
                 </span>
               )}
             </div>
 
             <h4 className="text-base font-bold text-slate-900 leading-snug">
-              {notice?.title || '등록된 공지사항이 없습니다.'}
+              {currentNotice?.title || '등록된 공지사항이 없습니다.'}
             </h4>
 
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
-              {notice?.content || '상세 내용이 없습니다.'}
+              {currentNotice?.content || '상세 내용이 없습니다.'}
             </div>
 
             <div className="flex justify-end pt-3 border-t border-slate-100">

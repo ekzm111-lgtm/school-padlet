@@ -797,22 +797,41 @@ export async function fetchRemoteSettings(): Promise<SystemSettings | null> {
 }
 
 // 📢 전역 관리자 공지사항 Supabase 동기화
-// 📢 전역 기본 공지사항 (초기 설정 및 복구용)
-export const DEFAULT_NOTICE: Notice = {
-  id: 'schoolpad_official_notice',
-  title: '📢 2026학년도 스쿨패들(SchoolPad) 디지털 수업 플랫폼 안내',
-  content: '선생님과 학생들이 실시간으로 생각을 붙이고 나누며 함께 성장하는 디지털 협업 교실입니다. 상단의 6자리 참여 코드로 원하는 수업 보드에 입장하세요!',
+// 📢 교직원 및 학생 대상 분리된 기본 공지사항
+// 1) 관리자 공지: 교사/교직원 대상 (학생에게는 절대 보이지 않음)
+export const DEFAULT_ADMIN_NOTICE: Notice = {
+  id: 'schoolpad_admin_notice',
+  title: '🏫 2026학년도 교직원 및 교사 디지털 수업 운영 안내',
+  content: '선생님들의 원활한 디지털 수업 및 학급 보드 개설/공유를 위한 교무 안내 사항입니다.',
   category: 'general',
-  authorName: '미래한국 학교관리자',
+  authorName: '학교 관리자',
   isActive: true,
   createdAt: '2026-11-18',
   updatedAt: Date.now(),
+  targetAudience: 'teachers',
+  noticeType: 'admin',
 };
 
-export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> {
+// 2) 선생님 공지: 학생 대상 (학생 홈 화면 메인 상단 노출)
+export const DEFAULT_TEACHER_NOTICE: Notice = {
+  id: 'schoolpad_teacher_notice',
+  title: '📢 2026학년도 스쿨패들 수업 협업 안내',
+  content: '선생님과 학생들이 실시간으로 생각을 붙이고 나누며 함께 성장하는 디지털 협업 교실입니다. 6자리 참여 코드로 수업에 참여해 보세요!',
+  category: 'general',
+  authorName: '선생님',
+  isActive: true,
+  createdAt: '2026-11-18',
+  updatedAt: Date.now(),
+  targetAudience: 'students',
+  noticeType: 'teacher',
+};
+
+// 기존 코드와의 하위 호환성 유지용
+export const DEFAULT_NOTICE = DEFAULT_TEACHER_NOTICE;
+
+export async function saveRemoteNoticeByType(type: 'admin' | 'teacher', notice: Notice | null): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
-    // __SYSTEM_USERS__ 시스템 보드가 없을 경우 외래키 제약조건 위반 방지를 위해 보장
     await supabase.from('boards').upsert({
       id: '__SYSTEM_USERS__',
       code: 'SYSUSER',
@@ -823,59 +842,110 @@ export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> 
       author_name: '시스템',
     });
 
-    const targetNotice = notice || {
-      ...DEFAULT_NOTICE,
+    const defaultNotice = type === 'admin' ? DEFAULT_ADMIN_NOTICE : DEFAULT_TEACHER_NOTICE;
+    const postId = type === 'admin' ? 'schoolpad_admin_notice' : 'schoolpad_teacher_notice';
+
+    const targetNotice: Notice = notice || {
+      ...defaultNotice,
       isActive: false,
       updatedAt: Date.now(),
     };
 
+    if (typeof window !== 'undefined') {
+      try {
+        if (type === 'admin') {
+          if (targetNotice.isActive !== false) {
+            localStorage.setItem('schoolpad_admin_notice', JSON.stringify(targetNotice));
+          } else {
+            localStorage.removeItem('schoolpad_admin_notice');
+          }
+        } else {
+          if (targetNotice.isActive !== false) {
+            localStorage.setItem('schoolpad_teacher_notice', JSON.stringify(targetNotice));
+            localStorage.setItem('schoolpad_global_notice', JSON.stringify(targetNotice));
+          } else {
+            localStorage.removeItem('schoolpad_teacher_notice');
+            localStorage.removeItem('schoolpad_global_notice');
+          }
+        }
+        window.dispatchEvent(new Event('schoolpad_notice_updated'));
+      } catch (e) {}
+    }
+
     const { error } = await supabase.from('posts').upsert({
-      id: 'schoolpad_global_notice',
+      id: postId,
       board_id: '__SYSTEM_USERS__',
       title: targetNotice.title,
       content: JSON.stringify(targetNotice),
-      author_id: 'admin',
-      author_name: targetNotice.authorName || '관리자',
+      author_id: type === 'admin' ? 'admin' : 'teacher',
+      author_name: targetNotice.authorName || (type === 'admin' ? '관리자' : '선생님'),
       column_name: '__notice__',
     });
     if (error) {
-      console.error('saveRemoteNotice Supabase error:', error);
+      console.error(`saveRemoteNoticeByType (${type}) Supabase error:`, error);
       return false;
     }
     return true;
   } catch (e) {
-    console.error('saveRemoteNotice exception:', e);
+    console.error(`saveRemoteNoticeByType (${type}) exception:`, e);
     return false;
   }
 }
 
-export async function fetchRemoteNoticeResult(): Promise<{ notice: Notice | null; error: any }> {
-  if (!isSupabaseConfigured || !supabase) return { notice: DEFAULT_NOTICE, error: null };
+export async function fetchRemoteNoticeByTypeResult(type: 'admin' | 'teacher'): Promise<{ notice: Notice | null; error: any }> {
+  const defaultNotice = type === 'admin' ? DEFAULT_ADMIN_NOTICE : DEFAULT_TEACHER_NOTICE;
+  const postId = type === 'admin' ? 'schoolpad_admin_notice' : 'schoolpad_teacher_notice';
+  if (!isSupabaseConfigured || !supabase) return { notice: defaultNotice, error: null };
   try {
     const { data, error } = await supabase
       .from('posts')
       .select('content')
-      .eq('id', 'schoolpad_global_notice')
+      .eq('id', postId)
       .maybeSingle();
 
     if (error) {
       return { notice: null, error };
     }
     if (!data || !data.content) {
-      return { notice: DEFAULT_NOTICE, error: null };
+      // 기존 단일 공지 데이터(schoolpad_global_notice)가 있다면 학생 공지로 마이그레이션 호환
+      if (type === 'teacher') {
+        const { data: legacyData } = await supabase
+          .from('posts')
+          .select('content')
+          .eq('id', 'schoolpad_global_notice')
+          .maybeSingle();
+        if (legacyData && legacyData.content) {
+          try {
+            const legacyParsed = JSON.parse(legacyData.content) as Notice;
+            if (legacyParsed.id !== 'deleted' && legacyParsed.title !== '__DELETED__') {
+              return { notice: { ...legacyParsed, noticeType: 'teacher', targetAudience: 'students' }, error: null };
+            }
+          } catch (e) {}
+        }
+      }
+      return { notice: defaultNotice, error: null };
     }
     try {
       const parsed = JSON.parse(data.content) as Notice;
       if (parsed.id === 'deleted' || parsed.title === '__DELETED__') {
-        return { notice: DEFAULT_NOTICE, error: null };
+        return { notice: defaultNotice, error: null };
       }
       return { notice: parsed, error: null };
     } catch (parseErr) {
-      return { notice: DEFAULT_NOTICE, error: null };
+      return { notice: defaultNotice, error: null };
     }
   } catch (e) {
-    return { notice: DEFAULT_NOTICE, error: e };
+    return { notice: defaultNotice, error: e };
   }
+}
+
+export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> {
+  const type = notice?.noticeType === 'admin' || notice?.targetAudience === 'teachers' ? 'admin' : 'teacher';
+  return saveRemoteNoticeByType(type, notice);
+}
+
+export async function fetchRemoteNoticeResult(): Promise<{ notice: Notice | null; error: any }> {
+  return fetchRemoteNoticeByTypeResult('teacher');
 }
 
 export async function fetchRemoteNotice(): Promise<Notice | null> {
