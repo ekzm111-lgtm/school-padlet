@@ -498,9 +498,8 @@ export default function PostModal({
     let finalImageUrl = imageUrl.trim();
     let finalTitle = title.trim();
 
-    // 링크는 입력했으나 대표 이미지가 아직 없는 경우 (붙여넣고 즉시 저장 누른 경우 포함)
-    // 저장 직전에 대표 이미지 및 제목을 즉시 추출하여 카드에 함께 저장
-    if ((!finalImageUrl || !finalTitle) && linkUrl.trim()) {
+    // 링크는 입력했으나 대표 이미지가 아직 없는 경우 (신규 카드 작성 모드에서만 자동 추출)
+    if (mode === 'create' && (!finalImageUrl || !finalTitle) && linkUrl.trim()) {
       const instant = extractInstantThumbnail(linkUrl.trim());
       if (instant && !finalImageUrl) {
         finalImageUrl = instant;
@@ -544,15 +543,24 @@ export default function PostModal({
           fileAttachment: attachments[0] || undefined,
           authorName: customAuthor.trim() || post.authorName,
           updatedAt: new Date().toISOString(),
-        };
+          _lastEditedMs: Date.now(),
+        } as any;
 
+        // 1. 브라우저 로컬 저장소 즉시 반영
         const data = getStoreData();
         saveStoreData.posts(data.posts.map((p) => (p.id === post.id ? updated : p)));
-        if (isSupabaseConfigured) {
-          await saveRemotePost(updated);
-        }
+
+        // 2. 상위 컴포넌트 알림 및 모달 즉시 닫기 (0.01초 만에 즉시 수정 완료)
         if (onUpdated) onUpdated(updated);
         onClose();
+
+        // 3. 백그라운드 원격 Supabase 비동기 저장 (UI 멈춤/지연 원천 방지)
+        if (isSupabaseConfigured) {
+          saveRemotePost(updated).catch((err) => {
+            console.error('saveRemotePost background sync error:', err);
+          });
+        }
+        return;
       } else {
         // 생성 모드 저장 (유니크 타임스탬프 + 랜덤 ID)
         const nowIso = new Date().toISOString();
@@ -1029,10 +1037,20 @@ export default function PostModal({
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-1.5"
+              disabled={isSubmitting}
+              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-1.5"
             >
-              {mode === 'edit' ? <Save className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-              <span>{mode === 'edit' ? '수정 완료' : '보드에 붙이기'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{mode === 'edit' ? '수정 저장 중...' : '게시 중...'}</span>
+                </>
+              ) : (
+                <>
+                  {mode === 'edit' ? <Save className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                  <span>{mode === 'edit' ? '수정 완료' : '보드에 붙이기'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

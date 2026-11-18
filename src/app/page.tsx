@@ -49,6 +49,7 @@ import {
   saveRemoteBoard,
   deleteRemoteBoard,
   fetchRemoteNotice,
+  fetchRemoteNoticeResult,
   saveRemoteNotice,
   fetchRemoteUsers,
   fetchRemoteUserPrefs,
@@ -333,8 +334,12 @@ export default function HomePage() {
           .catch(() => {});
 
         // 원격 공지사항 비동기 조회 (원격 서버를 단일 진실의 원천으로 신뢰하여 모든 기기/계정에 즉시 동기화)
-        fetchRemoteNotice()
-          .then((remNotice) => {
+        fetchRemoteNoticeResult()
+          .then(({ notice: remNotice, error }) => {
+            if (error) {
+              // ⚠️ 네트워크 지연 또는 에러 발생 시 기존 공지사항을 지우지 않고 유지하여 깜빡임 원천 차단!
+              return;
+            }
             if (remNotice !== null) {
               setNotice((prev) => {
                 if (
@@ -356,6 +361,7 @@ export default function HomePage() {
                 localStorage.removeItem('schoolpad_global_notice_deleted');
               } catch (e) {}
             } else {
+              // 원격 DB에 공지사항 행이 정상적으로 없음 (관리자가 명시적으로 삭제함)
               setNotice(null);
               try {
                 localStorage.removeItem('schoolpad_global_notice');

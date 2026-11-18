@@ -158,6 +158,8 @@ export default function BoardDetailPage() {
 
   // 사용자가 방금 카드를 조작(드래그 이동, 수정, 생성 등)한 시각 (원격 폴링 충돌 방어용)
   const lastUserActionTimeRef = useRef<number>(0);
+  // 🔥 최근 사용자가 직접 수정한 카드 캐시 (실시간 원격 폴링에 의한 덮어쓰기/원상복구 방지)
+  const recentlyEditedPostsRef = useRef<Map<string, { post: Post; time: number }>>(new Map());
 
   // 보드 메인 가로 스크롤 Ref & 휠 조작 & 좌우 버튼 핸들러
   const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -577,6 +579,33 @@ export default function BoardDetailPage() {
             let finalPosts = localPending.length > 0 ? [...remote, ...localPending] : remote;
             finalPosts = finalPosts.filter((p: Post) => !isPostDeleted(p.id));
 
+            // 🔥 로컬에서 30초 이내에 사용자가 수정한 카드가 있다면 원격 구버전으로 덮어쓰지 않고 로컬 최신본 유지
+            finalPosts = finalPosts.map((r: Post) => {
+              const localMatch = (localBoardPosts || []).find((lp) => lp.id === r.id);
+              if (
+                localMatch &&
+                (localMatch as any)._lastEditedMs &&
+                Date.now() - (localMatch as any)._lastEditedMs < 30000
+              ) {
+                return { ...r, ...localMatch };
+              }
+              return r;
+            });
+
+            // 🔥 엔트리 중학교 보드: 중복 생성되었던 구버전 카드(entry-post-*) 필터링 및 원격 DB 영구 정리
+            if (targetId === 'board-entry-middle-school' || targetId === '334455') {
+              finalPosts = finalPosts.filter((p: Post) => {
+                if (p.id.startsWith('entry-post-')) {
+                  if (isSupabaseConfigured) {
+                    deleteRemotePost(p.id).catch(() => {});
+                  }
+                  return false;
+                }
+                return true;
+              });
+              finalPosts = finalPosts.map((p: Post) => ({ ...p, color: 'white' }));
+            }
+
             // 🌟 복제본 보드인데 카드가 0개로 비어있는 경우, 원본 템플릿 카드 자동 복원 및 원격 저장!
             if (
               finalPosts.length === 0 &&
@@ -635,6 +664,17 @@ export default function BoardDetailPage() {
                 '모둠 1', '모둠 2', '모둠 3', '모둠 1 (과제 수행 계획)', '모둠 2 (의견 및 아이디어)', '모둠 3 (최종 결과물)'
               ]);
               activeCols = activeCols.filter((c) => !foreignColumns.has(c));
+            }
+
+            // 🔥 엔트리 보드 컬럼 정규화 (중복 10개 열 방지 및 공식 5개 열 엄격 보장)
+            if (targetId === 'board-entry-middle-school' || targetId === '334455') {
+              activeCols = [
+                "🎮 아케이드 & 액션 게임 (추천수 BEST)",
+                "🧠 뇌섹 퍼즐 & 스토리 방탈출 게임",
+                "🤖 엔트리 AI 인공지능 & 데이터",
+                "📱 실생활 유틸리티 & 앱 제작",
+                "💡 중학 정보 핵심 알고리즘 & 꿀팁"
+              ];
             }
           }
 
@@ -750,7 +790,32 @@ export default function BoardDetailPage() {
             if (prevSig === remoteSig) return prevPosts;
 
             // 🗑️ 삭제된 카드는 원격 목록에서도 영구 제외
-            const cleanRemote = remote.filter((r) => !isPostDeleted(r.id));
+            let cleanRemote = remote.filter((r) => !isPostDeleted(r.id));
+
+            // 🔥 최근 30초 이내에 로컬에서 직접 수정한 카드가 있다면 원격 구버전 데이터로 덮어쓰지 않고 로컬 최신본 유지!
+            cleanRemote = cleanRemote.map((r) => {
+              const recent = recentlyEditedPostsRef.current.get(r.id);
+              if (recent) {
+                if (Date.now() - recent.time < 30000) {
+                  const isRemoteSynced =
+                    r.title === recent.post.title &&
+                    r.content === recent.post.content &&
+                    (r.color || 'white') === (recent.post.color || 'white') &&
+                    (r.imageUrl || '') === (recent.post.imageUrl || '') &&
+                    (r.linkUrl || '') === (recent.post.linkUrl || '') &&
+                    (r.column || '') === (recent.post.column || '');
+
+                  if (!isRemoteSynced) {
+                    return { ...r, ...recent.post };
+                  } else {
+                    recentlyEditedPostsRef.current.delete(r.id);
+                  }
+                } else {
+                  recentlyEditedPostsRef.current.delete(r.id);
+                }
+              }
+              return r;
+            });
             const remoteMap = new Map(cleanRemote.map((p) => [p.id, p]));
             
             // 🔥 오직 현재 브라우저에서 방금 작성하여 아직 원격에 업로드 대기 중인 새 카드만 보존 (그 외 원격에 없는 카드는 삭제된 것이므로 자동 소거!)
@@ -781,8 +846,17 @@ export default function BoardDetailPage() {
 
             let merged = localPending.length > 0 ? [...cleanRemote, ...localPending] : cleanRemote;
 
-            // 🔥 엔트리 중학교 보드: 모든 카드 배경 흰색('white') 보장
+            // 🔥 엔트리 중학교 보드: 중복 영상 카드(entry-post-*) 필터링 및 모든 카드 배경 흰색('white') 보장
             if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
+              merged = merged.filter((p) => {
+                if (p.id.startsWith('entry-post-')) {
+                  if (isSupabaseConfigured) {
+                    deleteRemotePost(p.id).catch(() => {});
+                  }
+                  return false;
+                }
+                return true;
+              });
               merged = merged.map((p) => ({ ...p, color: 'white' }));
             }
 
@@ -860,6 +934,17 @@ export default function BoardDetailPage() {
                 '모둠 1', '모둠 2', '모둠 3', '모둠 1 (과제 수행 계획)', '모둠 2 (의견 및 아이디어)', '모둠 3 (최종 결과물)'
               ]);
               cleanCols = cleanCols.filter((c) => !foreignColumns.has(c));
+            }
+
+            // 🔥 엔트리 보드 컬럼 정규화 (중복 10개 열 방지 및 공식 5개 열 엄격 보장)
+            if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
+              cleanCols = [
+                "🎮 아케이드 & 액션 게임 (추천수 BEST)",
+                "🧠 뇌섹 퍼즐 & 스토리 방탈출 게임",
+                "🤖 엔트리 AI 인공지능 & 데이터",
+                "📱 실생활 유틸리티 & 앱 제작",
+                "💡 중학 정보 핵심 알고리즘 & 꿀팁"
+              ];
             }
 
             if (cleanCols.length > 0) {
@@ -1857,8 +1942,14 @@ export default function BoardDetailPage() {
   };
 
   // 카드 수정 콜백
-  const handlePostUpdated = async (updated: Post) => {
+  const handlePostUpdated = (updated: Post) => {
     lastUserActionTimeRef.current = Date.now();
+    // 🔥 최근 수정한 카드를 캐시에 기록하여 원격 폴링에 의한 구버전 덮어쓰기(원상복구 현상) 원천 차단
+    recentlyEditedPostsRef.current.set(updated.id, {
+      post: updated,
+      time: Date.now(),
+    });
+
     setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     const targetCol = updated.column;
     if (targetCol && !columns.includes(targetCol)) {
@@ -1869,11 +1960,11 @@ export default function BoardDetailPage() {
       saveStoreData.boards(data.boards.map((b) => (b.id === board.id ? updatedBoard : b)));
       setBoard(updatedBoard);
       if (isSupabaseConfigured) {
-        await saveRemoteBoard(updatedBoard);
+        saveRemoteBoard(updatedBoard).catch(() => {});
       }
     }
     if (isSupabaseConfigured) {
-      await saveRemotePost(updated);
+      saveRemotePost(updated).catch(() => {});
     }
   };
 

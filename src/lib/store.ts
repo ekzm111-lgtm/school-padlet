@@ -686,17 +686,47 @@ export const getStoreData = (): StoreData => {
   }
 
   // 엔트리 중학교 인기 추천 영상 보드 (board-entry-middle-school) 포스트 정규화:
-  // 모든 카드의 배경색을 'white'로 보장하고, 썸네일을 해당 영상 공식 썸네일로 보장
+  // 1. 중복 생성되었던 구버전 카드(entry-post-*) 및 비정규 카드 영구 제거
+  // 2. 모든 카드의 배경색을 'white'로 보장하고, 썸네일과 컬럼을 공식 설정과 일치
   let entryPostsCleaned = false;
 
-  // 모든 엔트리 보드 카드의 배경을 'white'로, 썸네일을 해당 영상 썸네일로 보장
+  const removedDuplicates: string[] = [];
+  postsList = postsList.filter((p) => {
+    if (p.boardId === ENTRY_MIDDLE_SCHOOL_BOARD.id) {
+      if (p.id.startsWith('entry-post-')) {
+        removedDuplicates.push(p.id);
+        entryPostsCleaned = true;
+        return false;
+      }
+    }
+    return true;
+  });
+
+  if (isSupabaseConfigured && removedDuplicates.length > 0) {
+    removedDuplicates.forEach((id) => {
+      deleteRemotePost(id).catch(() => {});
+    });
+  }
+
+  // 모든 엔트리 보드 카드의 배경을 'white'로, 썸네일 및 컬럼명을 정규화
   postsList = postsList.map((p) => {
     if (p.boardId === ENTRY_MIDDLE_SCHOOL_BOARD.id) {
       const canonical = ENTRY_MIDDLE_SCHOOL_POSTS.find((ep) => ep.id === p.id);
       if (canonical) {
-        if (p.color !== 'white' || p.imageUrl !== canonical.imageUrl || p.linkUrl !== canonical.linkUrl) {
+        if (
+          p.color !== 'white' ||
+          p.imageUrl !== canonical.imageUrl ||
+          p.linkUrl !== canonical.linkUrl ||
+          p.column !== canonical.column
+        ) {
           entryPostsCleaned = true;
-          return { ...p, color: 'white', imageUrl: canonical.imageUrl, linkUrl: canonical.linkUrl };
+          return {
+            ...p,
+            color: 'white',
+            imageUrl: canonical.imageUrl,
+            linkUrl: canonical.linkUrl,
+            column: canonical.column,
+          };
         }
       } else if (p.color !== 'white') {
         entryPostsCleaned = true;
@@ -719,6 +749,7 @@ export const getStoreData = (): StoreData => {
   }
 
   if (entryPostsCleaned) {
+    memoryPostsCache = postsList;
     try {
       localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(postsList));
     } catch (e) {}

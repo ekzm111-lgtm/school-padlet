@@ -44,6 +44,7 @@ import {
   deleteRemoteBoard,
   deleteRemotePost,
   fetchRemoteNotice,
+  fetchRemoteNoticeResult,
   saveRemoteNotice,
   fetchRemoteBannerSettings,
   saveRemoteBannerSettings,
@@ -354,7 +355,11 @@ export default function AdminPage() {
           }
         });
 
-        fetchRemoteNotice().then((rn) => {
+        fetchRemoteNoticeResult().then(({ notice: rn, error }) => {
+          if (error) {
+            // ⚠️ 네트워크 지연 또는 에러 시 기존 공지사항을 유지하여 깜빡임 방지
+            return;
+          }
           if (rn !== null) {
             setNotice((prev) => {
               if (

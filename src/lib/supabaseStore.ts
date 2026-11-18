@@ -436,10 +436,9 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       safeCreatedAt = new Date().toISOString();
     }
 
-    const rowPayload: any = {
+    const standardPayload: any = {
       id: post.id,
       board_id: post.boardId,
-      column_id: colName,
       column_name: colName,
       title: post.title,
       content: finalContent,
@@ -453,17 +452,22 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       comments: post.comments || [],
       attachments: atts,
       pinned: Boolean(post.pinned),
-      order_index: typeof post.order === 'number' ? post.order : 0,
       created_at: safeCreatedAt,
+    };
+
+    const rowPayload: any = {
+      ...standardPayload,
+      column_id: colName,
+      order_index: typeof post.order === 'number' ? post.order : 0,
     };
 
     let res = await supabase.from('posts').upsert(rowPayload);
     if (res.error) {
-      console.warn('saveRemotePost 1st try failed:', res.error);
+      console.warn('saveRemotePost 1st try failed, retrying with standard columns payload:', res.error);
 
-      // 1-1. 일시적 네트워크 지연 또는 동시 요청 충돌 방어 (400ms 후 2차 재시도)
-      await new Promise((r) => setTimeout(r, 400));
-      res = await supabase.from('posts').upsert(rowPayload);
+      // 1-1. column_id 등 미지원 컬럼 제거한 표준 페이로드로 2차 시도
+      await new Promise((r) => setTimeout(r, 200));
+      res = await supabase.from('posts').upsert(standardPayload);
       if (!res.error) return true;
 
       // 1-2. 페이로드 용량 초과 방어: 대용량 첨부 dataUrl 경량화 재시도
@@ -479,7 +483,7 @@ export async function saveRemotePost(post: Post): Promise<boolean> {
       const lightContent = `${cleanContent}\n<!--SCHOOLPAD_META:${JSON.stringify(lightMeta)}-->`;
 
       const lightPayload = {
-        ...rowPayload,
+        ...standardPayload,
         content: lightContent,
         attachments: lightAtts,
         image_url: (post.imageUrl && post.imageUrl.length > 200000) ? null : (post.imageUrl || null),
@@ -831,8 +835,8 @@ export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> 
   }
 }
 
-export async function fetchRemoteNotice(): Promise<Notice | null> {
-  if (!isSupabaseConfigured || !supabase) return null;
+export async function fetchRemoteNoticeResult(): Promise<{ notice: Notice | null; error: any }> {
+  if (!isSupabaseConfigured || !supabase) return { notice: null, error: 'Not configured' };
   try {
     const { data, error } = await supabase
       .from('posts')
@@ -840,11 +844,26 @@ export async function fetchRemoteNotice(): Promise<Notice | null> {
       .eq('id', 'schoolpad_global_notice')
       .maybeSingle();
 
-    if (error || !data?.content) return null;
-    return JSON.parse(data.content) as Notice;
+    if (error) {
+      return { notice: null, error };
+    }
+    if (!data || !data.content) {
+      return { notice: null, error: null };
+    }
+    try {
+      const parsed = JSON.parse(data.content) as Notice;
+      return { notice: parsed, error: null };
+    } catch (parseErr) {
+      return { notice: null, error: parseErr };
+    }
   } catch (e) {
-    return null;
+    return { notice: null, error: e };
   }
+}
+
+export async function fetchRemoteNotice(): Promise<Notice | null> {
+  const res = await fetchRemoteNoticeResult();
+  return res.notice;
 }
 
 // 📌 사용자별 개별 설정(고정 보드 ID 목록 & 보드 정렬 순서) Supabase 원격 동기화
