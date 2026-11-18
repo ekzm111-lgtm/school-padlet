@@ -50,7 +50,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, saveAllRemotePosts, deleteRemotePost, saveRemoteBoardActiveQuiz, fetchRemoteBoardActiveQuiz } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
 import { createShortUrl } from '@/lib/shortUrl';
-import { ENTRY_MIDDLE_SCHOOL_POSTS } from '@/data/entryMiddleSchoolBoard';
+import { ENTRY_MIDDLE_SCHOOL_BOARD, ENTRY_MIDDLE_SCHOOL_POSTS } from '@/data/entryMiddleSchoolBoard';
 import { USEFUL_SCHOOL_LINKS_POSTS } from '@/data/usefulSchoolLinksBoard';
 
 const DEFAULT_COLUMNS = ['모둠 1 (조사 및 계획)', '모둠 2 (의견 토론)', '모둠 3 (결과 정리)'];
@@ -604,6 +604,16 @@ export default function BoardDetailPage() {
                 return true;
               });
               finalPosts = finalPosts.map((p: Post) => ({ ...p, color: 'white' }));
+
+              // 🤖 누락된 최신 공식 엔트리 포스트(로봇 교육 영상 등) 자동 보충
+              const currentIds = new Set(finalPosts.map((p) => p.id));
+              const missingOfficial = ENTRY_MIDDLE_SCHOOL_POSTS.filter((p) => !currentIds.has(p.id));
+              if (missingOfficial.length > 0) {
+                finalPosts = [...finalPosts, ...missingOfficial];
+                if (isSupabaseConfigured) {
+                  missingOfficial.forEach((p) => saveRemotePost(p).catch(() => {}));
+                }
+              }
             }
 
             // 🌟 복제본 보드인데 카드가 0개로 비어있는 경우, 원본 템플릿 카드 자동 복원 및 원격 저장!
@@ -666,15 +676,9 @@ export default function BoardDetailPage() {
               activeCols = activeCols.filter((c) => !foreignColumns.has(c));
             }
 
-            // 🔥 엔트리 보드 컬럼 정규화 (중복 10개 열 방지 및 공식 5개 열 엄격 보장)
+            // 🔥 엔트리 보드 컬럼 정규화 (중복 10개 열 방지 및 공식 정규 열 엄격 보장)
             if (targetId === 'board-entry-middle-school' || targetId === '334455') {
-              activeCols = [
-                "🎮 아케이드 & 액션 게임 (추천수 BEST)",
-                "🧠 뇌섹 퍼즐 & 스토리 방탈출 게임",
-                "🤖 엔트리 AI 인공지능 & 데이터",
-                "📱 실생활 유틸리티 & 앱 제작",
-                "💡 중학 정보 핵심 알고리즘 & 꿀팁"
-              ];
+              activeCols = ENTRY_MIDDLE_SCHOOL_BOARD.columns || [];
             }
           }
 
@@ -858,6 +862,12 @@ export default function BoardDetailPage() {
                 return true;
               });
               merged = merged.map((p) => ({ ...p, color: 'white' }));
+
+              const currentIds = new Set(merged.map((p) => p.id));
+              const missingOfficial = ENTRY_MIDDLE_SCHOOL_POSTS.filter((p) => !currentIds.has(p.id));
+              if (missingOfficial.length > 0) {
+                merged = [...merged, ...missingOfficial];
+              }
             }
 
             // 🔥 카드 order 기준 오름차순 안정 정렬 보장!
@@ -936,15 +946,9 @@ export default function BoardDetailPage() {
               cleanCols = cleanCols.filter((c) => !foreignColumns.has(c));
             }
 
-            // 🔥 엔트리 보드 컬럼 정규화 (중복 10개 열 방지 및 공식 5개 열 엄격 보장)
+            // 🔥 엔트리 보드 컬럼 정규화 (중복 10개 열 방지 및 공식 정규 열 엄격 보장)
             if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
-              cleanCols = [
-                "🎮 아케이드 & 액션 게임 (추천수 BEST)",
-                "🧠 뇌섹 퍼즐 & 스토리 방탈출 게임",
-                "🤖 엔트리 AI 인공지능 & 데이터",
-                "📱 실생활 유틸리티 & 앱 제작",
-                "💡 중학 정보 핵심 알고리즘 & 꿀팁"
-              ];
+              cleanCols = ENTRY_MIDDLE_SCHOOL_BOARD.columns || [];
             }
 
             if (cleanCols.length > 0) {

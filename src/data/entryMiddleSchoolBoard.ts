@@ -24,7 +24,8 @@ export const ENTRY_MIDDLE_SCHOOL_BOARD: Board = {
     "🧠 뇌섹 퍼즐 & 스토리 방탈출 게임",
     "🤖 엔트리 AI 인공지능 & 데이터",
     "📱 실생활 유틸리티 & 앱 제작",
-    "💡 중학 정보 핵심 알고리즘 & 꿀팁"
+    "💡 중학 정보 핵심 알고리즘 & 꿀팁",
+    "🤖 엔트리 로봇 코딩 & 피지컬 컴퓨팅 (추천 BEST)"
   ],
   createdAt: '2026-11-16',
 };
@@ -468,6 +469,116 @@ export const ENTRY_MIDDLE_SCHOOL_POSTS: Post[] = [
       "clap": 23,
       "heart": 28,
       "insight": 22
+    },
+    "comments": [],
+    "createdAt": "방금 전"
+  },
+  {
+    "id": "entry-vid-robot-hamster-move",
+    "boardId": "board-entry-middle-school",
+    "column": "🤖 엔트리 로봇 코딩 & 피지컬 컴퓨팅 (추천 BEST)",
+    "order": 1,
+    "title": "햄스터 S 로봇 엔트리 연동 & 바퀴 제어 이동 코딩",
+    "linkUrl": "https://www.youtube.com/watch?v=JW7pE7vYBtQ",
+    "imageUrl": "https://img.youtube.com/vi/JW7pE7vYBtQ/hqdefault.jpg",
+    "color": "white",
+    "authorId": "user-admin",
+    "authorName": "김정보 (정보교사)",
+    "authorRole": "teacher",
+    "content": "▶ 중학교 로봇 코딩 대표 교구 햄스터봇 첫걸음!\n• 주요 개념: 엔트리 하드웨어 연결, 좌우 모터 PWM 속도 제어, 기본 주행 및 90도 회전\n• 컴퓨터 화면 속 블록 코딩으로 현실의 햄스터 로봇을 움직여보며 피지컬 컴퓨팅의 원리를 학습합니다.",
+    "reactions": {
+      "like": 35,
+      "clap": 26,
+      "heart": 29,
+      "insight": 20
+    },
+    "comments": [],
+    "createdAt": "방금 전"
+  },
+  {
+    "id": "entry-vid-robot-hamster-line",
+    "boardId": "board-entry-middle-school",
+    "column": "🤖 엔트리 로봇 코딩 & 피지컬 컴퓨팅 (추천 BEST)",
+    "order": 2,
+    "title": "햄스터 S 로봇 바닥 적외선 센서 라인트레이서 코딩",
+    "linkUrl": "https://www.youtube.com/watch?v=MLlC-50a2AA",
+    "imageUrl": "https://img.youtube.com/vi/MLlC-50a2AA/hqdefault.jpg",
+    "color": "white",
+    "authorId": "user-admin",
+    "authorName": "김정보 (정보교사)",
+    "authorRole": "teacher",
+    "content": "▶ 로봇 경진대회 필수 종목 라인트레이서!\n• 주요 개념: 바닥 적외선 센서 2개의 반사광 감지(흰색/검은색 판별), 분기문 조건 판단, 라인 추적 주행\n• 바닥 센서 값의 변화에 따라 좌우 바퀴 속도를 실시간 조절하여 구불구불한 검은 선을 이탈 없이 따라가는 알고리즘을 완성합니다.",
+    "reactions": {
+      "like": 42,
+      "clap": 31,
+      "heart": 36,
+      "insight": 24
+    },
+    "comments": [],
+    "createdAt": "방금 전"
+  },
+  {
+    "id": "entry-vid-robot-hamster-maze",
+    "boardId": "board-entry-middle-school",
+    "column": "🤖 엔트리 로봇 코딩 & 피지컬 컴퓨팅 (추천 BEST)",
+    "order": 3,
+    "title": "햄스터 봇 근접 센서 자율주행 & 미로 탈출 알고리즘",
+    "linkUrl": "https://www.youtube.com/watch?v=J98SIkALN3Q",
+    "imageUrl": "https://img.youtube.com/vi/J98SIkALN3Q/hqdefault.jpg",
+    "color": "white",
+    "authorId": "user-admin",
+    "authorName": "김정보 (정보교사)",
+    "authorRole": "teacher",
+    "content": "▶ 센서 기반 자율주행의 핵심!\n• 주요 개념: 전방 좌우 근접(적외선) 센서, 벽 충돌 방지 회피 기동, 우수법(오른손 법칙) 미로 주행\n• 앞에 장애물이나 벽이 나타나면 스스로 판단해 회전하고 멈추며 복잡한 미로 경로를 탈출하는 자율주행 알고리즘을 실습합니다.",
+    "reactions": {
+      "like": 38,
+      "clap": 28,
+      "heart": 32,
+      "insight": 22
+    },
+    "comments": [],
+    "createdAt": "방금 전"
+  },
+  {
+    "id": "entry-vid-robot-maqueen",
+    "boardId": "board-entry-middle-school",
+    "column": "🤖 엔트리 로봇 코딩 & 피지컬 컴퓨팅 (추천 BEST)",
+    "order": 4,
+    "title": "마이크로비트 마퀸(Maqueen) 초음파 센서 로봇카 자율주행",
+    "linkUrl": "https://www.youtube.com/watch?v=rvjdX_3uGs4",
+    "imageUrl": "https://img.youtube.com/vi/rvjdX_3uGs4/hqdefault.jpg",
+    "color": "white",
+    "authorId": "user-admin",
+    "authorName": "김정보 (정보교사)",
+    "authorRole": "teacher",
+    "content": "▶ 중학교 자유학년제 AI 로봇 실습 인기 1위!\n• 주요 개념: 마이크로비트-엔트리 연동, 초음파 거리 센서(cm 단위 측정), 능동형 장애물 회피\n• 초음파 센서로 물체와의 거리를 정밀 측정하여 위험 거리에 도달하면 부저를 울리고 방향을 전환하는 스마트 로봇카를 제어합니다.",
+    "reactions": {
+      "like": 39,
+      "clap": 27,
+      "heart": 33,
+      "insight": 25
+    },
+    "comments": [],
+    "createdAt": "방금 전"
+  },
+  {
+    "id": "entry-vid-robot-arduino",
+    "boardId": "board-entry-middle-school",
+    "column": "🤖 엔트리 로봇 코딩 & 피지컬 컴퓨팅 (추천 BEST)",
+    "order": 5,
+    "title": "아두이노 로봇 스마트카 & 엔트리 피지컬 컴퓨팅 제어",
+    "linkUrl": "https://www.youtube.com/watch?v=sjkSTn7dvfg",
+    "imageUrl": "https://img.youtube.com/vi/sjkSTn7dvfg/hqdefault.jpg",
+    "color": "white",
+    "authorId": "user-admin",
+    "authorName": "김정보 (정보교사)",
+    "authorRole": "teacher",
+    "content": "▶ 하드웨어와 소프트웨어를 아우르는 중학 메이커 프로젝트!\n• 주요 개념: 아두이노 모터 드라이버, 엔트리 키보드 무선 조종, 서보모터 헤드 회전\n• 아두이노 보드와 엔트리를 연결하여 키보드로 전후좌우 자유롭게 조종하고 센서 데이터를 화면으로 모니터링하는 로봇 자동차를 만듭니다.",
+    "reactions": {
+      "like": 34,
+      "clap": 25,
+      "heart": 28,
+      "insight": 19
     },
     "comments": [],
     "createdAt": "방금 전"
