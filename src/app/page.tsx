@@ -57,6 +57,7 @@ import {
   fetchRemoteBannerSettings,
   saveRemoteBannerSettings,
   DEFAULT_BANNER_SETTINGS,
+  DEFAULT_NOTICE,
 } from '@/lib/supabaseStore';
 import { Board, User, Notice, BannerSettings } from '@/lib/types';
 import confetti from 'canvas-confetti';
@@ -93,30 +94,23 @@ export default function HomePage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  // 📢 관리자 공지사항 상태
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [showNoticeModal, setShowNoticeModal] = useState(false);
-  const [dismissedNoticeId, setDismissedNoticeIdState] = useState<string | null>(() => {
+  // 📢 관리자 및 선생님 전체 공지사항 상태 (기본값 DEFAULT_NOTICE 보장)
+  const [notice, setNotice] = useState<Notice | null>(() => {
     if (typeof window !== 'undefined') {
       try {
-        return sessionStorage.getItem('schoolpad_dismissed_notice_id');
-      } catch (e) {}
-    }
-    return null;
-  });
-
-  const setDismissedNoticeId = (id: string | null) => {
-    setDismissedNoticeIdState(id);
-    if (typeof window !== 'undefined') {
-      try {
-        if (id) {
-          sessionStorage.setItem('schoolpad_dismissed_notice_id', id);
-        } else {
-          sessionStorage.removeItem('schoolpad_dismissed_notice_id');
+        const cached = localStorage.getItem('schoolpad_global_notice');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.title && parsed.title !== '__DELETED__' && parsed.isActive !== false) {
+            return parsed;
+          }
         }
       } catch (e) {}
     }
-  };
+    return DEFAULT_NOTICE;
+  });
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [dismissedNoticeId, setDismissedNoticeId] = useState<string | null>(null);
 
   // 📌 각 사용자(ID)별 독립적인 상단 고정(Pin) 목록 및 순서(Order) 상태
   const [userPinnedIds, setUserPinnedIds] = useState<string[]>([]);
@@ -357,49 +351,31 @@ export default function HomePage() {
         fetchRemoteNoticeResult()
           .then(({ notice: remNotice, error }) => {
             if (error) {
-              // ⚠️ 네트워크 지연 또는 일시적 에러 시 기존 로컬 공지사항을 유지하여 깜빡임 원천 차단!
+              // ⚠️ 네트워크 지연 또는 일시적 에러 시 기존 공지사항 유지
               return;
             }
-            if (remNotice !== null) {
-              if (remNotice.isActive === false || remNotice.title === '__DELETED__') {
-                // 명시적으로 관리자가 삭제한 공지
-                setNotice(null);
-                try {
-                  localStorage.removeItem('schoolpad_global_notice');
-                } catch (e) {}
-              } else {
-                setNotice((prev) => {
-                  if (
-                    prev &&
-                    prev.id === remNotice.id &&
-                    prev.isActive === remNotice.isActive &&
-                    prev.title === remNotice.title &&
-                    prev.content === remNotice.content &&
-                    prev.category === remNotice.category &&
-                    prev.expiresAt === remNotice.expiresAt &&
-                    prev.updatedAt === remNotice.updatedAt
-                  ) {
-                    return prev;
-                  }
-                  return remNotice;
-                });
-                try {
-                  localStorage.setItem('schoolpad_global_notice', JSON.stringify(remNotice));
-                  localStorage.removeItem('schoolpad_global_notice_deleted');
-                } catch (e) {}
+            const activeNotice = (remNotice && remNotice.isActive !== false && remNotice.title !== '__DELETED__')
+              ? remNotice
+              : DEFAULT_NOTICE;
+
+            setNotice((prev) => {
+              if (
+                prev &&
+                prev.id === activeNotice.id &&
+                prev.isActive === activeNotice.isActive &&
+                prev.title === activeNotice.title &&
+                prev.content === activeNotice.content &&
+                prev.category === activeNotice.category &&
+                prev.expiresAt === activeNotice.expiresAt &&
+                prev.updatedAt === activeNotice.updatedAt
+              ) {
+                return prev;
               }
-            } else {
-              // 원격 DB에 아직 행이 없는 경우: 로컬에 공지사항이 있다면 삭제하지 않고 원격으로 보존 업로드
-              try {
-                const localStr = localStorage.getItem('schoolpad_global_notice');
-                if (localStr) {
-                  const localObj = JSON.parse(localStr);
-                  if (localObj && localObj.title && localObj.isActive !== false) {
-                    saveRemoteNotice(localObj).catch(() => {});
-                  }
-                }
-              } catch (e) {}
-            }
+              return activeNotice;
+            });
+            try {
+              localStorage.setItem('schoolpad_global_notice', JSON.stringify(activeNotice));
+            } catch (e) {}
           })
           .catch(() => {});
 
@@ -660,18 +636,22 @@ export default function HomePage() {
     }
   };
 
-  // 📢 관리자 전역 공지사항 저장 및 원격 동기화 (오직 관리자 admin 전용)
+  // 📢 선생님 & 관리자 전역 공지사항 저장 및 원격 동기화
   const handleSaveNotice = async (newNotice: Notice | null) => {
-    if (currentUser?.role !== 'admin') {
-      alert('공지사항 관리는 학교 관리자(admin) 전용 권한입니다.');
+    if (!isTeacherOrAdmin) {
+      alert('공지사항 관리는 선생님 및 학교 관리자 전용 권한입니다.');
       return;
     }
     const nowTime = Date.now();
-    const stampedNotice = newNotice ? { ...newNotice, updatedAt: nowTime } : null;
-    setNotice(stampedNotice);
+    const finalNotice: Notice = newNotice
+      ? { ...newNotice, updatedAt: nowTime }
+      : { ...DEFAULT_NOTICE, isActive: false, updatedAt: nowTime };
+
+    setNotice(finalNotice);
+    setDismissedNoticeId(null);
     try {
-      if (stampedNotice) {
-        localStorage.setItem('schoolpad_global_notice', JSON.stringify(stampedNotice));
+      if (finalNotice.isActive !== false && finalNotice.title) {
+        localStorage.setItem('schoolpad_global_notice', JSON.stringify(finalNotice));
         localStorage.removeItem('schoolpad_global_notice_deleted');
       } else {
         localStorage.removeItem('schoolpad_global_notice');
@@ -680,10 +660,11 @@ export default function HomePage() {
     } catch (e) {}
 
     if (isSupabaseConfigured) {
-      await saveRemoteNotice(stampedNotice).catch((err) => {
+      await saveRemoteNotice(finalNotice).catch((err) => {
         console.error('Remote notice save error:', err);
       });
     }
+    alert('전체 공지사항이 성공적으로 저장되었습니다.');
   };
 
   // 🖼️ 메인 배너 이미지 및 슬라이드 설정 저장 (관리자 admin 전용)
@@ -1048,14 +1029,17 @@ export default function HomePage() {
                   <span>추천 템플릿 복제하기</span>
                 </button>
 
-                {/* 📢 학교 관리자(admin) 전용 공지사항 관리 버튼 */}
-                {currentUser?.role === 'admin' && (
+                {/* 📢 학교 선생님 & 관리자 공지사항 관리 버튼 */}
+                {isTeacherOrAdmin && (
                   <button
-                    onClick={() => setShowNoticeModal(true)}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition-all active:scale-95"
+                    onClick={() => {
+                      setDismissedNoticeId(null);
+                      setShowNoticeModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
                   >
                     <Megaphone className="w-4 h-4 text-amber-900" />
-                    <span>{notice ? '공지사항 관리' : '공지사항 작성'}</span>
+                    <span>{notice && notice.isActive ? '공지사항 관리' : '공지사항 작성'}</span>
                     {notice && notice.isActive && (!notice.expiresAt || new Date(notice.expiresAt).getTime() > Date.now()) && (
                       <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
                     )}
@@ -1800,13 +1784,14 @@ export default function HomePage() {
         />
       )}
 
-      {/* 📢 관리자 공지사항 작성/수정/열람 모달 */}
+      {/* 📢 관리자 및 선생님 공지사항 작성/수정/열람 모달 */}
       <NoticeModal
         isOpen={showNoticeModal}
         onClose={() => setShowNoticeModal(false)}
         notice={notice}
         onSave={handleSaveNotice}
         isAdmin={currentUser?.role === 'admin'}
+        isTeacherOrAdmin={isTeacherOrAdmin}
       />
 
       {/* 🖼️ 메인 배너 이미지 및 슬라이드쇼 관리 모달 */}

@@ -49,6 +49,7 @@ import {
   fetchRemoteBannerSettings,
   saveRemoteBannerSettings,
   DEFAULT_BANNER_SETTINGS,
+  DEFAULT_NOTICE,
 } from '@/lib/supabaseStore';
 
 export default function AdminPage() {
@@ -57,7 +58,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(getStoreData().settings);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(DEFAULT_NOTICE);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
   const [showBannerModal, setShowBannerModal] = useState(false);
@@ -357,47 +358,26 @@ export default function AdminPage() {
 
         fetchRemoteNoticeResult().then(({ notice: rn, error }) => {
           if (error) {
-            // ⚠️ 네트워크 지연 또는 에러 시 기존 공지사항을 유지하여 깜빡임 방지
+            // ⚠️ 네트워크 지연 또는 에러 시 기존 공지사항을 유지
             return;
           }
-          if (rn !== null) {
-            if (rn.isActive === false || rn.title === '__DELETED__') {
-              // 명시적으로 삭제된 공지
-              setNotice(null);
-              try {
-                localStorage.removeItem('schoolpad_global_notice');
-              } catch (e) {}
-            } else {
-              setNotice((prev) => {
-                if (
-                  prev &&
-                  prev.id === rn.id &&
-                  prev.isActive === rn.isActive &&
-                  prev.title === rn.title &&
-                  prev.content === rn.content &&
-                  prev.category === rn.category &&
-                  prev.expiresAt === rn.expiresAt &&
-                  prev.updatedAt === rn.updatedAt
-                ) return prev;
-                return rn;
-              });
-              try {
-                localStorage.setItem('schoolpad_global_notice', JSON.stringify(rn));
-                localStorage.removeItem('schoolpad_global_notice_deleted');
-              } catch (e) {}
-            }
-          } else {
-            // 원격 DB에 아직 행이 없는 경우 로컬 공지사항이 있다면 업로드하여 보존
-            try {
-              const localStr = localStorage.getItem('schoolpad_global_notice');
-              if (localStr) {
-                const localObj = JSON.parse(localStr);
-                if (localObj && localObj.title && localObj.isActive !== false) {
-                  saveRemoteNotice(localObj).catch(() => {});
-                }
-              }
-            } catch (e) {}
-          }
+          const valid = (rn && rn.isActive !== false && rn.title !== '__DELETED__') ? rn : DEFAULT_NOTICE;
+          setNotice((prev) => {
+            if (
+              prev &&
+              prev.id === valid.id &&
+              prev.isActive === valid.isActive &&
+              prev.title === valid.title &&
+              prev.content === valid.content &&
+              prev.category === valid.category &&
+              prev.expiresAt === valid.expiresAt &&
+              prev.updatedAt === valid.updatedAt
+            ) return prev;
+            return valid;
+          });
+          try {
+            localStorage.setItem('schoolpad_global_notice', JSON.stringify(valid));
+          } catch (e) {}
         });
 
         fetchRemoteBoards().then((rb) => {

@@ -797,6 +797,18 @@ export async function fetchRemoteSettings(): Promise<SystemSettings | null> {
 }
 
 // 📢 전역 관리자 공지사항 Supabase 동기화
+// 📢 전역 기본 공지사항 (초기 설정 및 복구용)
+export const DEFAULT_NOTICE: Notice = {
+  id: 'schoolpad_official_notice',
+  title: '📢 2026학년도 스쿨패들(SchoolPad) 디지털 수업 플랫폼 안내',
+  content: '선생님과 학생들이 실시간으로 생각을 붙이고 나누며 함께 성장하는 디지털 협업 교실입니다. 상단의 6자리 참여 코드로 원하는 수업 보드에 입장하세요!',
+  category: 'general',
+  authorName: '미래한국 학교관리자',
+  isActive: true,
+  createdAt: '2026-11-18',
+  updatedAt: Date.now(),
+};
+
 export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
@@ -811,36 +823,19 @@ export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> 
       author_name: '시스템',
     });
 
-    if (!notice) {
-      // 명시적으로 삭제된 상태(Tombstone)를 저장하여 모든 클라이언트에 삭제 이벤트를 확실히 동기화
-      const deletedNotice: Notice = {
-        id: 'deleted',
-        title: '__DELETED__',
-        content: '',
-        category: 'general',
-        authorName: '관리자',
-        createdAt: new Date().toISOString().split('T')[0],
-        isActive: false,
-        updatedAt: Date.now(),
-      };
-      await supabase.from('posts').upsert({
-        id: 'schoolpad_global_notice',
-        board_id: '__SYSTEM_USERS__',
-        title: '__DELETED__',
-        content: JSON.stringify(deletedNotice),
-        author_id: 'admin',
-        author_name: '관리자',
-        column_name: '__notice__',
-      });
-      return true;
-    }
+    const targetNotice = notice || {
+      ...DEFAULT_NOTICE,
+      isActive: false,
+      updatedAt: Date.now(),
+    };
+
     const { error } = await supabase.from('posts').upsert({
       id: 'schoolpad_global_notice',
       board_id: '__SYSTEM_USERS__',
-      title: notice.title,
-      content: JSON.stringify(notice),
+      title: targetNotice.title,
+      content: JSON.stringify(targetNotice),
       author_id: 'admin',
-      author_name: notice.authorName || '관리자',
+      author_name: targetNotice.authorName || '관리자',
       column_name: '__notice__',
     });
     if (error) {
@@ -855,7 +850,7 @@ export async function saveRemoteNotice(notice: Notice | null): Promise<boolean> 
 }
 
 export async function fetchRemoteNoticeResult(): Promise<{ notice: Notice | null; error: any }> {
-  if (!isSupabaseConfigured || !supabase) return { notice: null, error: 'Not configured' };
+  if (!isSupabaseConfigured || !supabase) return { notice: DEFAULT_NOTICE, error: null };
   try {
     const { data, error } = await supabase
       .from('posts')
@@ -867,19 +862,19 @@ export async function fetchRemoteNoticeResult(): Promise<{ notice: Notice | null
       return { notice: null, error };
     }
     if (!data || !data.content) {
-      return { notice: null, error: null };
+      return { notice: DEFAULT_NOTICE, error: null };
     }
     try {
       const parsed = JSON.parse(data.content) as Notice;
-      if (parsed.id === 'deleted' || parsed.isActive === false || parsed.title === '__DELETED__') {
-        return { notice: { ...parsed, isActive: false }, error: null };
+      if (parsed.id === 'deleted' || parsed.title === '__DELETED__') {
+        return { notice: DEFAULT_NOTICE, error: null };
       }
       return { notice: parsed, error: null };
     } catch (parseErr) {
-      return { notice: null, error: parseErr };
+      return { notice: DEFAULT_NOTICE, error: null };
     }
   } catch (e) {
-    return { notice: null, error: e };
+    return { notice: DEFAULT_NOTICE, error: e };
   }
 }
 
