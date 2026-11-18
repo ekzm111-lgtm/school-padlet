@@ -652,13 +652,19 @@ export default function PostCard({
                 e.stopPropagation();
                 setShowDetailModal(true);
               }}
-              className="mt-2 relative w-full overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group bg-black/5"
+              className={`mt-2 relative w-full overflow-hidden rounded-xl border border-black/10 shadow-xs cursor-pointer group ${
+                currentPost.boardId === 'board-useful-school-links' ? 'bg-white' : 'bg-black/5'
+              }`}
               title="클릭하여 상세 모달에서 보기 (동영상 재생 및 전체 내용)"
             >
               <img
                 src={cardImage}
                 alt="대표 이미지"
-                className="w-full aspect-video object-cover group-hover:scale-105 transition-all duration-300 block"
+                className={`w-full aspect-video ${
+                  currentPost.boardId === 'board-useful-school-links'
+                    ? 'object-contain p-0.5 bg-white'
+                    : 'object-cover'
+                } group-hover:scale-105 transition-all duration-300 block`}
               />
               {/* 유튜브 또는 외부 링크가 있을 때 우측 상단 새 탭 열기 버튼 */}
               {currentPost.linkUrl && (

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" style="background:#ffffff; font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.08" />
+    </filter>
+    <filter id="iconShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.15" />
+    </filter>
+    <linearGradient id="cardGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5F3FF"/><stop offset="100%" stop-color="#EDE9FE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="800" height="450" fill="#ffffff" />
+  
+  <!-- Outer Decorative Soft Card -->
+  <rect x="24" y="24" width="752" height="402" rx="28" fill="url(#cardGrad)" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)" />
+  
+  <!-- Inner White Logo Stage -->
+  <rect x="52" y="52" width="696" height="346" rx="22" fill="#ffffff" fill-opacity="0.96" stroke="#F1F5F9" stroke-width="1.5" />
+
+  <!-- Badge / Category Tag -->
+  <g transform="translate(84, 86)">
+    <rect width="auto" height="30" rx="15" fill="#6D28D9" fill-opacity="0.12" />
+    <text x="14" y="20" fill="#6D28D9" font-size="13" font-weight="800" letter-spacing="0.5">🌱 디지털새싹 & AI 윤리</text>
+  </g>
+
+  <!-- Main Brand Icon -->
+  <g transform="translate(84, 136)" filter="url(#iconShadow)">
+    
+      <rect width="124" height="124" rx="26" fill="#7C3AED" />
+      <circle cx="62" cy="62" r="32" fill="#ffffff" />
+      <!-- Sprout -->
+      <path d="M62 76 V50 C62 40 50 40 50 50 C50 60 62 64 62 64" stroke="#10B981" stroke-width="5" stroke-linecap="round" fill="none" />
+      <path d="M62 60 C62 60 72 56 72 46 C72 38 62 38 62 48" stroke="#10B981" stroke-width="5" stroke-linecap="round" fill="none" />
+    
+  </g>
+
+  <!-- Title & Subtitle -->
+  <text x="240" y="210" fill="#0F172A" font-size="38" font-weight="900" letter-spacing="-0.8">디지털새싹 & AI 윤리</text>
+  <text x="240" y="252" fill="#64748B" font-size="17" font-weight="600">한국과학창의재단 초·중·고 디지털 시민성 & 올바른 인공지능 윤리 포털</text>
+
+  <!-- Bottom Official Verification Marker -->
+  <g transform="translate(240, 280)">
+    <circle cx="8" cy="8" r="7" fill="#10B981" />
+    <path d="M5 8.5 L7.2 10.5 L11.5 5.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <text x="22" y="12" fill="#475569" font-size="13" font-weight="700">학교 공식 인증 교육 사이트 (Official)</text>
+  </g>
+</svg>

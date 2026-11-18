@@ -645,21 +645,43 @@ export const getStoreData = (): StoreData => {
     } catch (e) {}
   }
 
-  // 유용한 학습 사이트 보드의 중복/구버전 컬럼명 정규화
+  // 유용한 학습 사이트 보드의 중복/구버전 컬럼명 정규화, 로고 썸네일 및 배경색 white 동기화
   let postsMigrated = false;
   postsList = postsList.map((p) => {
     if (p.boardId === USEFUL_SCHOOL_LINKS_BOARD.id) {
-      if (p.column === '💻 코딩 & 컴퓨팅 사고력') {
+      const canonical = USEFUL_SCHOOL_LINKS_POSTS.find((up) => up.id === p.id);
+      let targetCol = p.column;
+      if (targetCol === '💻 코딩 & 컴퓨팅 사고력') targetCol = '💻 코딩 & AI 인공지능';
+      if (targetCol === '📐 수학 탐구 & AI 학습') targetCol = '📐 수학 탐구 & 그래프 도구';
+      if (targetCol === '📚 교과 종합 & 디자인 협업') targetCol = '📚 교과 종합 & 디자인 학습도구';
+
+      if (canonical) {
+        if (
+          p.color !== 'white' ||
+          p.imageUrl !== canonical.imageUrl ||
+          p.linkUrl !== canonical.linkUrl ||
+          p.column !== targetCol
+        ) {
+          postsMigrated = true;
+          const updated: Post = {
+            ...p,
+            color: 'white',
+            imageUrl: canonical.imageUrl,
+            linkUrl: canonical.linkUrl,
+            column: targetCol,
+          };
+          if (isSupabaseConfigured) {
+            saveRemotePost(updated).catch(() => {});
+          }
+          return updated;
+        }
+      } else if (p.color !== 'white' || p.column !== targetCol) {
         postsMigrated = true;
-        return { ...p, column: '💻 코딩 & AI 인공지능' };
-      }
-      if (p.column === '📐 수학 탐구 & AI 학습') {
-        postsMigrated = true;
-        return { ...p, column: '📐 수학 탐구 & 그래프 도구' };
-      }
-      if (p.column === '📚 교과 종합 & 디자인 협업') {
-        postsMigrated = true;
-        return { ...p, column: '📚 교과 종합 & 디자인 학습도구' };
+        const updated: Post = { ...p, color: 'white', column: targetCol };
+        if (isSupabaseConfigured) {
+          saveRemotePost(updated).catch(() => {});
+        }
+        return updated;
       }
     }
     return p;

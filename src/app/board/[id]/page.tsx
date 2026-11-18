@@ -616,6 +616,30 @@ export default function BoardDetailPage() {
               }
             }
 
+            // 🌟 유용한 학습 사이트 보드: 모든 카드 배경색 white 및 공식 로고 썸네일 동기화
+            if (targetId === 'board-useful-school-links' || targetId === '778899') {
+              finalPosts = finalPosts.map((p: Post): Post => {
+                const canonical = USEFUL_SCHOOL_LINKS_POSTS.find((up) => up.id === p.id);
+                if (canonical) {
+                  return {
+                    ...p,
+                    color: 'white' as const,
+                    imageUrl: canonical.imageUrl,
+                    column: canonical.column || p.column,
+                  };
+                }
+                return { ...p, color: 'white' as const };
+              });
+              const currentIds = new Set(finalPosts.map((p) => p.id));
+              const missingOfficial = USEFUL_SCHOOL_LINKS_POSTS.filter((p) => !currentIds.has(p.id));
+              if (missingOfficial.length > 0) {
+                finalPosts = [...finalPosts, ...missingOfficial];
+                if (isSupabaseConfigured) {
+                  missingOfficial.forEach((p) => saveRemotePost(p).catch(() => {}));
+                }
+              }
+            }
+
             // 🌟 복제본 보드인데 카드가 0개로 비어있는 경우, 원본 템플릿 카드 자동 복원 및 원격 저장!
             if (
               finalPosts.length === 0 &&
@@ -865,6 +889,27 @@ export default function BoardDetailPage() {
 
               const currentIds = new Set(merged.map((p) => p.id));
               const missingOfficial = ENTRY_MIDDLE_SCHOOL_POSTS.filter((p) => !currentIds.has(p.id));
+              if (missingOfficial.length > 0) {
+                merged = [...merged, ...missingOfficial];
+              }
+            }
+
+            // 🌟 유용한 학습 사이트 보드: polling 시에도 로고 썸네일 및 white 배경 보장
+            if (targetBoardId === 'board-useful-school-links' || targetBoardId === '778899') {
+              merged = merged.map((p): Post => {
+                const canonical = USEFUL_SCHOOL_LINKS_POSTS.find((up) => up.id === p.id);
+                if (canonical) {
+                  return {
+                    ...p,
+                    color: 'white' as const,
+                    imageUrl: canonical.imageUrl,
+                    column: canonical.column || p.column,
+                  };
+                }
+                return { ...p, color: 'white' as const };
+              });
+              const currentIds = new Set(merged.map((p) => p.id));
+              const missingOfficial = USEFUL_SCHOOL_LINKS_POSTS.filter((p) => !currentIds.has(p.id));
               if (missingOfficial.length > 0) {
                 merged = [...merged, ...missingOfficial];
               }

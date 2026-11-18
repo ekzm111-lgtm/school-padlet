@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" style="background:#ffffff; font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.08" />
+    </filter>
+    <filter id="iconShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.15" />
+    </filter>
+    <linearGradient id="cardGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FEF2F2"/><stop offset="100%" stop-color="#FEE2E2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="800" height="450" fill="#ffffff" />
+  
+  <!-- Outer Decorative Soft Card -->
+  <rect x="24" y="24" width="752" height="402" rx="28" fill="url(#cardGrad)" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)" />
+  
+  <!-- Inner White Logo Stage -->
+  <rect x="52" y="52" width="696" height="346" rx="22" fill="#ffffff" fill-opacity="0.96" stroke="#F1F5F9" stroke-width="1.5" />
+
+  <!-- Badge / Category Tag -->
+  <g transform="translate(84, 86)">
+    <rect width="auto" height="30" rx="15" fill="#DC2626" fill-opacity="0.12" />
+    <text x="14" y="20" fill="#DC2626" font-size="13" font-weight="800" letter-spacing="0.5">🧠 구글 노코드 AI</text>
+  </g>
+
+  <!-- Main Brand Icon -->
+  <g transform="translate(84, 136)" filter="url(#iconShadow)">
+    
+      <rect width="124" height="124" rx="26" fill="#DC2626" />
+      <circle cx="44" cy="46" r="14" fill="#3B82F6" />
+      <circle cx="80" cy="46" r="14" fill="#FACC15" />
+      <circle cx="62" cy="80" r="16" fill="#22C55E" />
+      <line x1="44" y1="46" x2="62" y2="80" stroke="#ffffff" stroke-width="4" />
+      <line x1="80" y1="46" x2="62" y2="80" stroke="#ffffff" stroke-width="4" />
+    
+  </g>
+
+  <!-- Title & Subtitle -->
+  <text x="240" y="210" fill="#0F172A" font-size="38" font-weight="900" letter-spacing="-0.8">Google Teachable Machine</text>
+  <text x="240" y="252" fill="#64748B" font-size="17" font-weight="600">웹캠과 마이크로 이미지, 소리, 자세를 직접 훈련시키는 구글 AI</text>
+
+  <!-- Bottom Official Verification Marker -->
+  <g transform="translate(240, 280)">
+    <circle cx="8" cy="8" r="7" fill="#10B981" />
+    <path d="M5 8.5 L7.2 10.5 L11.5 5.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <text x="22" y="12" fill="#475569" font-size="13" font-weight="700">학교 공식 인증 교육 사이트 (Official)</text>
+  </g>
+</svg>
