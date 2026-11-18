@@ -626,10 +626,10 @@ export default function HomePage() {
     }
   };
 
-  // 📢 관리자/교사 공지사항 저장 및 원격 동기화
+  // 📢 관리자 전역 공지사항 저장 및 원격 동기화 (오직 관리자 admin 전용)
   const handleSaveNotice = async (newNotice: Notice | null) => {
-    if (currentUser?.role !== 'admin' && currentUser?.role !== 'teacher') {
-      alert('공지사항 관리는 관리자(admin) 및 교사 권한에서만 가능합니다.');
+    if (currentUser?.role !== 'admin') {
+      alert('공지사항 관리는 학교 관리자(admin) 전용 권한입니다.');
       return;
     }
     const nowTime = Date.now();
@@ -652,8 +652,12 @@ export default function HomePage() {
     }
   };
 
-  // 🖼️ 메인 배너 이미지 및 슬라이드 설정 저장 (관리자/교사 전용)
+  // 🖼️ 메인 배너 이미지 및 슬라이드 설정 저장 (관리자 admin 전용)
   const handleSaveBannerSettings = async (newSettings: BannerSettings) => {
+    if (currentUser?.role !== 'admin') {
+      alert('메인 배너 이미지 설정은 학교 관리자(admin) 전용 권한입니다.');
+      return;
+    }
     const nowTime = Date.now();
     const stamped = { ...newSettings, updatedAt: nowTime };
     setBannerSettings(stamped);
@@ -953,8 +957,8 @@ export default function HomePage() {
             </>
           )}
 
-          {/* 교사 또는 관리자를 위한 [🖼️ 배너 이미지 변경] 버튼 */}
-          {(currentUser?.role === 'admin' || currentUser?.role === 'teacher') && (
+          {/* 학교 관리자(admin) 전용 [🖼️ 배너 이미지 변경] 버튼 */}
+          {currentUser?.role === 'admin' && (
             <button
               type="button"
               onClick={(e) => {
@@ -1009,7 +1013,8 @@ export default function HomePage() {
                   <span>추천 템플릿 복제하기</span>
                 </button>
 
-                {(currentUser?.role === 'admin' || currentUser?.role === 'teacher') && (
+                {/* 📢 학교 관리자(admin) 전용 공지사항 관리 버튼 */}
+                {currentUser?.role === 'admin' && (
                   <button
                     onClick={() => setShowNoticeModal(true)}
                     className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition-all active:scale-95"

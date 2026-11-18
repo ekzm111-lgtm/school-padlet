@@ -34,8 +34,8 @@ export default function NoticeModal({
   isAdmin,
   isTeacherOrAdmin,
 }: NoticeModalProps) {
-  // 관리자 또는 교사 모두 공지 관리 가능
-  const canManageNotice = Boolean(isAdmin || isTeacherOrAdmin);
+  // 오직 관리자(admin)만 공지 작성/수정/삭제 관리 가능 (교사/학생은 열람 전용)
+  const canManageNotice = Boolean(isAdmin);
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
