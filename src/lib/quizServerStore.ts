@@ -79,13 +79,15 @@ export function mergeServerLiveStates(current: any, incoming: any): any {
   if (!current) return incoming;
   if (!incoming) return current;
 
-  // 새 게임 시작 등으로 waiting 상태로 명시적 리셋하는 경우
-  if (incoming.status === 'waiting' && (incoming.currentQuestionIndex === 0 || incoming.currentQuestionIndex === undefined)) {
+  // 새 게임 시작 등으로 waiting 상태로 명시적 리셋을 요청한 경우만 리셋 허용
+  if (incoming.isReset && incoming.status === 'waiting') {
     return {
       ...current,
       ...incoming,
+      status: 'waiting',
+      currentQuestionIndex: 0,
       participants: mergeParticipants(current.participants, incoming.participants),
-      answersSubmitted: incoming.answersSubmitted || [],
+      answersSubmitted: [],
       updatedAt: Date.now(),
     };
   }
@@ -96,19 +98,20 @@ export function mergeServerLiveStates(current: any, incoming: any): any {
   let finalStatus = incoming.status || current.status;
   let finalQuestionIndex = inQ;
 
-  // 1. finished 상태라면 어떤 경우에도 다른 상태(reveal, question)로 역행하지 않음
-  if (incoming.status === 'finished') {
+  // 1. finished 상태라면 어떤 경우에도 다른 상태(reveal, question, waiting)로 역행하지 않음
+  if (incoming.status === 'finished' || current.status === 'finished') {
     finalStatus = 'finished';
     finalQuestionIndex = Math.max(currQ, inQ);
-  } else if (current.status === 'finished') {
-    finalStatus = 'finished';
-    finalQuestionIndex = Math.max(currQ, inQ);
+  } else if (current.status !== 'waiting' && incoming.status === 'waiting') {
+    // 2. 이미 퀴즈가 시작(question, reveal)되었으면 waiting으로 절대 역행 불가!
+    finalStatus = current.status;
+    finalQuestionIndex = currQ;
   } else if (currQ > inQ) {
-    // 2. 현재 문제 인덱스가 더 앞서 있다면 이전 인덱스/상태로 되돌리지 않음
+    // 3. 현재 문제 인덱스가 더 앞서 있다면 이전 인덱스/상태로 되돌리지 않음
     finalQuestionIndex = currQ;
     finalStatus = current.status;
   } else if (currQ === inQ) {
-    // 3. 동일 문제 번호에서는 reveal -> question 역행 불가
+    // 4. 동일 문제 번호에서는 reveal -> question 역행 불가
     if (current.status === 'reveal' && incoming.status === 'question') {
       finalStatus = 'reveal';
     }
@@ -121,6 +124,7 @@ export function mergeServerLiveStates(current: any, incoming: any): any {
     currentQuestionIndex: finalQuestionIndex,
     participants: mergeParticipants(current.participants, incoming.participants),
     answersSubmitted: mergeAnswers(current.answersSubmitted, incoming.answersSubmitted),
+    questionStartedAt: incoming.questionStartedAt || current.questionStartedAt,
     updatedAt: Math.max(current.updatedAt || 0, incoming.updatedAt || 0, Date.now()),
   };
 }
@@ -296,7 +300,9 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
 
   const memoryState = serverQuizStore.liveStates.get(pin);
   // 메모리와 DB 중 더 최신 상태로 단조 증가 병합 (진행 상태가 절대 누락되거나 지연되지 않음)
-  const finalState = mergeServerLiveStates(remoteState || memoryState, memoryState || remoteState);
+  const finalState = remoteState
+    ? mergeServerLiveStates(remoteState, memoryState)
+    : (memoryState || null);
 
   if (finalState) {
     serverQuizStore.liveStates.set(pin, finalState);

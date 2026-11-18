@@ -545,13 +545,10 @@ export function applyMonotonicQuizState(prev: LiveQuizState | null, incoming: Li
 
 export function setLiveQuizState(state: LiveQuizState, syncRemote: boolean = true): void {
   const prev = getLiveQuizState(state.pin);
-  const mergedParticipants = mergeParticipantsList(prev?.participants, state.participants);
-  const mergedAnswers = mergeAnswersList(prev?.answersSubmitted, state.answersSubmitted);
+  const combined = applyMonotonicQuizState(prev, state);
 
   const stateWithTime: LiveQuizState = {
-    ...state,
-    participants: mergedParticipants,
-    answersSubmitted: mergedAnswers,
+    ...combined,
     updatedAt: state.updatedAt || Date.now(),
   };
   localStorage.setItem(`${LIVE_STATE_KEY_PREFIX}${stateWithTime.pin}`, JSON.stringify(stateWithTime));

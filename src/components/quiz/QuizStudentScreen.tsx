@@ -309,13 +309,16 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
       setNickname(finalNick);
     }
 
-    await clientJoinRoom(pin, {
+    const updatedState = await clientJoinRoom(pin, {
       id: studentIdRef.current,
       nickname: finalNick,
       avatarId: selectedAvatar.id,
       avatarUrl: selectedAvatar.imageUrl,
       avatarEmoji: selectedAvatar.emoji,
     });
+    if (updatedState) {
+      setLiveState((prev) => applyMonotonicQuizState(prev, updatedState));
+    }
     setIsJoined(true);
   };
 
