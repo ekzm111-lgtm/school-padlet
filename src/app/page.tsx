@@ -32,6 +32,7 @@ import {
   Bell,
   Pin,
   PinOff,
+  Image as ImageIcon,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import StudentHomeView from '@/components/StudentHomeView';
@@ -39,6 +40,7 @@ import CreateBoardModal from '@/components/CreateBoardModal';
 import EditBoardModal from '@/components/EditBoardModal';
 import QrModal from '@/components/QrModal';
 import NoticeModal from '@/components/NoticeModal';
+import BannerSettingsModal from '@/components/BannerSettingsModal';
 import Footer from '@/components/Footer';
 import { getStoreData, saveStoreData, duplicateBoard, getMyBoardIds } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -51,8 +53,11 @@ import {
   fetchRemoteUsers,
   fetchRemoteUserPrefs,
   saveRemoteUserPrefs,
+  fetchRemoteBannerSettings,
+  saveRemoteBannerSettings,
+  DEFAULT_BANNER_SETTINGS,
 } from '@/lib/supabaseStore';
-import { Board, User, Notice } from '@/lib/types';
+import { Board, User, Notice, BannerSettings } from '@/lib/types';
 import confetti from 'canvas-confetti';
 
 // 🔑 사용자 계정별(ID/이메일/아이디) 고유 식별 키 추출 헬퍼
@@ -96,6 +101,11 @@ export default function HomePage() {
   const [userPinnedIds, setUserPinnedIds] = useState<string[]>([]);
   const [userOrderMap, setUserOrderMap] = useState<Record<string, number>>({});
 
+  // 🖼️ 메인 배너 이미지 및 슬라이드쇼 상태
+  const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
+  const [showBannerModal, setShowBannerModal] = useState<boolean>(false);
+
   // 🎛️ 메인 페이지 보드 카드 크기 유동 조절 상태: 'auto'(개수에 따라 유동 조절) | 'large'(크게) | 'medium'(보통) | 'compact'(작게)
   const [cardDensity, setCardDensity] = useState<'auto' | 'large' | 'medium' | 'compact'>('auto');
 
@@ -109,6 +119,16 @@ export default function HomePage() {
       } catch (e) {}
     }
   }, []);
+
+  // 🖼️ 배너 자동 슬라이드 롤링 타이머
+  useEffect(() => {
+    if (!bannerSettings.autoSlide || !bannerSettings.slides || bannerSettings.slides.length <= 1) return;
+    const intervalMs = Math.max(2, bannerSettings.intervalSeconds || 5) * 1000;
+    const timer = setInterval(() => {
+      setCurrentSlideIndex((prev) => (prev + 1) % bannerSettings.slides.length);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [bannerSettings.autoSlide, bannerSettings.intervalSeconds, bannerSettings.slides?.length]);
 
   const handleChangeCardDensity = (density: 'auto' | 'large' | 'medium' | 'compact') => {
     setCardDensity(density);
@@ -251,6 +271,17 @@ export default function HomePage() {
       }
     } catch (e) {}
 
+    // 🖼️ 로컬 메인 배너 이미지 및 슬라이드 설정 로드
+    try {
+      const cachedBanner = localStorage.getItem('schoolpad_banner_settings');
+      if (cachedBanner) {
+        const parsed = JSON.parse(cachedBanner);
+        if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+          setBannerSettings(parsed);
+        }
+      }
+    } catch (e) {}
+
     // 로컬 공지사항 로드
     try {
       const cachedNotice = localStorage.getItem('schoolpad_global_notice');
@@ -261,6 +292,26 @@ export default function HomePage() {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        // 🖼️ 메인 배너 이미지 원격 동기화
+        fetchRemoteBannerSettings()
+          .then((remBanner) => {
+            if (remBanner && Array.isArray(remBanner.slides) && remBanner.slides.length > 0) {
+              let localTime = 0;
+              try {
+                const cached = localStorage.getItem('schoolpad_banner_settings');
+                if (cached) localTime = JSON.parse(cached).updatedAt || 0;
+              } catch (e) {}
+
+              if ((remBanner.updatedAt || 0) >= localTime) {
+                setBannerSettings(remBanner);
+                try {
+                  localStorage.setItem('schoolpad_banner_settings', JSON.stringify(remBanner));
+                } catch (e) {}
+              }
+            }
+          })
+          .catch(() => {});
+
         // 📌 사용자별 원격 고정(Pin) 및 순서(Order) 실시간 동기화
         fetchRemoteUserPrefs(userKey)
           .then((remPrefs) => {
@@ -601,6 +652,23 @@ export default function HomePage() {
     }
   };
 
+  // 🖼️ 메인 배너 이미지 및 슬라이드 설정 저장 (관리자/교사 전용)
+  const handleSaveBannerSettings = async (newSettings: BannerSettings) => {
+    const nowTime = Date.now();
+    const stamped = { ...newSettings, updatedAt: nowTime };
+    setBannerSettings(stamped);
+    setCurrentSlideIndex(0);
+    try {
+      localStorage.setItem('schoolpad_banner_settings', JSON.stringify(stamped));
+    } catch (e) {}
+
+    if (isSupabaseConfigured) {
+      await saveRemoteBannerSettings(stamped).catch((err) => {
+        console.error('Remote banner save error:', err);
+      });
+    }
+  };
+
   // 1) 좌/우 화살표 버튼으로 한 칸씩 순서 이동 (아이디별 독립 순서 저장)
   const handleMoveBoardStep = async (e: React.MouseEvent, boardId: string, direction: 'prev' | 'next', currentList: Board[]) => {
     e.stopPropagation();
@@ -815,18 +883,96 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 학교/교실 실사진 배경의 단정하고 깔끔한 프리미엄 배너 */}
-        <div className="relative overflow-hidden rounded-[2rem] text-white p-7 sm:p-10 shadow-xl mb-8 border border-white/20 min-h-[300px] flex items-center">
-          {/* 한국 교실 실사진 배경 */}
-          <div
-            className="absolute inset-0 bg-cover bg-[center_top_25%]"
-            style={{
-              backgroundImage: `url('/korean_classroom_banner.jpg')`,
-            }}
-          />
+        {/* 학교/교실 실사진 배경의 단정하고 깔끔한 프리미엄 배너 (여러 장 슬라이드쇼 회전 지원) */}
+        <div className="relative overflow-hidden rounded-[2rem] text-white p-7 sm:p-10 shadow-xl mb-8 border border-white/20 min-h-[300px] flex items-center group">
+          {/* 슬라이드 이미지들 (부드러운 크로스페이드 전환) */}
+          {(bannerSettings.slides && bannerSettings.slides.length > 0
+            ? bannerSettings.slides
+            : DEFAULT_BANNER_SETTINGS.slides
+          ).map((slide, sIdx) => {
+            const isCurrent = sIdx === currentSlideIndex;
+            return (
+              <div
+                key={slide.id || sIdx}
+                className={`absolute inset-0 bg-cover bg-[center_top_25%] transition-opacity duration-1000 ease-in-out ${
+                  isCurrent ? 'opacity-100 z-0' : 'opacity-0 -z-10 pointer-events-none'
+                }`}
+                style={{
+                  backgroundImage: `url('${slide.url}')`,
+                }}
+              />
+            );
+          })}
 
           {/* 선명한 텍스트 가독성을 위한 고급 그라데이션 오버레이 */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-blue-950/85 to-indigo-950/70 backdrop-blur-[0.5px]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-blue-950/85 to-indigo-950/70 backdrop-blur-[0.5px] z-1 pointer-events-none" />
+
+          {/* 좌 / 우 슬라이드 이동 화살표 버튼 (2장 이상일 때 노출) */}
+          {bannerSettings.slides && bannerSettings.slides.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIndex((prev) => (prev - 1 + bannerSettings.slides.length) % bannerSettings.slides.length);
+                }}
+                className="absolute left-3 sm:left-4 z-20 p-2 rounded-full bg-black/35 hover:bg-black/60 text-white/80 hover:text-white backdrop-blur-md transition opacity-0 group-hover:opacity-100 shadow-md active:scale-90"
+                title="이전 배경 사진"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIndex((prev) => (prev + 1) % bannerSettings.slides.length);
+                }}
+                className="absolute right-3 sm:right-4 z-20 p-2 rounded-full bg-black/35 hover:bg-black/60 text-white/80 hover:text-white backdrop-blur-md transition opacity-0 group-hover:opacity-100 shadow-md active:scale-90"
+                title="다음 배경 사진"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* 하단 슬라이드 인디케이터 점(Dots) */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
+                {bannerSettings.slides.map((_, dotIdx) => (
+                  <button
+                    key={dotIdx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentSlideIndex(dotIdx);
+                    }}
+                    className={`h-1.5 rounded-full transition-all ${
+                      dotIdx === currentSlideIndex ? 'w-5 bg-white shadow-xs' : 'w-1.5 bg-white/40 hover:bg-white/70'
+                    }`}
+                    title={`${dotIdx + 1}번째 이미지`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* 교사 또는 관리자를 위한 [🖼️ 배너 이미지 변경] 버튼 */}
+          {(currentUser?.role === 'admin' || currentUser?.role === 'teacher') && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowBannerModal(true);
+              }}
+              className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 hover:bg-black/60 text-white/90 hover:text-white text-[11px] font-bold backdrop-blur-md border border-white/20 transition shadow-md active:scale-95 cursor-pointer"
+              title="메인 배경 이미지 변경 및 슬라이드 관리"
+            >
+              <ImageIcon className="w-3.5 h-3.5 text-amber-300" />
+              <span>배너 이미지 변경</span>
+              {bannerSettings.slides && bannerSettings.slides.length > 1 && (
+                <span className="px-1.5 py-0.2 bg-white/20 rounded-full font-mono text-[9px]">
+                  {currentSlideIndex + 1}/{bannerSettings.slides.length}
+                </span>
+              )}
+            </button>
+          )}
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8 w-full">
             <div className="max-w-2xl">
@@ -1621,6 +1767,14 @@ export default function HomePage() {
         notice={notice}
         onSave={handleSaveNotice}
         isAdmin={currentUser?.role === 'admin'}
+      />
+
+      {/* 🖼️ 메인 배너 이미지 및 슬라이드쇼 관리 모달 */}
+      <BannerSettingsModal
+        isOpen={showBannerModal}
+        onClose={() => setShowBannerModal(false)}
+        settings={bannerSettings}
+        onSave={handleSaveBannerSettings}
       />
     </div>
   );

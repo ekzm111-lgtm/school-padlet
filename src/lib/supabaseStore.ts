@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Board, Post, User, FileAttachment, UserRole, SystemSettings, Notice } from './types';
+import { Board, Post, User, FileAttachment, UserRole, SystemSettings, Notice, BannerSettings } from './types';
 
 // Supabase 테이블 데이터 <-> SchoolPad 로컬 타입 상호 변환기
 
@@ -878,6 +878,80 @@ export async function fetchRemoteUserPrefs(userKey: string): Promise<UserPrefere
 
     if (error || !data?.content) return null;
     return JSON.parse(data.content) as UserPreferences;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 🖼️ 메인 배너 이미지 기본 프리셋 및 원격 동기화
+export const DEFAULT_BANNER_SETTINGS: BannerSettings = {
+  slides: [
+    {
+      id: 'default-1',
+      url: '/korean_classroom_banner.jpg',
+      title: '한국형 교실 풍경',
+    },
+    {
+      id: 'default-2',
+      url: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1600&auto=format&fit=crop&q=80',
+      title: '밝고 쾌적한 교실',
+    },
+    {
+      id: 'default-3',
+      url: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1600&auto=format&fit=crop&q=80',
+      title: '열정적인 수업과 발표',
+    },
+    {
+      id: 'default-4',
+      url: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1600&auto=format&fit=crop&q=80',
+      title: '함께 탐구하는 학생들',
+    },
+  ],
+  autoSlide: true,
+  intervalSeconds: 5,
+};
+
+export async function saveRemoteBannerSettings(settings: BannerSettings): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    await supabase.from('boards').upsert({
+      id: '__SYSTEM_USERS__',
+      code: 'SYSUSER',
+      title: '__SYSTEM_USERS__',
+      description: 'System User Registry for Cross-Device Sync',
+      is_public: false,
+      author_id: 'system',
+      author_name: '시스템',
+    });
+
+    const { error } = await supabase.from('posts').upsert({
+      id: 'schoolpad_banner_settings',
+      board_id: '__SYSTEM_USERS__',
+      title: 'Main Banner Settings',
+      content: JSON.stringify({ ...settings, updatedAt: Date.now() }),
+      author_id: 'admin',
+      author_name: '관리자',
+      column_name: '__banner_settings__',
+    });
+    return !error;
+  } catch (e) {
+    console.error('saveRemoteBannerSettings error:', e);
+    return false;
+  }
+}
+
+export async function fetchRemoteBannerSettings(): Promise<BannerSettings | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('content')
+      .eq('id', 'schoolpad_banner_settings')
+      .eq('board_id', '__SYSTEM_USERS__')
+      .maybeSingle();
+
+    if (error || !data?.content) return null;
+    return JSON.parse(data.content) as BannerSettings;
   } catch (e) {
     return null;
   }

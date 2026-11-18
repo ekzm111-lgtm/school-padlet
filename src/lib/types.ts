@@ -112,3 +112,16 @@ export interface Notice {
   createdAt: string;
   updatedAt?: number;
 }
+
+export interface BannerSlide {
+  id: string;
+  url: string;
+  title?: string;
+}
+
+export interface BannerSettings {
+  slides: BannerSlide[];
+  autoSlide: boolean;
+  intervalSeconds: number;
+  updatedAt?: number;
+}

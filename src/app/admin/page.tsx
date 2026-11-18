@@ -24,12 +24,14 @@ import {
   Pencil,
   Globe,
   Megaphone,
+  Image as ImageIcon,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import NoticeModal from '@/components/NoticeModal';
+import BannerSettingsModal from '@/components/BannerSettingsModal';
 import { getStoreData, saveStoreData } from '@/lib/store';
-import { User, SystemSettings, Board, Notice } from '@/lib/types';
+import { User, SystemSettings, Board, Notice, BannerSettings } from '@/lib/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   fetchRemoteUsers,
@@ -43,6 +45,9 @@ import {
   deleteRemotePost,
   fetchRemoteNotice,
   saveRemoteNotice,
+  fetchRemoteBannerSettings,
+  saveRemoteBannerSettings,
+  DEFAULT_BANNER_SETTINGS,
 } from '@/lib/supabaseStore';
 
 export default function AdminPage() {
@@ -53,6 +58,8 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<SystemSettings>(getStoreData().settings);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
+  const [showBannerModal, setShowBannerModal] = useState(false);
   const [activeTab, setActiveTabState] = useState<'pending' | 'users' | 'boards' | 'adminPw'>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -98,6 +105,17 @@ export default function AdminPage() {
     setBoards(data.boards);
     setSettings(data.settings);
 
+    // 로컬 배너 설정 로드
+    try {
+      const cachedBanner = localStorage.getItem('schoolpad_banner_settings');
+      if (cachedBanner) {
+        const parsed = JSON.parse(cachedBanner);
+        if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+          setBannerSettings(parsed);
+        }
+      }
+    } catch (e) {}
+
     // 로컬 공지사항 로드
     try {
       const cachedNotice = localStorage.getItem('schoolpad_global_notice');
@@ -109,12 +127,27 @@ export default function AdminPage() {
     // 🌟 원격 Supabase 클라우드에서 최신 사용자, 보드 및 시스템 설정 불러오기
     if (isSupabaseConfigured) {
       try {
-        const [remoteUsers, remoteSettings, remoteBoards, remoteNotice] = await Promise.all([
+        const [remoteUsers, remoteSettings, remoteBoards, remoteNotice, remoteBanner] = await Promise.all([
           fetchRemoteUsers(),
           fetchRemoteSettings(),
           fetchRemoteBoards(),
           fetchRemoteNotice(),
+          fetchRemoteBannerSettings(),
         ]);
+
+        if (remoteBanner && Array.isArray(remoteBanner.slides) && remoteBanner.slides.length > 0) {
+          let localTime = 0;
+          try {
+            const cached = localStorage.getItem('schoolpad_banner_settings');
+            if (cached) localTime = JSON.parse(cached).updatedAt || 0;
+          } catch (e) {}
+          if ((remoteBanner.updatedAt || 0) >= localTime) {
+            setBannerSettings(remoteBanner);
+            try {
+              localStorage.setItem('schoolpad_banner_settings', JSON.stringify(remoteBanner));
+            } catch (e) {}
+          }
+        }
 
         if (remoteNotice !== null) {
           let localTime = 0;
@@ -682,6 +715,23 @@ export default function AdminPage() {
     showToast('전체 공지사항 설정이 성공적으로 저장되었습니다.');
   };
 
+  // 🖼️ 메인 배너 이미지 설정 저장
+  const handleSaveBannerSettings = async (newSettings: BannerSettings) => {
+    const nowTime = Date.now();
+    const stamped = { ...newSettings, updatedAt: nowTime };
+    setBannerSettings(stamped);
+    try {
+      localStorage.setItem('schoolpad_banner_settings', JSON.stringify(stamped));
+    } catch (e) {}
+
+    if (isSupabaseConfigured) {
+      await saveRemoteBannerSettings(stamped).catch((err) => {
+        console.error('Remote banner save error:', err);
+      });
+    }
+    showToast('메인 배너 이미지 및 슬라이드 설정이 저장되었습니다.');
+  };
+
   const pendingUsers = users.filter((u) => u.status === 'pending');
   const rejectedUsers = users.filter((u) => u.status === 'rejected');
   const filteredUsers = users.filter(
@@ -728,6 +778,15 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
+            {/* 메인 배너 이미지 관리 버튼 */}
+            <button
+              onClick={() => setShowBannerModal(true)}
+              className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-sm transition active:scale-95 cursor-pointer"
+            >
+              <ImageIcon className="w-4 h-4 text-indigo-200" />
+              <span>메인 배너 이미지 관리</span>
+            </button>
+
             {/* 전체 공지사항 관리 버튼 */}
             <button
               onClick={() => setShowNoticeModal(true)}
@@ -1361,6 +1420,14 @@ export default function AdminPage() {
         onSave={handleSaveNotice}
         isAdmin={true}
         isTeacherOrAdmin={true}
+      />
+
+      {/* 🖼️ 메인 배너 관리 모달 */}
+      <BannerSettingsModal
+        isOpen={showBannerModal}
+        onClose={() => setShowBannerModal(false)}
+        settings={bannerSettings}
+        onSave={handleSaveBannerSettings}
       />
     </div>
   );
