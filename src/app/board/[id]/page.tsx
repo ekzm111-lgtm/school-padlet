@@ -558,18 +558,24 @@ export default function BoardDetailPage() {
             // 🔥 원격 Supabase DB를 절대적인 단일 진실 원천(Single Source of Truth)으로 사용
             const remoteMap = new Map(remote.map((p: Post) => [p.id, p]));
 
-            // 로컬에만 있고 원격에 아직 없는 새 미동기화 카드가 있다면 원격에 안전하게 보강 (다른 사람의 글 삭제 원천 방지)
-            const unsyncedLocal = (localBoardPosts || []).filter(
-              (lp) => !remoteMap.has(lp.id) && !remote.some((r: Post) => r.column === lp.column && r.title.trim() && r.title.trim() === lp.title.trim())
+            // 오직 현재 브라우저에서 방금 작성하여 아직 업로드 진행 중인 초단기 대기 카드만 보존 (그 외 원격에 없는 카드는 삭제된 것이므로 재업로드 금지!)
+            const localPending = (localBoardPosts || []).filter(
+              (lp) =>
+                !remoteMap.has(lp.id) &&
+                !isPostDeleted(lp.id) &&
+                (lp as any)._isPendingUpload &&
+                Date.now() - ((lp as any)._createdAtMs || 0) < 15000
             );
 
-            if (unsyncedLocal.length > 0) {
-              unsyncedLocal.forEach((p) => {
+            if (localPending.length > 0) {
+              localPending.forEach((p) => {
                 saveRemotePost(p).catch(() => {});
               });
             }
 
-            let finalPosts = unsyncedLocal.length > 0 ? [...remote, ...unsyncedLocal] : remote;
+            // 원격에서 삭제된 카드는 절대 부활시키지 않고 클라우드 상태를 100% 온전히 수용
+            let finalPosts = localPending.length > 0 ? [...remote, ...localPending] : remote;
+            finalPosts = finalPosts.filter((p: Post) => !isPostDeleted(p.id));
 
             // 🌟 복제본 보드인데 카드가 0개로 비어있는 경우, 원본 템플릿 카드 자동 복원 및 원격 저장!
             if (
@@ -714,8 +720,8 @@ export default function BoardDetailPage() {
     const syncRemoteData = async () => {
       if (!isSupabaseConfigured || !supabase) return;
       if (isSyncingRef.current) return;
-      // 사용자가 최근 8초 내에 카드를 조작했다면 원격 폴링으로 인한 덮어쓰기 방지
-      if (Date.now() - lastUserActionTimeRef.current < 4000) return;
+      // 카드 드래그 이동 중에만 덮어쓰기 방지
+      if (draggingId || draggedPostId) return;
 
       isSyncingRef.current = true;
       try {
@@ -728,8 +734,8 @@ export default function BoardDetailPage() {
 
         if (remote && Array.isArray(remote)) {
           setPosts((prevPosts) => {
-            // 사용자가 최근 15초 내에 카드를 이동/조작했다면 원격 폴링으로 인한 순서 롤백 완전 방지!
-            if (Date.now() - lastUserActionTimeRef.current < 15000) return prevPosts;
+            // 카드 드래그 조작 중에는 덮어쓰지 않음
+            if (draggingId || draggedPostId) return prevPosts;
 
             const buildSig = (list: Post[]) =>
               list
@@ -938,7 +944,7 @@ export default function BoardDetailPage() {
       if (!document.hidden) {
         syncRemoteData();
       }
-    }, 3000);
+    }, 1500);
 
     return () => {
       if (channel && supabase) {
