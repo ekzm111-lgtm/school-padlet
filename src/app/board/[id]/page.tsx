@@ -45,7 +45,7 @@ import BoardParticipantsModal, { BoardParticipant } from '@/components/BoardPart
 import BoardQuizModal from '@/components/quiz/BoardQuizModal';
 import { QuizHostScreen } from '@/components/quiz/QuizHostScreen';
 import { QuizStudentScreen } from '@/components/quiz/QuizStudentScreen';
-import { getStoreData, saveStoreData, duplicateBoard, deletePost, getMyPostIds } from '@/lib/store';
+import { getStoreData, saveStoreData, duplicateBoard, deletePost, getMyPostIds, markPostAsDeleted, isPostDeleted } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchRemotePosts, saveRemoteBoard, saveRemotePost, saveRemotePosts, saveAllRemotePosts, deleteRemotePost, saveRemoteBoardActiveQuiz, fetchRemoteBoardActiveQuiz } from '@/lib/supabaseStore';
 import { Board, Post, User, BoardLayout } from '@/lib/types';
@@ -743,39 +743,37 @@ export default function BoardDetailPage() {
             const remoteSig = buildSig(remote);
             if (prevSig === remoteSig) return prevPosts;
 
-            // 🔥 로컬 중복 방지 및 원격-로컬 스마트 병합 (보드 수정이나 폴링 시 카드 증발 원천 차단)
-            const myPostIds = getMyPostIds();
-            const remoteMap = new Map(remote.map((p) => [p.id, p]));
+            // 🗑️ 삭제된 카드는 원격 목록에서도 영구 제외
+            const cleanRemote = remote.filter((r) => !isPostDeleted(r.id));
+            const remoteMap = new Map(cleanRemote.map((p) => [p.id, p]));
             
+            // 🔥 오직 현재 브라우저에서 방금 작성하여 아직 원격에 업로드 대기 중인 새 카드만 보존 (그 외 원격에 없는 카드는 삭제된 것이므로 자동 소거!)
             const localPending: Post[] = [];
             for (const p of prevPosts) {
               if (remoteMap.has(p.id)) continue;
+              if (isPostDeleted(p.id)) continue;
 
-              // 원격에 동일한 제목과 열을 가진 카드가 이미 있다면(예: 단축키 카드) 원격 ID로 자동 통합하여 중복 방지
-              const sameRemote = remote.find(
+              // 원격에 동일한 내용의 카드가 이미 있다면 원격 데이터 우선 채택
+              const sameRemote = cleanRemote.find(
                 (r) => r.column === p.column && r.title.trim() && r.title.trim() === p.title.trim()
               );
-              if (sameRemote) {
-                continue; // 원격 데이터 우선 채택
+              if (sameRemote) continue;
+
+              // ⏱️ 사용자가 이 기기에서 방금 막(15초 이내) 작성하여 업로드 대기 중인 새 글만 보존
+              const isMyPendingUpload =
+                (p as any)._isPendingUpload &&
+                Date.now() - ((p as any)._createdAtMs || 0) < 15000;
+
+              if (isMyPendingUpload) {
+                localPending.push(p);
+                if (isSupabaseConfigured) {
+                  saveRemotePost(p).catch(() => {});
+                }
               }
-
-              // 🔥 핵심: 원격이 비어있거나(remote.length === 0), 현재 보드에 속한 로컬 카드인 경우 절대 삭제하지 않고 보존
-              const isMineOrValidLocal =
-                myPostIds.includes(p.id) ||
-                (currentUser && (p.authorId === currentUser.id || p.authorName === currentUser.name)) ||
-                remote.length === 0 ||
-                p.boardId === targetBoardId;
-
-              if (!isMineOrValidLocal) continue;
-
-              localPending.push(p);
-              // 원격에 아직 없는 로컬 새 글이면 백그라운드로 즉시 upsert
-              if (isSupabaseConfigured) {
-                saveRemotePost(p).catch(() => {});
-              }
+              // ⚠️ 원격에 없는 기존 카드는 누군가(선생님/학생) 삭제한 것이므로 다시 업로드(부활)하지 않고 자동 제거!
             }
 
-            let merged = localPending.length > 0 ? [...remote, ...localPending] : remote;
+            let merged = localPending.length > 0 ? [...cleanRemote, ...localPending] : cleanRemote;
 
             // 🔥 엔트리 중학교 보드: 모든 카드 배경 흰색('white') 보장
             if (targetBoardId === 'board-entry-middle-school' || targetBoardId === '334455') {
@@ -1812,6 +1810,7 @@ export default function BoardDetailPage() {
   const handleDeletePost = async (postId: string) => {
     if (!confirm('이 카드를 정말 삭제하시겠습니까?')) return;
     lastUserActionTimeRef.current = Date.now();
+    markPostAsDeleted(postId);
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     await deletePost(postId);
     if (isSupabaseConfigured) {
@@ -1822,9 +1821,15 @@ export default function BoardDetailPage() {
   // 카드 생성 콜백 (중복 생성 방어 및 새 모둠 자동 반영)
   const handlePostCreated = async (newPost: Post, newColName?: string) => {
     lastUserActionTimeRef.current = Date.now();
+    const postWithPending: Post = {
+      ...newPost,
+      _isPendingUpload: true,
+      _createdAtMs: Date.now(),
+    } as any;
+
     setPosts((prev) => {
       if (prev.some((p) => p.id === newPost.id)) return prev;
-      return [newPost, ...prev];
+      return [postWithPending, ...prev];
     });
 
     if (isSupabaseConfigured) {

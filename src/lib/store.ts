@@ -633,9 +633,9 @@ export const getStoreData = (): StoreData => {
 
   let postsList: Post[] = memoryPostsCache || (storedPosts ? JSON.parse(storedPosts) : INITIAL_POSTS);
 
-  // 🧹 퀴즈 시스템 메타데이터 카드(Active Quiz)가 로컬 캐시에 남아있다면 영구 소거
+  // 🧹 삭제된 카드 및 퀴즈 시스템 메타데이터 카드(Active Quiz)가 로컬 캐시에 남아있다면 영구 소거
   const cleanPosts = postsList.filter(
-    (p) => !p.id?.startsWith('active_quiz_') && p.column !== '__active_quiz__' && !p.title?.startsWith('Active Quiz')
+    (p) => !isPostDeleted(p.id) && !p.id?.startsWith('active_quiz_') && p.column !== '__active_quiz__' && !p.title?.startsWith('Active Quiz')
   );
   if (cleanPosts.length !== postsList.length) {
     postsList = cleanPosts;
@@ -885,8 +885,35 @@ export const saveStoreData = {
   },
 };
 
+const DELETED_POSTS_KEY = 'schoolpad_deleted_post_ids';
+
+// 🗑️ 삭제된 카드 ID 영구 블랙리스트 등록 (다른 기기/폴링으로 인한 부활 원천 차단)
+export const markPostAsDeleted = (postId: string) => {
+  if (typeof window === 'undefined' || !postId) return;
+  try {
+    const raw = localStorage.getItem(DELETED_POSTS_KEY);
+    const set = new Set<string>(raw ? JSON.parse(raw) : []);
+    set.add(postId);
+    const arr = Array.from(set).slice(-500);
+    localStorage.setItem(DELETED_POSTS_KEY, JSON.stringify(arr));
+  } catch (e) {}
+};
+
+export const isPostDeleted = (postId: string): boolean => {
+  if (typeof window === 'undefined' || !postId) return false;
+  try {
+    const raw = localStorage.getItem(DELETED_POSTS_KEY);
+    if (!raw) return false;
+    const set = new Set<string>(JSON.parse(raw));
+    return set.has(postId);
+  } catch (e) {
+    return false;
+  }
+};
+
 // 🔥 개별 쪽지/카드 영구 삭제 함수 (로컬 + Supabase 클라우드 DB 연동)
 export const deletePost = async (postId: string) => {
+  markPostAsDeleted(postId);
   if (typeof window !== 'undefined') {
     const data = getStoreData();
     const updated = data.posts.filter((p) => p.id !== postId);
