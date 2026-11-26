@@ -166,29 +166,8 @@ export async function getQuizRoomServer(pin: string): Promise<any> {
     } catch {}
   }
 
-  // 메모리에 다른 방이 있다면 최신 방 기반으로 PIN 복원
-  if (serverQuizStore.rooms.size > 0) {
-    const all = Array.from(serverQuizStore.rooms.values());
-    const latest = all[all.length - 1];
-    const recovered = { ...latest, pin, isActive: true };
-    serverQuizStore.rooms.set(pin, recovered);
-    return recovered;
-  }
-
-  // 기본 엔트리 코딩 방 생성
-  const defaultRoom: QuizRoom = {
-    pin,
-    title: '중학교 코딩 교육 엔트리(Entry) 지필평가',
-    subject: 'entry',
-    createdAt: new Date().toLocaleString(),
-    examInfo: defaultEntryExamInfo,
-    questions: defaultEntryQuestions,
-    timePerQuestion: 20,
-    allowAnonymous: true,
-    isActive: true,
-  };
-  serverQuizStore.rooms.set(pin, defaultRoom);
-  return defaultRoom;
+  // 🛡️ 존재하지 않는 PIN인 경우 무단 복제/유출 없이 정확히 null 반환 (404 보장)
+  return null;
 }
 
 export async function saveQuizRoomServer(pin: string, roomData: any): Promise<void> {
@@ -266,7 +245,17 @@ export async function deleteQuizRoomServer(pin: string): Promise<void> {
 // =========================================================================
 // 2. 퀴즈 실시간 진행 상태 (public.quiz_live_states)
 // =========================================================================
+
+// ⚡ 인메모리 1.2초 TTL 캐시 (초고빈도 폴링 시 Supabase 대역폭 및 연결 풀 고갈 원천 방어)
+const liveStateCache = new Map<string, { data: any; expiresAt: number }>();
+
 export async function getQuizLiveStateServer(pin: string): Promise<any> {
+  const now = Date.now();
+  const cached = liveStateCache.get(pin);
+  if (cached && now < cached.expiresAt) {
+    return cached.data;
+  }
+
   let remoteState: any = null;
 
   // 1. Supabase에서 최신 상태 조회 (서버리스 인스턴스 간 실시간 단일 진실 공급원)
@@ -295,22 +284,30 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
           updatedAt: row.updated_at ? Number(row.updated_at) : Date.now(),
         };
       }
-    } catch {}
+    } catch (e) {
+      // Supabase Egress 할당량 초과 시에도 500 크래시 없이 인메모리 자율 모드로 복구
+      console.warn('getQuizLiveStateServer remote query skipped/failed, using memory mode:', e);
+    }
   }
 
   const memoryState = serverQuizStore.liveStates.get(pin);
-  // 메모리와 DB 중 더 최신 상태로 단조 증가 병합 (진행 상태가 절대 누락되거나 지연되지 않음)
+  // 메모리와 DB 중 더 최신 상태로 단조 증가 병합
   const finalState = remoteState
     ? mergeServerLiveStates(remoteState, memoryState)
     : (memoryState || null);
 
   if (finalState) {
     serverQuizStore.liveStates.set(pin, finalState);
+    liveStateCache.set(pin, { data: finalState, expiresAt: now + 1200 });
     return finalState;
   }
 
-  // 둘 다 없으면 방 정보로부터 초기 생성
+  // 둘 다 없으면 방 정보 조회 (방이 없으면 null 반환)
   const room = await getQuizRoomServer(pin);
+  if (!room) {
+    return null;
+  }
+
   const initialState = {
     pin,
     status: 'waiting',
@@ -322,6 +319,7 @@ export async function getQuizLiveStateServer(pin: string): Promise<any> {
     updatedAt: Date.now(),
   };
   serverQuizStore.liveStates.set(pin, initialState);
+  liveStateCache.set(pin, { data: initialState, expiresAt: now + 1200 });
   return initialState;
 }
 
@@ -330,10 +328,12 @@ export async function saveQuizLiveStateServer(pin: string, patch: any): Promise<
   const merged = mergeServerLiveStates(current, patch);
 
   serverQuizStore.liveStates.set(pin, merged);
+  // 캐시 즉시 갱신
+  liveStateCache.set(pin, { data: merged, expiresAt: Date.now() + 1200 });
 
   if (supabase) {
     try {
-      // 서버리스 프로세스가 중단되기 전에 Supabase DB 쓰기 완료를 반드시 보장 (await)
+      // 서버리스 프로세스가 중단되기 전에 Supabase DB 쓰기 완료 보장 (실패해도 프로세스 중단 방지)
       await withTimeout(
         supabase
           .from('quiz_live_states')

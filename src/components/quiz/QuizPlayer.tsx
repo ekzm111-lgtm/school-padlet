@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import type { QuizRoom, QuizParticipantResult, QuizAvatar } from '@/types/quiz';
 import { QUIZ_AVATARS } from '@/types/quiz';
-import { getQuizRoom, submitQuizResult } from '@/utils/quizStorage';
+import { getQuizRoom, loadQuizRoomAsync, submitQuizResult } from '@/utils/quizStorage';
 import {
   playCorrectSound,
   playWrongSound,
@@ -84,13 +84,21 @@ export const QuizPlayer: React.FC<QuizPlayerProps> = ({ pin, onExit, onViewLeade
   // 답안 기록 목록
   const recordedAnswersRef = useRef<QuizParticipantResult['answers']>([]);
 
-  // 룸 데이터 로드
+  // 룸 데이터 로드 (로컬 캐시 확인 후 없을 시 서버 비동기 로딩)
   useEffect(() => {
-    const r = getQuizRoom(pin);
-    if (r) {
-      setRoom(r);
-      setTimeLeft(r.timePerQuestion > 0 ? r.timePerQuestion : 999);
+    let isMounted = true;
+    async function initRoom() {
+      let r = getQuizRoom(pin);
+      if (!r) {
+        r = await loadQuizRoomAsync(pin);
+      }
+      if (r && isMounted) {
+        setRoom(r);
+        setTimeLeft(r.timePerQuestion > 0 ? r.timePerQuestion : 999);
+      }
     }
+    initRoom();
+    return () => { isMounted = false; };
   }, [pin]);
 
   // 배경음악(BGM) 자동 전환 및 정지

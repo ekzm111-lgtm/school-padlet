@@ -8,6 +8,9 @@ export async function GET(req: NextRequest) {
   }
 
   const state = await getQuizLiveStateServer(pin);
+  if (!state) {
+    return NextResponse.json({ error: 'Quiz room not found' }, { status: 404 });
+  }
 
   const now = Date.now();
   const serverElapsedSec =

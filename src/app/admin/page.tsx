@@ -113,7 +113,12 @@ export default function AdminPage() {
       if (cachedBanner) {
         const parsed = JSON.parse(cachedBanner);
         if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
-          setBannerSettings(parsed);
+          setBannerSettings((prev) => {
+            if (prev && prev.updatedAt === parsed.updatedAt && JSON.stringify(prev) === cachedBanner) {
+              return prev;
+            }
+            return parsed;
+          });
         }
       }
     } catch (e) {}
@@ -144,7 +149,10 @@ export default function AdminPage() {
             if (cached) localTime = JSON.parse(cached).updatedAt || 0;
           } catch (e) {}
           if ((remoteBanner.updatedAt || 0) >= localTime) {
-            setBannerSettings(remoteBanner);
+            setBannerSettings((prev) => {
+              if (prev && prev.updatedAt === remoteBanner.updatedAt) return prev;
+              return remoteBanner;
+            });
             try {
               localStorage.setItem('schoolpad_banner_settings', JSON.stringify(remoteBanner));
             } catch (e) {}
@@ -718,6 +726,7 @@ export default function AdminPage() {
     setBannerSettings(stamped);
     try {
       localStorage.setItem('schoolpad_banner_settings', JSON.stringify(stamped));
+      window.dispatchEvent(new Event('schoolpad_banner_updated'));
     } catch (e) {}
 
     if (isSupabaseConfigured) {

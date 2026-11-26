@@ -10,6 +10,16 @@ export const PACKAGES_KEY = 'quizn_saved_packages';
 export const LIVE_STATE_KEY_PREFIX = 'quizn_live_state_';
 export const BROADCAST_CHANNEL_NAME = 'quizn_live_channel';
 
+// 안전한 JSON 파싱 헬퍼 (스토리지 손상 및 SyntaxError 예외 원천 방어)
+export function safeJsonParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 // 6자리 랜덤 PIN 생성기
 export function generateQuizPin(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -74,7 +84,7 @@ export function createQuizRoom(
 // 모든 퀴즈 룸 불러오기
 export function getAllQuizRooms(): Record<string, QuizRoom> {
   const data = localStorage.getItem(ROOMS_KEY);
-  return data ? JSON.parse(data) : {};
+  return safeJsonParse<Record<string, QuizRoom>>(data, {});
 }
 
 // 특정 PIN의 퀴즈 룸 가져오기 (로컬 캐시)
@@ -160,7 +170,7 @@ export function submitQuizResult(result: QuizParticipantResult): void {
 // 모든 퀴즈 결과 불러오기
 export function getAllQuizResults(): Record<string, QuizParticipantResult[]> {
   const data = localStorage.getItem(RESULTS_KEY);
-  return data ? JSON.parse(data) : {};
+  return safeJsonParse<Record<string, QuizParticipantResult[]>>(data, {});
 }
 
 // 특정 방의 리더보드 순위표 가져오기
@@ -228,7 +238,7 @@ export function deleteQuizRoom(pin: string): void {
 export function getAllSavedQuizPackages(): SavedQuizPackage[] {
   const data = localStorage.getItem(PACKAGES_KEY);
   if (data) {
-    return JSON.parse(data);
+    return safeJsonParse<SavedQuizPackage[]>(data, []);
   }
 
   // 기본 세트 2종 (엔트리 1종, 음악 1종) 자동 등록
@@ -404,7 +414,7 @@ export function updateSavedQuizPackage(
 
 export function getLiveQuizState(pin: string): LiveQuizState | null {
   const data = localStorage.getItem(`${LIVE_STATE_KEY_PREFIX}${pin}`);
-  return data ? JSON.parse(data) : null;
+  return safeJsonParse<LiveQuizState | null>(data, null);
 }
 
 export async function fetchLiveQuizStateAsync(pin: string): Promise<LiveQuizState | null> {
@@ -618,14 +628,14 @@ export function subscribeToQuizUpdates(
   };
   window.addEventListener('storage', storageHandler);
 
-  // 원격 스마트폰-PC 간 실시간 동기화를 위한 스마트 폴링 (탭 비활성화 시 자동 절약)
+  // 원격 스마트폰-PC 간 실시간 동기화를 위한 최적화 스마트 폴링 (Supabase Egress 절약 및 즉각 동기화)
   let pollTimer: any = null;
   let pollCount = 0;
   if (activePin && typeof window !== 'undefined') {
     pollTimer = setInterval(async () => {
       pollCount++;
-      // 탭이 백그라운드에 있을 때는 4회(2초)에 1번씩 폴링, 활성 탭일 때는 매 500ms(0.5초) 즉시 폴링
-      if (document.hidden && pollCount % 4 !== 0) return;
+      // 탭이 백그라운드에 있을 때는 3회(약 3초)에 1번씩 폴링, 활성 탭일 때는 매 1,000ms(1초) 안정 폴링
+      if (document.hidden && pollCount % 3 !== 0) return;
 
       try {
         const res = await fetch(`${getApiBaseUrl()}/api/quiz/live?pin=${activePin}`);
@@ -642,7 +652,7 @@ export function subscribeToQuizUpdates(
           }
         }
       } catch {}
-    }, 500);
+    }, 1000);
   }
 
   return () => {

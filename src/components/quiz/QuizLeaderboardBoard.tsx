@@ -831,6 +831,7 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                           return {
                             py: 'py-10 md:py-14',
                             bg: 'bg-gradient-to-b from-amber-400 to-yellow-500 border-amber-300',
+                            textColor: 'text-amber-950 font-black',
                             label: isTie ? '🥇 1위 (공동)' : '🥇 1위',
                             crown: true,
                             scoreColor: 'text-amber-600',
@@ -840,6 +841,7 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                           return {
                             py: 'py-6 md:py-8',
                             bg: 'bg-slate-300 border-slate-400',
+                            textColor: 'text-slate-900 font-black',
                             label: isTie ? '🥈 2위 (공동)' : '🥈 2위',
                             crown: false,
                             scoreColor: 'text-indigo-600',
@@ -848,7 +850,8 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                         if (rank === 3) {
                           return {
                             py: 'py-4 md:py-6',
-                            bg: 'bg-amber-700/60 border-amber-700',
+                            bg: 'bg-gradient-to-b from-amber-700 to-amber-800 border-amber-700',
+                            textColor: 'text-amber-100 font-black',
                             label: isTie ? '🥉 3위 (공동)' : '🥉 3위',
                             crown: false,
                             scoreColor: 'text-indigo-600',
@@ -857,6 +860,7 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                         return {
                           py: 'py-3 md:py-4',
                           bg: 'bg-slate-200 border-slate-300',
+                          textColor: 'text-slate-900 font-black',
                           label: `${rank}위`,
                           crown: false,
                           scoreColor: 'text-slate-600',
@@ -887,7 +891,7 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                                     {(top2.score || 0).toLocaleString()}점
                                   </div>
                                   <div
-                                    className={`${top2Style.bg} rounded-t-2xl ${top2Style.py} border-t-4 font-black text-white text-lg shadow-sm transition-all duration-300`}
+                                    className={`${top2Style.bg} rounded-t-2xl ${top2Style.py} border-t-4 ${top2Style.textColor} text-base md:text-lg shadow-sm transition-all duration-300`}
                                   >
                                     {top2Style.label}
                                   </div>
@@ -921,7 +925,7 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                                     {(top1.score || 0).toLocaleString()}점
                                   </div>
                                   <div
-                                    className={`${top1Style.bg} rounded-t-2xl ${top1Style.py} border-t-4 font-black text-white text-xl shadow-md transition-all duration-300`}
+                                    className={`${top1Style.bg} rounded-t-2xl ${top1Style.py} border-t-4 ${top1Style.textColor} text-lg md:text-xl shadow-md transition-all duration-300`}
                                   >
                                     {top1Style.label}
                                   </div>
@@ -952,7 +956,7 @@ export const QuizLeaderboardBoard: React.FC<QuizLeaderboardBoardProps> = ({
                                     {(top3.score || 0).toLocaleString()}점
                                   </div>
                                   <div
-                                    className={`${top3Style.bg} rounded-t-2xl ${top3Style.py} border-t-4 font-black text-white text-lg shadow-sm transition-all duration-300`}
+                                    className={`${top3Style.bg} rounded-t-2xl ${top3Style.py} border-t-4 ${top3Style.textColor} text-base md:text-lg shadow-sm transition-all duration-300`}
                                   >
                                     {top3Style.label}
                                   </div>

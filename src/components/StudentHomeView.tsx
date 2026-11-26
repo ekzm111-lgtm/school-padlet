@@ -53,8 +53,8 @@ export default function StudentHomeView({
     return false;
   });
 
-  // 6자리 참여 PIN 코드 제출
-  const handlePinSubmit = (e: React.FormEvent) => {
+  // 6자리 참여 PIN 코드 제출 (보드 또는 실시간 퀴즈 자동 판별 라우팅)
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPin = pinInput.trim().replace(/\s+/g, '');
     if (!cleanPin) {
@@ -63,17 +63,32 @@ export default function StudentHomeView({
     }
 
     setPinError('');
-    // 로컬 보드 중 일치하는 보드가 있는지 확인
+    // 1. 로컬 보드 중 일치하는 보드가 있는지 확인
     const found = boards.find(
       (b) => b.code.toLowerCase() === cleanPin.toLowerCase() || b.id === cleanPin
     );
 
     if (found) {
       router.push(`/board/${found.id}`);
-    } else {
-      // 클라우드 Supabase에 있을 수 있으므로 /join/[code] 로 이동
-      router.push(`/join/${cleanPin}`);
+      return;
     }
+
+    // 2. 숫자로 구성된 코드인 경우 실시간 퀴즈룸(/quiz?pin=) 존재 여부 우선 확인
+    if (/^\d{4,6}$/.test(cleanPin)) {
+      try {
+        const res = await fetch(`/api/quiz/room?pin=${cleanPin}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && data.room) {
+            router.push(`/quiz?pin=${cleanPin}`);
+            return;
+          }
+        }
+      } catch (err) {}
+    }
+
+    // 3. 패들릿 보드 입장 페이지로 이동
+    router.push(`/join/${cleanPin}`);
   };
 
   // 학교 전체 공개 수업 자료 필터링

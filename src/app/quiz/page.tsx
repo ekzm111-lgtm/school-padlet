@@ -136,7 +136,7 @@ function QuizAppContent() {
     return () => unsub();
   }, []);
 
-  // URL 쿼리 파라미터 감지 (?pin=... &role=host/student)
+  // URL 쿼리 파라미터 및 접속 환경 감지 (?pin=... &role=host/student)
   useEffect(() => {
     const pin = searchParams.get('pin');
     const role = searchParams.get('role');
@@ -147,6 +147,20 @@ function QuizAppContent() {
         setActiveHostPin(pin);
       } else {
         setActiveStudentPin(pin);
+        setActiveTab('student');
+      }
+    } else if (!tab && typeof window !== 'undefined') {
+      // 모바일 스마트폰 환경이거나 학생 로그인 상태인 경우 출제 화면 노출을 방지하고 student 탭 기본 활성화
+      const isMobile = window.innerWidth < 768;
+      let isStudent = false;
+      try {
+        const cachedUser = localStorage.getItem('schoolpad_user');
+        if (cachedUser) {
+          isStudent = JSON.parse(cachedUser)?.role === 'student';
+        }
+      } catch {}
+      if (isMobile || isStudent) {
+        setActiveTab('student');
       }
     }
 

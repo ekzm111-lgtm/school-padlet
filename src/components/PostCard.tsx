@@ -439,25 +439,25 @@ export default function PostCard({
 
               {/* 작성 시간 */}
               {formattedDate && (
-                <span className="text-[10px] text-slate-400 font-normal mt-0.5 select-none truncate">
+                <span className="text-[10px] sm:text-[11px] text-slate-600 font-medium mt-0.5 select-none truncate">
                   {formattedDate}
                 </span>
               )}
             </div>
 
-            {/* 오른쪽: 단정한 더보기 (···) 버튼 1개만 배치하여 이름 영역을 넓게 보호! */}
+            {/* 오른쪽: 단정한 더보기 (···) 버튼 1개만 배치하여 이름 영역을 넓게 보호! (모바일 터치 영역 32px 확보) */}
             <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 onClick={() => setShowMoreMenu((prev) => !prev)}
-                className={`p-1.5 rounded-xl transition ${
+                className={`min-w-[32px] min-h-[32px] p-1.5 flex items-center justify-center rounded-xl transition ${
                   showMoreMenu
                     ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-black/5'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-black/5'
                 }`}
                 title="카드 메뉴 (수정, 복사, 순서 이동, 삭제)"
               >
-                <MoreVertical className="w-3.5 h-3.5" />
+                <MoreVertical className="w-4 h-4" />
               </button>
 
               {/* 더보기 팝업 드롭다운 */}
@@ -732,34 +732,34 @@ export default function PostCard({
         <div className="mt-2 pt-1.5 border-t border-black/10">
           <div className="flex items-center justify-between gap-1.5 flex-wrap">
             {allowReactions && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleReaction('like')}
-                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/5 hover:bg-white text-[10px] font-bold text-slate-700 transition"
+                  className="flex items-center gap-1 min-h-[30px] px-2.5 py-1 rounded-full bg-black/5 hover:bg-white active:scale-95 text-xs font-bold text-slate-700 transition shadow-2xs"
                   title="좋아요"
                 >
-                  <ThumbsUp className="w-2.5 h-2.5 text-blue-600" />
+                  <ThumbsUp className="w-3.5 h-3.5 text-blue-600" />
                   <span>{reactions.like || 0}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleReaction('heart')}
-                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/5 hover:bg-white text-[10px] font-bold text-slate-700 transition"
+                  className="flex items-center gap-1 min-h-[30px] px-2.5 py-1 rounded-full bg-black/5 hover:bg-white active:scale-95 text-xs font-bold text-slate-700 transition shadow-2xs"
                   title="멋져요"
                 >
-                  <Heart className="w-2.5 h-2.5 text-rose-500 fill-current" />
+                  <Heart className="w-3.5 h-3.5 text-rose-500 fill-current" />
                   <span>{reactions.heart || 0}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleReaction('insight')}
-                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/5 hover:bg-white text-[10px] font-bold text-slate-700 transition"
+                  className="flex items-center gap-1 min-h-[30px] px-2.5 py-1 rounded-full bg-black/5 hover:bg-white active:scale-95 text-xs font-bold text-slate-700 transition shadow-2xs"
                   title="좋은 생각"
                 >
-                  <Lightbulb className="w-2.5 h-2.5 text-amber-500" />
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
                   <span>{reactions.insight || 0}</span>
                 </button>
               </div>

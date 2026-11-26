@@ -319,7 +319,12 @@ export default function HomePage() {
       if (cachedBanner) {
         const parsed = JSON.parse(cachedBanner);
         if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
-          setBannerSettings(parsed);
+          setBannerSettings((prev) => {
+            if (prev && prev.updatedAt === parsed.updatedAt && JSON.stringify(prev) === cachedBanner) {
+              return prev;
+            }
+            return parsed;
+          });
         }
       }
     } catch (e) {}
@@ -345,7 +350,10 @@ export default function HomePage() {
               } catch (e) {}
 
               if ((remBanner.updatedAt || 0) >= localTime) {
-                setBannerSettings(remBanner);
+                setBannerSettings((prev) => {
+                  if (prev && prev.updatedAt === remBanner.updatedAt) return prev;
+                  return remBanner;
+                });
                 try {
                   localStorage.setItem('schoolpad_banner_settings', JSON.stringify(remBanner));
                 } catch (e) {}
@@ -797,6 +805,7 @@ export default function HomePage() {
     setCurrentSlideIndex(0);
     try {
       localStorage.setItem('schoolpad_banner_settings', JSON.stringify(stamped));
+      window.dispatchEvent(new Event('schoolpad_banner_updated'));
     } catch (e) {}
 
     if (isSupabaseConfigured) {

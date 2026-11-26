@@ -335,8 +335,8 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     }
   };
 
-  // 사용자 요청: 선생 시작 시 기본이 자동으로 문제 넘김 모드 (원할 때 수동 토글 가능)
-  const [isAutoAdvance, setIsAutoAdvance] = useState(true);
+  // 정답 공개 후 자동 문제 넘김 모드 (선생님 오답 해설 및 수업 진행을 위해 기본 OFF, 필요 시 토글)
+  const [isAutoAdvance, setIsAutoAdvance] = useState(false);
   const [autoNextCountdown, setAutoNextCountdown] = useState<number>(5);
   // 문항별 시작 시각 영구 보관 (학생 답안 제출/외부 메시지 수신/리렌더링 시에도 절대 리셋되지 않음)
   const questionStartTimesRef = useRef<Record<number, number>>({});

@@ -91,15 +91,19 @@ export default function BannerSettingsModal({
   const [inputTitle, setInputTitle] = useState('');
   const [activeTab, setActiveTab] = useState<'upload' | 'preset' | 'url'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevIsOpenRef = useRef(false);
 
+  // 모달이 닫혀있다가 새로 열릴 때만(false -> true) 초기값을 동기화
+  // (모달이 열려 있는 동안 외부 폴링이나 리렌더링으로 사용자가 편집 중인 내용이 리셋되는 문제 방지)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       setSlides(settings.slides && settings.slides.length > 0 ? settings.slides : DEFAULT_BANNER_SETTINGS.slides);
       setAutoSlide(settings.autoSlide ?? true);
       setIntervalSeconds(settings.intervalSeconds || 5);
       setInputUrl('');
       setInputTitle('');
     }
+    prevIsOpenRef.current = isOpen;
   }, [isOpen, settings]);
 
   if (!isOpen) return null;
@@ -352,10 +356,10 @@ export default function BannerSettingsModal({
                         {/* 위치 프리셋 버튼들 */}
                         <div className="flex items-center gap-1">
                           {[
-                            { label: '상단', pos: 'center top', val: 0 },
+                            { label: '상단', pos: 'center 0%', val: 0 },
                             { label: '상단 25%', pos: 'center 25%', val: 25 },
-                            { label: '중앙', pos: 'center center', val: 50 },
-                            { label: '하단', pos: 'center bottom', val: 100 },
+                            { label: '중앙', pos: 'center 50%', val: 50 },
+                            { label: '하단', pos: 'center 100%', val: 100 },
                           ].map((preset) => {
                             const isSelected = currentPercent === preset.val;
                             return (
