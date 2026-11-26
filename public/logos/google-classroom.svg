@@ -22,8 +22,8 @@
 
   <!-- Badge / Category Tag -->
   <g transform="translate(84, 86)">
-    <rect width="auto" height="30" rx="15" fill="#854D0E" fill-opacity="0.12" />
-    <text x="14" y="20" fill="#854D0E" font-size="13" font-weight="800" letter-spacing="0.5">🎒 글로벌 표준 학급 LMS</text>
+    <rect width="180" height="30" rx="15" fill="#854D0E" fill-opacity="0.12" />
+    <text x="14" y="20" fill="#854D0E" font-size="13" font-weight="800" letter-spacing="0.5">?�� 글로벌 ?��? ?�급 LMS</text>
   </g>
 
   <!-- Main Brand Icon -->
@@ -38,13 +38,13 @@
   </g>
 
   <!-- Title & Subtitle -->
-  <text x="240" y="210" fill="#0F172A" font-size="38" font-weight="900" letter-spacing="-0.8">Google Classroom 클래스룸</text>
-  <text x="240" y="252" fill="#64748B" font-size="17" font-weight="600">전 세계 교실에서 가장 널리 쓰이는 구글의 교육용 과제 & 소통 솔루션</text>
+  <text x="240" y="210" fill="#0F172A" font-size="38" font-weight="900" letter-spacing="-0.8">Google Classroom ?�래?�룸</text>
+  <text x="240" y="252" fill="#64748B" font-size="17" font-weight="600">???�계 교실?�서 가???�리 ?�이??구�???교육??과제 & ?�통 ?�루??/text>
 
   <!-- Bottom Official Verification Marker -->
   <g transform="translate(240, 280)">
     <circle cx="8" cy="8" r="7" fill="#10B981" />
     <path d="M5 8.5 L7.2 10.5 L11.5 5.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-    <text x="22" y="12" fill="#475569" font-size="13" font-weight="700">학교 공식 인증 교육 사이트 (Official)</text>
+    <text x="22" y="12" fill="#475569" font-size="13" font-weight="700">?�교 공식 ?�증 교육 ?�이??(Official)</text>
   </g>
 </svg>

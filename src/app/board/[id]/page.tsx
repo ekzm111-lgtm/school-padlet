@@ -616,7 +616,7 @@ export default function BoardDetailPage() {
               }
             }
 
-            // 🌟 유용한 학습 사이트 보드: 모든 카드 배경색 white 및 공식 로고 썸네일 동기화
+            // 🌟 유용한 학습 사이트 보드: 모든 카드 배경색 white 및 공식 로고 썸네일 동기화 (사용자 커스텀 이미지 최우선 보존)
             if (targetId === 'board-useful-school-links' || targetId === '778899') {
               finalPosts = finalPosts.map((p: Post): Post => {
                 const canonical = USEFUL_SCHOOL_LINKS_POSTS.find((up) => up.id === p.id);
@@ -624,7 +624,7 @@ export default function BoardDetailPage() {
                   return {
                     ...p,
                     color: 'white' as const,
-                    imageUrl: canonical.imageUrl,
+                    imageUrl: p.imageUrl || canonical.imageUrl,
                     column: canonical.column || p.column,
                   };
                 }
@@ -894,7 +894,7 @@ export default function BoardDetailPage() {
               }
             }
 
-            // 🌟 유용한 학습 사이트 보드: polling 시에도 로고 썸네일 및 white 배경 보장
+            // 🌟 유용한 학습 사이트 보드: polling 시에도 로고 썸네일 및 white 배경 보장 (사용자 커스텀 이미지 최우선 보존)
             if (targetBoardId === 'board-useful-school-links' || targetBoardId === '778899') {
               merged = merged.map((p): Post => {
                 const canonical = USEFUL_SCHOOL_LINKS_POSTS.find((up) => up.id === p.id);
@@ -902,7 +902,7 @@ export default function BoardDetailPage() {
                   return {
                     ...p,
                     color: 'white' as const,
-                    imageUrl: canonical.imageUrl,
+                    imageUrl: p.imageUrl || canonical.imageUrl,
                     column: canonical.column || p.column,
                   };
                 }

@@ -239,9 +239,30 @@ export async function deleteRemoteBoard(boardId: string): Promise<boolean> {
 export async function fetchRemotePosts(boardId?: string): Promise<Post[] | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
+    let resolvedBoardId = boardId;
+
+    // 🛡️ 전달된 boardId가 6자리 참여 코드(숫자)인 경우, 실제 DB 보드 ID로 자동 역추적 매핑
+    if (boardId && /^\d{4,8}$/.test(boardId.trim())) {
+      const codeLookup = boardId.trim();
+      try {
+        const { data: bData } = await supabase
+          .from('boards')
+          .select('id')
+          .or(`code.eq.${codeLookup},id.eq.${codeLookup}`)
+          .maybeSingle();
+        if (bData && bData.id) {
+          resolvedBoardId = bData.id;
+        }
+      } catch {}
+    }
+
     let query = supabase.from('posts').select('*').order('created_at', { ascending: false });
-    if (boardId) {
-      query = query.eq('board_id', boardId);
+    if (resolvedBoardId) {
+      if (boardId && resolvedBoardId !== boardId) {
+        query = query.or(`board_id.eq.${resolvedBoardId},board_id.eq.${boardId}`);
+      } else {
+        query = query.eq('board_id', resolvedBoardId);
+      }
     }
     const { data, error } = await query;
     if (error || !data) return null;

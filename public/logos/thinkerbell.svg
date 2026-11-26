@@ -22,7 +22,7 @@
 
   <!-- Badge / Category Tag -->
   <g transform="translate(84, 86)">
-    <rect width="auto" height="30" rx="15" fill="#EA580C" fill-opacity="0.12" />
+    <rect width="180" height="30" rx="15" fill="#EA580C" fill-opacity="0.12" />
     <text x="14" y="20" fill="#EA580C" font-size="13" font-weight="800" letter-spacing="0.5">🔔 형성평가 & 퀴즈</text>
   </g>
 
