@@ -2,6 +2,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import abcjs from 'abcjs';
 import { Volume2, Square, AlertCircle } from 'lucide-react';
 
+let sharedAudioContext: AudioContext | null = null;
+function getSharedAudioContext(): AudioContext {
+  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    sharedAudioContext = new AudioCtx();
+  }
+  if (sharedAudioContext.state === 'suspended') {
+    sharedAudioContext.resume().catch(() => {});
+  }
+  return sharedAudioContext;
+}
+
 interface ScoreViewerProps {
   abcNotation: string;
   id?: string;
@@ -74,7 +86,7 @@ export const ScoreViewer: React.FC<ScoreViewerProps> = ({
       const synth = new abcjs.synth.CreateSynth();
       synthRef.current = synth;
 
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = getSharedAudioContext();
       await synth.init({
         visualObj: visualObj[0],
         audioContext: audioContext,

@@ -26,7 +26,7 @@ import {
   hostNextQuestion,
 } from '@/utils/liveQuizSync';
 import { getSavedCollectedAvatars } from '@/utils/avatarCollector';
-import { getHostIp, setCustomHostIp, getStudentJoinUrl, getApiBaseUrl, isLocalFileProtocol } from '@/utils/hostNetwork';
+import { getStudentJoinUrl, getApiBaseUrl, isLocalFileProtocol } from '@/utils/hostNetwork';
 import { calculateCompetitionRanks, getRankBadgeStyle, getPodiumStyle } from '@/utils/ranking';
 import { ScoreViewer } from '@/components/quiz/ScoreViewer';
 import { EntryBlockViewer } from '@/components/quiz/EntryBlockViewer';
@@ -49,7 +49,7 @@ import {
   BookOpen,
   Copy,
   Check,
-  Settings,
+  X,
   Volume2,
   VolumeX,
   Sparkles,
@@ -260,11 +260,9 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     }
   }, [liveState?.status]);
 
-  // 네트워크 IP 상태 및 URL 복사 피드백
-  const [currentHostIp, setCurrentHostIp] = useState<string>(getHostIp());
-  const [isEditingIp, setIsEditingIp] = useState(false);
-  const [tempIpInput, setTempIpInput] = useState<string>(getHostIp());
+  // URL 복사 피드백 및 미제출 학생 모달 상태
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
 
   // 로컬 서버 가동 여부 실시간 헬스체크 (스마트폰 접속 가능 여부 판별)
   const [isServerOnline, setIsServerOnline] = useState<boolean | null>(null);
@@ -296,10 +294,10 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     };
   }, [pin, room]);
 
-  // 휴대폰 접속 URL (localhost가 아닌 실제 네트워크 IP 기반)
-  const studentJoinUrl = room ? getStudentJoinUrl(room.pin, currentHostIp) : '';
+  // 학생 접속 URL
+  const studentJoinUrl = room ? getStudentJoinUrl(room.pin) : '';
 
-  // QR 코드 생성 (IP 기반 URL)
+  // QR 코드 생성
   useEffect(() => {
     if (!room || !studentJoinUrl) return;
     QRCode.toDataURL(studentJoinUrl, {
@@ -323,15 +321,6 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch {
       alert(`접속 주소:\n${studentJoinUrl}`);
-    }
-  };
-
-  const handleSaveIp = () => {
-    const trimmed = tempIpInput.trim();
-    if (trimmed) {
-      setCustomHostIp(trimmed);
-      setCurrentHostIp(trimmed);
-      setIsEditingIp(false);
     }
   };
 
@@ -593,6 +582,15 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
     : [];
   const participantCount = liveState ? (liveState.participants || []).length : 0;
   const submittedCount = currentQAnswers.length;
+
+  // 실시간 문항 제출자 및 미제출자 명단 분리
+  const submittedParticipantIds = new Set(currentQAnswers.map((a: any) => a.participantId));
+  const unsubmittedParticipants = (liveState?.participants || []).filter(
+    (p) => !submittedParticipantIds.has(p.id)
+  );
+  const submittedParticipants = (liveState?.participants || []).filter(
+    (p) => submittedParticipantIds.has(p.id)
+  );
 
   // 실시간 점수 순위표 (표준 경쟁 순위: 동점자는 동일 등수, 다음 등수는 동점자 수만큼 건너뜀)
   // 참가자의 점수가 0으로 유실되지 않도록 answersSubmitted 합계, 로컬 저장소 및 원격 서버(Supabase DB) 리더보드 점수와 종합 병합
@@ -912,51 +910,26 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
 
                   {/* 실제 스마트폰 접속 URL 및 복사 */}
                   <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-bold">
+                    <div className="flex items-center text-[11px] text-slate-400 font-bold">
                       <span className="flex items-center gap-1.5 text-slate-300">
                         <Smartphone size={13} className="text-indigo-400" />
                         스마트폰 직접 접속 주소:
                       </span>
-                      <button
-                        onClick={() => setIsEditingIp(!isEditingIp)}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold"
-                      >
-                        <Settings size={11} />
-                        <span>IP 설정</span>
-                      </button>
                     </div>
 
-                    {isEditingIp ? (
-                      <div className="flex gap-1.5 pt-1">
-                        <input
-                          type="text"
-                          value={tempIpInput}
-                          onChange={(e) => setTempIpInput(e.target.value)}
-                          placeholder="예: 10.131.1.19"
-                          className="bg-slate-900 border border-indigo-500 text-white text-xs px-2.5 py-1.5 rounded-lg flex-1 font-mono"
-                        />
-                        <button
-                          onClick={handleSaveIp}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold"
-                        >
-                          저장
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-2 bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
-                        <code className="text-xs font-mono text-indigo-300 truncate select-all flex-1 text-left">
-                          {studentJoinUrl}
-                        </code>
-                        <button
-                          onClick={handleCopyStudentUrl}
-                          className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 text-[11px] font-bold transition flex items-center gap-1 shrink-0"
-                          title="주소 복사"
-                        >
-                          {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                          <span>{copiedUrl ? '복사됨!' : '복사'}</span>
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between gap-2 bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
+                      <code className="text-xs font-mono text-indigo-300 truncate select-all flex-1 text-left">
+                        {studentJoinUrl}
+                      </code>
+                      <button
+                        onClick={handleCopyStudentUrl}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 text-[11px] font-bold transition flex items-center gap-1 shrink-0"
+                        title="주소 복사"
+                      >
+                        {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        <span>{copiedUrl ? '복사됨!' : '복사'}</span>
+                      </button>
+                    </div>
 
                     {/* 단일 파일(무의존성) 또는 웹 서버 구동 상태 배지 */}
                     {isLocalFileProtocol() ? (
@@ -1124,14 +1097,21 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
                     문제 {liveState.currentQuestionIndex + 1} / {room.questions.length}
                   </span>
 
-                  {/* 실시간 제출자 카운터 */}
-                  <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
-                    <span className="text-[11px] text-slate-400">제출 완료:</span>
+                  {/* 실시간 제출자 카운터 (클릭 시 미제출/제출 학생 명단 모달 오픈) */}
+                  <button
+                    onClick={() => setShowSubmissionModal(true)}
+                    className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 hover:border-indigo-500/60 transition cursor-pointer shadow-sm group"
+                    title="클릭하여 미제출 학생 명단 확인"
+                  >
+                    <span className="text-[11px] text-slate-400 group-hover:text-slate-300">제출 완료:</span>
                     <strong className="text-emerald-400 font-black text-xs sm:text-sm">
                       {submittedCount}
                     </strong>
                     <span className="text-[11px] text-slate-500">/ {participantCount}명</span>
-                  </div>
+                    <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.2 rounded font-semibold ml-0.5">
+                      명단 보기
+                    </span>
+                  </button>
 
                   {/* 타이머 / 상태 배지 */}
                   {room.timePerQuestion > 0 && (() => {
@@ -1648,6 +1628,120 @@ export const QuizHostScreen: React.FC<QuizHostScreenProps> = ({
           </aside>
         )}
       </div>
+
+      {/* 실시간 문항 제출/미제출 학생 명단 모달 */}
+      {showSubmissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 sm:p-7 max-w-xl w-full text-left space-y-5 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                  실시간 문제 풀이 현황 (문제 {liveState ? liveState.currentQuestionIndex + 1 : 1})
+                </div>
+                <h3 className="text-lg sm:text-xl font-extrabold text-white flex items-center gap-2">
+                  <span>제출 현황:</span>
+                  <span className="text-emerald-400">{submittedCount}명 제출</span>
+                  <span className="text-slate-500">/</span>
+                  <span className="text-rose-400 font-bold">{unsubmittedParticipants.length}명 미제출</span>
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowSubmissionModal(false)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition"
+                title="닫기"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-5 pr-1 text-sm">
+              {/* 1. 미제출 학생 명단 */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-rose-400 flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                    ⏳ 미제출 학생 ({unsubmittedParticipants.length}명)
+                  </span>
+                  <span className="text-slate-500 text-[11px]">호명하여 제출을 독려해주세요</span>
+                </div>
+
+                {unsubmittedParticipants.length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-center text-xs font-bold">
+                    🎉 모든 학생이 답안을 제출했습니다!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {unsubmittedParticipants.map((p) => {
+                      const allAvatars = [...getSavedCollectedAvatars(), ...QUIZ_AVATARS];
+                      const avatarInfo = allAvatars.find((a) => a.id === p.avatarId) || QUIZ_AVATARS[0];
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-2 p-2 rounded-xl bg-rose-950/30 border border-rose-500/30 text-rose-200"
+                        >
+                          <span className="shrink-0">
+                            {avatarInfo.imageUrl ? (
+                              <img src={avatarInfo.imageUrl} alt="" className="w-5 h-5 object-contain inline" />
+                            ) : (
+                              <span className="text-base">{avatarInfo.emoji}</span>
+                            )}
+                          </span>
+                          <span className="truncate font-semibold text-xs">{p.nickname}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. 제출 완료 학생 명단 */}
+              <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+                <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle size={14} />
+                  <span>제출 완료 학생 ({submittedParticipants.length}명)</span>
+                </div>
+
+                {submittedParticipants.length === 0 ? (
+                  <div className="p-3 rounded-xl bg-slate-950 text-slate-500 text-center text-xs">
+                    아직 제출한 학생이 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {submittedParticipants.map((p) => {
+                      const allAvatars = [...getSavedCollectedAvatars(), ...QUIZ_AVATARS];
+                      const avatarInfo = allAvatars.find((a) => a.id === p.avatarId) || QUIZ_AVATARS[0];
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-2 p-2 rounded-xl bg-slate-800/70 border border-slate-700 text-slate-200"
+                        >
+                          <span className="shrink-0">
+                            {avatarInfo.imageUrl ? (
+                              <img src={avatarInfo.imageUrl} alt="" className="w-5 h-5 object-contain inline" />
+                            ) : (
+                              <span className="text-base">{avatarInfo.emoji}</span>
+                            )}
+                          </span>
+                          <span className="truncate font-medium text-xs">{p.nickname}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 shrink-0 text-right">
+              <button
+                onClick={() => setShowSubmissionModal(false)}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QR 코드 대형 팝업 모달 */}
       {showQrModal && (

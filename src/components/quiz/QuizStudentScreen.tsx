@@ -36,6 +36,7 @@ import {
   Smartphone,
   Sparkles,
   Award,
+  ArrowRight,
 } from 'lucide-react';
 
 interface QuizStudentScreenProps {
@@ -473,8 +474,37 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
             </p>
           </div>
 
-          {/* 애니메이션 & 마스코트 캐릭터 선택 */}
-          <div className="space-y-2">
+          {/* 1. 닉네임 입력 및 바로 입장하기 버튼 (모바일에서 스크롤 없이 즉시 표시) */}
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span>닉네임 (또는 이름/학번)</span>
+                <span className="text-[11px] text-indigo-400">필수 입력</span>
+              </label>
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleJoin();
+                }}
+                placeholder="예: 3반 김엔트리 또는 홍길동"
+                className="w-full bg-slate-950 border border-indigo-500/50 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 font-bold"
+                autoFocus
+              />
+            </div>
+
+            <button
+              onClick={handleJoin}
+              className="w-full py-3 bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-500 hover:from-violet-500 hover:to-indigo-400 text-white font-black text-sm rounded-xl shadow-lg transition active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <span>퀴즈룸 입장하기!</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
+
+          {/* 2. 캐릭터 선택 (컴팩트 가로/세로 뷰로 모바일 한 화면에 쏙) */}
+          <div className="space-y-2 pt-2 border-t border-slate-800">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
               <span>🎨 내 응원 캐릭터 ({allAvailableAvatars.length}종)</span>
               <span className="text-amber-400 font-extrabold text-[11px] bg-slate-800/80 px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -487,70 +517,65 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
               </span>
             </div>
 
-            {/* 🌐 웹 2등신 캐릭터 자동 수집 버튼 */}
-            <div className="flex gap-2">
+            {/* 🌐 웹 캐릭터 뽑기 & 카테고리 탭 (압축 한 줄) */}
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 disabled={isCollectingWeb}
                 onClick={() => handleCollectRandomChibi()}
-                className="flex-1 py-2 px-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition"
+                className="py-1.5 px-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shrink-0 shadow-xs transition"
+                title="새로운 2등신 캐릭터 뽑기"
               >
                 {isCollectingWeb ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    <span>웹에서 캐릭터 수집 중...</span>
-                  </>
+                  <Loader2 size={12} className="animate-spin" />
                 ) : (
-                  <>
-                    <Sparkles size={13} className="text-amber-300" />
-                    <span>🌐 웹 2등신 캐릭터 자동 수집/뽑기!</span>
-                  </>
+                  <Sparkles size={12} className="text-amber-300" />
                 )}
+                <span>랜덤 뽑기</span>
               </button>
+
+              <div className="grid grid-cols-4 gap-0.5 bg-slate-950 p-0.5 rounded-lg text-[10px] font-bold border border-slate-800 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setAvatarCategory('all')}
+                  className={`py-1 rounded transition text-center ${avatarCategory === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}
+                >
+                  전체
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAvatarCategory('anime')}
+                  className={`py-1 rounded transition text-center ${avatarCategory === 'anime' ? 'bg-rose-600 text-white' : 'text-slate-400'}`}
+                >
+                  만화
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAvatarCategory('animal')}
+                  className={`py-1 rounded transition text-center ${avatarCategory === 'animal' ? 'bg-amber-600 text-white' : 'text-slate-400'}`}
+                >
+                  동물
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAvatarCategory('hero')}
+                  className={`py-1 rounded transition text-center ${avatarCategory === 'hero' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
+                >
+                  영웅
+                </button>
+              </div>
             </div>
 
-            {/* 카테고리 필터 탭 */}
-            <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl text-[11px] font-bold border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setAvatarCategory('all')}
-                className={`py-1.5 rounded-lg transition ${avatarCategory === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                전체
-              </button>
-              <button
-                type="button"
-                onClick={() => setAvatarCategory('anime')}
-                className={`py-1.5 rounded-lg transition ${avatarCategory === 'anime' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                🌟 인기만화
-              </button>
-              <button
-                type="button"
-                onClick={() => setAvatarCategory('animal')}
-                className={`py-1.5 rounded-lg transition ${avatarCategory === 'animal' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                🐾 귀요미
-              </button>
-              <button
-                type="button"
-                onClick={() => setAvatarCategory('hero')}
-                className={`py-1.5 rounded-lg transition ${avatarCategory === 'hero' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                🎮 영웅·과목
-              </button>
-            </div>
-
-            {/* 아바타 선택 그리드 (2등신 고화질 일러스트 렌더링) */}
-            <div className="grid grid-cols-4 gap-2 bg-slate-950 p-2.5 rounded-2xl border border-slate-800 max-h-56 overflow-y-auto">
+            {/* 아바타 선택 그리드 (콤팩트 max-h-36로 스크롤 최소화) */}
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 bg-slate-950 p-2 rounded-xl border border-slate-800 max-h-36 overflow-y-auto">
               {displayedAvatars.map((av) => (
                 <button
                   key={av.id}
                   type="button"
                   onClick={() => setSelectedAvatar(av)}
-                  className={`aspect-square rounded-xl p-1.5 flex flex-col items-center justify-center transition active:scale-95 overflow-hidden ${
+                  className={`aspect-square rounded-xl p-1 flex flex-col items-center justify-center transition active:scale-95 overflow-hidden ${
                     selectedAvatar.id === av.id
-                      ? `${av.bgColor} ring-2 ring-white scale-105 shadow-lg`
+                      ? `${av.bgColor} ring-2 ring-white scale-105 shadow-md`
                       : 'bg-slate-850 hover:bg-slate-800 text-slate-400'
                   }`}
                 >
@@ -558,45 +583,25 @@ export const QuizStudentScreen: React.FC<QuizStudentScreenProps> = ({ pin, onExi
                     <img
                       src={av.imageUrl}
                       alt={av.name}
-                      className="w-10 h-10 object-contain drop-shadow-sm pointer-events-none"
+                      className="w-8 h-8 object-contain drop-shadow-sm pointer-events-none"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}
                     />
                   ) : (
-                    <span className="text-2xl">{av.emoji}</span>
+                    <span className="text-xl">{av.emoji}</span>
                   )}
-                  <span className="text-[10px] truncate w-full text-center mt-0.5 font-bold">
+                  <span className="text-[9px] truncate w-full text-center mt-0.5 font-bold">
                     {av.name.split(' ')[0]}
                   </span>
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-slate-300 italic text-center bg-slate-800/40 py-1.5 px-3 rounded-lg border border-slate-800">
+
+            <p className="text-[10px] text-slate-400 italic text-center bg-slate-800/30 py-1 px-2.5 rounded-lg border border-slate-800/60 truncate">
               &quot;{selectedAvatar.catchphrase}&quot;
             </p>
           </div>
-
-          {/* 닉네임 입력 */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 block">
-              닉네임 (또는 이름/학번)
-            </label>
-            <input
-              type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder="예: 3반 김엔트리 또는 이수학 선생님"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 font-bold"
-            />
-          </div>
-
-          <button
-            onClick={handleJoin}
-            className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-sm rounded-2xl shadow-xl transition"
-          >
-            퀴즈룸 입장하기!
-          </button>
         </div>
       </div>
     );

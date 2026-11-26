@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import type { QuizRoom } from '@/types/quiz';
 import type { ExamInfo, Question } from '@/types/exam';
 import { createQuizRoom } from '@/utils/quizStorage';
-import { getHostIp, getStudentJoinUrl, setCustomHostIp } from '@/utils/hostNetwork';
+import { getStudentJoinUrl } from '@/utils/hostNetwork';
 import {
   X,
   QrCode,
@@ -16,7 +16,6 @@ import {
   ExternalLink,
   Smartphone,
   ShieldCheck,
-  Settings,
 } from 'lucide-react';
 
 interface QuizLobbyModalProps {
@@ -62,12 +61,7 @@ export const QuizLobbyModal: React.FC<QuizLobbyModalProps> = ({
     }
   };
 
-  // 네트워크 IP 상태
-  const [currentHostIp, setCurrentHostIp] = useState<string>(getHostIp());
-  const [isEditingIp, setIsEditingIp] = useState(false);
-  const [tempIpInput, setTempIpInput] = useState<string>(getHostIp());
-
-  const joinUrl = room ? getStudentJoinUrl(room.pin, currentHostIp) : '';
+  const joinUrl = room ? getStudentJoinUrl(room.pin) : '';
 
   // QR 코드 이미지 생성 (실제 LAN IP 기반)
   useEffect(() => {
@@ -94,15 +88,6 @@ export const QuizLobbyModal: React.FC<QuizLobbyModalProps> = ({
       setTimeout(() => setCopied(false), 2000);
     } catch {
       alert(`초대 주소:\n${joinUrl}`);
-    }
-  };
-
-  const handleSaveIp = () => {
-    const trimmed = tempIpInput.trim();
-    if (trimmed) {
-      setCustomHostIp(trimmed);
-      setCurrentHostIp(trimmed);
-      setIsEditingIp(false);
     }
   };
 
@@ -153,43 +138,18 @@ export const QuizLobbyModal: React.FC<QuizLobbyModalProps> = ({
                 아래 링크를 공유하여 참여하세요!
               </p>
 
-              {/* 스마트폰 접속 주소 박스 및 IP 설정 */}
+              {/* 스마트폰 접속 주소 박스 */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1.5 text-left">
-                <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                <div className="flex items-center text-[11px] text-slate-500 font-bold">
                   <span className="flex items-center gap-1">
                     <Smartphone size={12} className="text-indigo-600" />
-                    접속 주소 (LAN IP):
+                    학생 접속 주소:
                   </span>
-                  <button
-                    onClick={() => setIsEditingIp(!isEditingIp)}
-                    className="text-[10px] text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5"
-                  >
-                    <Settings size={10} />
-                    <span>IP 변경</span>
-                  </button>
                 </div>
 
-                {isEditingIp ? (
-                  <div className="flex gap-1.5 pt-0.5">
-                    <input
-                      type="text"
-                      value={tempIpInput}
-                      onChange={(e) => setTempIpInput(e.target.value)}
-                      placeholder="예: 10.131.1.19"
-                      className="bg-white border border-indigo-400 text-slate-900 text-xs px-2 py-1 rounded-lg flex-1 font-mono"
-                    />
-                    <button
-                      onClick={handleSaveIp}
-                      className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold"
-                    >
-                      저장
-                    </button>
-                  </div>
-                ) : (
-                  <code className="text-xs font-mono text-slate-700 block truncate select-all bg-white p-1 rounded-md border border-slate-200">
-                    {joinUrl}
-                  </code>
-                )}
+                <code className="text-xs font-mono text-slate-700 block truncate select-all bg-white p-1.5 rounded-md border border-slate-200">
+                  {joinUrl}
+                </code>
               </div>
 
               {/* 링크 복사 버튼 */}
